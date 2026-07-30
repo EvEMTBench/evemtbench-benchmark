@@ -44,6 +44,7 @@ graphs = ["networkx>=3.0"]
 tracking = ["wandb>=0.16"]
 dev = [
     "pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "mypy>=1.8", "jsonschema>=4.18", "networkx>=3.0",
+    "tomli>=2.0; python_version < '3.11'",
 ]
 
 [project.scripts]

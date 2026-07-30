@@ -8,7 +8,10 @@ docs/release.md step 4 relies on this test to force the three files to move toge
 import re
 from pathlib import Path
 
-import tomllib
+try:
+    import tomllib  # stdlib from Python 3.11
+except ModuleNotFoundError:  # Python 3.10 (the CI floor): the API-compatible backport
+    import tomli as tomllib  # type: ignore[no-redef]
 
 from evemtbench.version import BENCHMARK_VERSION
 
