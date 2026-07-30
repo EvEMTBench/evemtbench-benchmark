@@ -206,6 +206,7 @@ class ResNetBaseline:
             xb = self._sx(move(xb_t))
             outs.append(self.model(xb).cpu().numpy())
         out = np.concatenate(outs, axis=0) if outs else np.zeros((0, 1))
+        preds: np.ndarray  # float (regression) or integer class ids (argmax)
         if self._regression:
             preds = out.reshape(-1) * self._y_std + self._y_mean
         else:

@@ -2,6 +2,9 @@
 # make_public_release.sh — build the public GitHub export, gated by a leak scan.
 #
 #   bash hpc/make_public_release.sh [OUT_DIR]      # default OUT_DIR: dist/
+#   bash hpc/make_public_release.sh --update       # sync the EXISTING public clone (new commit
+#                                                  #   on top of its main — for every push after
+#                                                  #   the first; never rewrite public history)
 #   bash hpc/make_public_release.sh --scan-only <dir>    # run just the scan (test hook)
 #   bash hpc/make_public_release.sh --print-prune        # list the prune set (test hook)
 #
@@ -79,6 +82,11 @@ cd "$(git rev-parse --show-toplevel)"
 # shellcheck disable=SC1091
 if [ -f hpc/clusters/local.env ]; then source hpc/clusters/local.env; fi
 PY="${PY:-python3}"
+UPDATE=0
+if [ "${1:-}" = "--update" ]; then
+  UPDATE=1
+  shift
+fi
 OUT_DIR="${1:-dist}"
 VERSION="$(PYTHONPATH=src "$PY" -c 'from evemtbench.version import BENCHMARK_VERSION; print(BENCHMARK_VERSION)')"
 [ -n "$VERSION" ] || { echo "ERROR: could not resolve BENCHMARK_VERSION (is \$PY usable?)" >&2; exit 1; }
@@ -108,6 +116,7 @@ REQUIRED=(
   RESULTS.md leaderboard.html coverage_snapshot.json
   "results/$VERSION" audit/index.html "audit/provenance/$VERSION/index.json"
   .github/workflows/ci.yml .github/workflows/nightly.yml
+  index.html .nojekyll
   docs/quickstart.md docs/protocol.md docs/DATA_LAYOUT.md
   hpc/sweep.sh hpc/submit.sh hpc/make_results.py hpc/make_results_bundle.py hpc/make_audit.py
   hpc/check_results_fresh.py hpc/rescore_validation.py hpc/paper_artifacts/paper_lib.py
@@ -125,9 +134,29 @@ if leak_scan "$STAGE/$NAME"; then
 fi
 echo "leak scan clean."
 
-# --- Emit a ready-to-push repo with a single release commit -------------------------------------
 GIT_NAME="$(git config user.name)"
 GIT_EMAIL="$(git config user.email)"
+DEST="$OUT_DIR/${NAME}-public"
+
+if [ "$UPDATE" = 1 ]; then
+  # --- Sync the EXISTING public clone: replace its tree with the staged export, commit on top ---
+  # Public history is append-only (forks/clones/stars depend on it) — never a rewritten root.
+  [ -d "$DEST/.git" ] || { echo "ERROR: --update needs an existing clone at $DEST (first release: run without --update, push, keep the dir)" >&2; exit 1; }
+  rsync -a --delete --exclude=.git "$STAGE/$NAME/" "$DEST/"
+  git -C "$DEST" add -A
+  if git -C "$DEST" diff --cached --quiet; then
+    echo "public clone already matches the export of $SHA — nothing to commit."
+    exit 0
+  fi
+  git -C "$DEST" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" commit -q \
+    -m "sync with development repository @ ${SHA}" \
+    -m "Curated, leak-scanned export (v${VERSION})."
+  echo "committed sync in $DEST — push with:"
+  echo "  git -C $DEST push origin main"
+  exit 0
+fi
+
+# --- First release: emit a ready-to-push repo with a single release commit ----------------------
 git -C "$STAGE/$NAME" init -q -b main
 git -C "$STAGE/$NAME" add -A
 git -C "$STAGE/$NAME" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" commit -q \
@@ -135,7 +164,6 @@ git -C "$STAGE/$NAME" -c user.name="$GIT_NAME" -c user.email="$GIT_EMAIL" commit
   -m "Curated, leak-scanned export of the development repository at ${SHA}."
 
 mkdir -p "$OUT_DIR"
-DEST="$OUT_DIR/${NAME}-public"
 rm -rf "$DEST"
 mv "$STAGE/$NAME" "$DEST"
 echo "wrote $DEST ($(du -sh "$DEST" | cut -f1)) — single-commit git repo on branch 'main'."
