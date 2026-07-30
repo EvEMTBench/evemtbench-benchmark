@@ -1,0 +1,54 @@
+name: nightly
+
+# Scheduled full gate on FRESH runners — catches what the push-gate structurally cannot:
+# dependency/runner drift (the push-gate reuses caches and only fires on changes), and
+# time-dependent flakiness. Mirrors the fast gate's steps 1:1 so a nightly red means "the world
+# changed under us", never "the workflow differs". Data-bound checks (integrity over outputs/)
+# cannot run here — they live in hpc/nightly_integrity.sh on the loop host (cron).
+
+on:
+  schedule:
+    - cron: "17 3 * * *" # 03:17 UTC daily (off the :00 thundering herd)
+  workflow_dispatch: {}
+
+jobs:
+  full-gate:
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        python-version: ["3.10", "3.12"]
+    steps:
+      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+
+      - name: Install uv (no cache — fresh-world on purpose)
+        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+
+      - name: Set up Python ${{ matrix.python-version }}
+        run: uv python install ${{ matrix.python-version }}
+
+      - name: Create venv + install
+        run: |
+          uv venv --python ${{ matrix.python-version }}
+          uv pip install -e ".[dev]"
+
+      - name: Lint + types
+        run: |
+          uv run ruff check src tests hpc
+          uv run ruff format --check src tests hpc
+          uv run mypy src
+
+      - name: Full test suite (excludes data_integrity)
+        run: uv run pytest -q --cov=evemtbench
+
+      - name: Audit builder determinism smoke (data-free)
+        # Two builds must be byte-identical — the invariant the freshness gate rests on.
+        run: |
+          uv run python - <<'EOF'
+          import sys
+          sys.path.insert(0, "hpc")
+          from make_audit import fresh_pages
+          a, b = fresh_pages("outputs"), fresh_pages("outputs")
+          assert a == b, "audit build is not deterministic"
+          print(f"deterministic: {len(a)} pages")
+          EOF

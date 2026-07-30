@@ -1,0 +1,185 @@
+{
+  "shape": [
+    104,
+    8,
+    12
+  ],
+  "dtype": "float32",
+  "feature_names": [
+    "EndA_Isec_L1_A",
+    "EndA_Isec_L2_A",
+    "EndA_Isec_L3_A",
+    "EndA_Usec_L1_V",
+    "EndA_Usec_L2_V",
+    "EndA_Usec_L3_V",
+    "EndB_Isec_L1_A",
+    "EndB_Isec_L2_A",
+    "EndB_Isec_L3_A",
+    "EndB_Usec_L1_V",
+    "EndB_Usec_L2_V",
+    "EndB_Usec_L3_V"
+  ],
+  "channels": [
+    {
+      "index": 0,
+      "cubicle": "EndA",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "I",
+      "phase": "L1",
+      "unit": "A"
+    },
+    {
+      "index": 1,
+      "cubicle": "EndA",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "I",
+      "phase": "L2",
+      "unit": "A"
+    },
+    {
+      "index": 2,
+      "cubicle": "EndA",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "I",
+      "phase": "L3",
+      "unit": "A"
+    },
+    {
+      "index": 3,
+      "cubicle": "EndA",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "V",
+      "phase": "L1",
+      "unit": "V"
+    },
+    {
+      "index": 4,
+      "cubicle": "EndA",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "V",
+      "phase": "L2",
+      "unit": "V"
+    },
+    {
+      "index": 5,
+      "cubicle": "EndA",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "V",
+      "phase": "L3",
+      "unit": "V"
+    },
+    {
+      "index": 6,
+      "cubicle": "EndB",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "I",
+      "phase": "L1",
+      "unit": "A"
+    },
+    {
+      "index": 7,
+      "cubicle": "EndB",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "I",
+      "phase": "L2",
+      "unit": "A"
+    },
+    {
+      "index": 8,
+      "cubicle": "EndB",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "I",
+      "phase": "L3",
+      "unit": "A"
+    },
+    {
+      "index": 9,
+      "cubicle": "EndB",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "V",
+      "phase": "L1",
+      "unit": "V"
+    },
+    {
+      "index": 10,
+      "cubicle": "EndB",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "V",
+      "phase": "L2",
+      "unit": "V"
+    },
+    {
+      "index": 11,
+      "cubicle": "EndB",
+      "bus": null,
+      "element_type": null,
+      "element_id": null,
+      "quantity": "V",
+      "phase": "L3",
+      "unit": "V"
+    }
+  ],
+  "feature_groups": {
+    "currents": [
+      0,
+      1,
+      2,
+      6,
+      7,
+      8
+    ],
+    "voltages": [
+      3,
+      4,
+      5,
+      9,
+      10,
+      11
+    ],
+    "end_a": [
+      0,
+      1,
+      2,
+      3,
+      4,
+      5
+    ],
+    "end_b": [
+      6,
+      7,
+      8,
+      9,
+      10,
+      11
+    ]
+  },
+  "extra": {
+    "topology": "mv_template_20kv",
+    "view": "double_line",
+    "channels_per_line": 12,
+    "window_length": 0.05,
+    "step_length_seconds": 0.005
+  }
+}

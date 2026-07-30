@@ -1,0 +1,129 @@
+<!doctype html><html lang=en><head><meta charset=utf-8><meta name=viewport content="width=device-width,initial-scale=1"><meta name=description content="EvEMTBench results audit — trace every claim to the script, command, artifact and verifying gate that produced it."><link rel=icon href="data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 16 16'%3E%3Crect width='16' height='16' rx='3' fill='%231890ff'/%3E%3Cpath d='M8 2 L3 9 h4 l-1 5 6-8 h-4 z' fill='white'/%3E%3C/svg%3E"><title>Provenance of the process</title><style>
+    body{font:14px/1.5 system-ui,sans-serif;margin:24px;color:#1a1a1a;background:#fff}
+    h1{margin:0 0 4px} .v{color:#666;font-size:13px;margin:0 0 4px}
+    header{border-bottom:1px solid #e5e5e5;padding-bottom:10px;margin-bottom:12px}
+    .nav{font-size:13px;margin-bottom:8px} .nav a{color:#1890ff;text-decoration:none}
+    .nav a:hover{text-decoration:underline}
+    .note{background:#fff7e6;border:1px solid #ffd591;padding:8px 12px;border-radius:6px;margin:12px 0;font-size:13px}
+    details.legend,details.cite{margin:12px 0;font-size:13px} details summary{cursor:pointer;font-weight:600}
+    details.legend ul{margin:6px 0 0 18px} details.cite pre{background:#f6f6f6;padding:8px;border-radius:6px;overflow:auto;font-size:12px}
+    h2{margin:24px 0 8px;font-size:16px} h3{margin:14px 0 4px;font-size:14px}
+    .tablewrap{overflow-x:auto;-webkit-overflow-scrolling:touch;margin-bottom:8px}
+    table{border-collapse:collapse;width:100%}
+    caption{caption-side:top;text-align:left;color:#888;font-size:12px;padding:2px 0}
+    th,td{border:1px solid #e5e5e5;padding:6px 9px;text-align:left;white-space:nowrap}
+    th{background:#fafafa;font-weight:600;cursor:pointer;user-select:none}
+    thead th{position:sticky;top:0;z-index:1}
+    td.base{font-weight:600} td.dim{color:#888;text-align:right}
+    .na{color:#8a8a8a;font-style:italic;cursor:help}
+    td.bg{min-width:160px}
+    .bar{position:relative;background:#f0f0f0;border-radius:3px;height:18px}
+    .bar span{position:absolute;left:0;top:0;bottom:0;background:linear-gradient(90deg,#69c0ff,#1890ff);border-radius:3px}
+    .bar em{position:relative;padding-left:6px;font-style:normal;font-size:12px;line-height:18px}
+    tr:hover td{background:#f6fbff}
+    .vfilter{margin:12px 0;font-size:13px;display:flex;flex-wrap:wrap;gap:14px;align-items:center}
+    .vfilter select,.cmpctl select{font:13px system-ui;padding:2px 4px;margin-left:4px}
+    #fcount{margin-left:4px;color:#888}
+    .gridcards{display:flex;flex-wrap:wrap;gap:10px}
+    .gridcard{border:1px solid #e5e5e5;border-radius:8px;padding:10px 14px;min-width:150px;background:#fafcff}
+    .gridkey{font-weight:600} .gridspec{color:#888;font-size:12px;font-weight:400}
+    .gridstat{font-size:12px;color:#555} .ok{color:#389e0d}
+    .compare{margin-top:8px} .cmpctl{font-size:13px;margin:4px 0}
+    .cmptask{margin-bottom:6px}
+    .cta{display:inline-block;background:#1890ff;color:#fff;padding:6px 12px;border-radius:6px;
+    text-decoration:none;font-size:13px;margin:8px 0}.cta:hover{background:#096dd9}
+    footer{border-top:1px solid #e5e5e5;margin-top:24px;padding-top:8px;color:#888;font-size:12px}
+    footer a{color:#1890ff;text-decoration:none}
+    @media (prefers-color-scheme:dark){
+      body{background:#15171a;color:#e6e6e6}
+      header,footer{border-color:#2a2f36}
+      th{background:#1e2227}thead th{background:#1e2227} th,td{border-color:#2a2f36}
+      .note{background:#2b2410;border-color:#5c4a12}
+      .bar{background:#262b31} tr:hover td{background:#1b2733}
+      .nav a,footer a{color:#69c0ff} .na{color:#8a8a8a} td.dim,.v,caption,.gridspec{color:#9aa0a6}
+      .gridcard{background:#1b1e22;border-color:#2a2f36} .gridstat{color:#b0b4b9} .ok{color:#73d13d}
+      details.cite pre{background:#1e2227}
+    }
+    
+    .pillars{display:grid;grid-template-columns:repeat(auto-fit,minmax(240px,1fr));gap:10px;margin:12px 0}
+    .pillar{border:1px solid #e5e5e5;border-left:3px solid #1890ff;border-radius:6px;padding:10px 12px;background:#fafcff}
+    .pillar b{display:block;margin-bottom:4px}
+    .pillar,.gate p,.ledgerdetail{font-size:13px}
+    .badge{font-size:11px;font-weight:600;padding:2px 8px;border-radius:10px;border:1px solid;white-space:nowrap}
+    .badge.measured{color:#389e0d;border-color:#389e0d55;background:#f6ffed}
+    .badge.enforced{color:#096dd9;border-color:#096dd955;background:#e6f7ff}
+    .badge.inprogress{color:#ad6800;border-color:#ad680055;background:#fffbe6}
+    .badge.deferred{color:#8c8c8c;border-color:#8c8c8c55;background:#fafafa}
+    .badge.note{color:#722ed1;border-color:#722ed155;background:#f9f0ff}
+    .claimrow{border:1px solid #e5e5e5;border-radius:8px;margin:10px 0;background:#fff}
+    .claimhead{display:flex;gap:10px;align-items:baseline;flex-wrap:wrap;padding:10px 14px;border-bottom:1px solid #f0f0f0}
+    .claimhead .c{font-weight:600}.claimhead .val{color:#096dd9}
+    .claimbody{padding:8px 14px}
+    dl.meta{display:grid;grid-template-columns:max-content 1fr;gap:3px 14px;margin:6px 0;font-size:13px}
+    dl.meta dt{color:#888}dl.meta dd{margin:0}
+    .strip{margin:2px 0;line-height:1.1;white-space:nowrap}
+    .strip .c{display:inline-block;width:13px;height:13px;border-radius:3px;margin:1px;vertical-align:middle;cursor:help}
+    .c.done{background:#52c41a}.c.pending{background:#faad14}.c.failed{background:#f5222d}
+    .c.na{background:#d9d9d9}
+    .striplabel{display:inline-block;min-width:230px;font-size:12px}
+    .gate{border:1px solid #e5e5e5;border-radius:8px;padding:12px 16px;margin:12px 0;background:#fafcff}
+    .gate h3{margin:0 0 6px}
+    .cmd{background:#f6f6f6;border-radius:4px;padding:1px 6px;font-size:12px}
+    pre.block{background:#f6f6f6;padding:10px 12px;border-radius:6px;overflow-x:auto;font-size:12.5px}
+    .cardnav{display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:10px;margin:14px 0}
+    .cardnav a{display:block;border:1px solid #e5e5e5;border-radius:8px;padding:12px 14px;text-decoration:none;color:inherit;background:#fafcff}
+    .cardnav a:hover{border-color:#1890ff}
+    .cardnav b{color:#096dd9}
+    .counts{display:flex;flex-wrap:wrap;gap:10px;margin:12px 0}
+    .counts .k{border:1px solid #e5e5e5;border-radius:8px;padding:8px 14px;background:#fafcff}
+    .counts .k b{font-size:19px;display:block}
+    .aboutbox{border-left:3px solid #1890ff;padding:6px 12px;background:#fafcff;margin:10px 0;font-size:13.5px}
+    .hrow{display:flex;align-items:center;gap:6px;font-size:11px;line-height:1.7}
+    .hlab{min-width:190px;color:#555}.hn{color:#888}
+    .hbar{display:inline-block;height:9px;background:#69c0ff;border-radius:2px}
+    @media (prefers-color-scheme:dark){
+      .pillar,.gate,.cardnav a,.counts .k,.aboutbox,.claimrow{background:#1b1e22;border-color:#2a2f36}
+      .claimhead{border-color:#2a2f36}
+      .cmd,pre.block{background:#1e2227}
+      .c.na{background:#3a3f45}
+      .badge.measured{background:#1c2a17}.badge.enforced{background:#111f2c}
+      .badge.inprogress{background:#2b2410}.badge.deferred{background:#1e2227}.badge.note{background:#221833}
+    }
+    </style></head><body><header><nav class=nav><span style="font-weight:600">EvEMTBench · results audit</span> · <a href="index.html">overview</a> · <a href="ledger.html">claim ledger</a> · <a href="paper_numbers.html">paper numbers</a> · <a href="coverage.html">coverage</a> · <a href="gates.html">gates</a> · <a href="environment.html">environment</a> · <a href="reproduce.html">reproduce</a> · <a href="provenance.html" style="font-weight:600;text-decoration:underline">provenance</a> · <a href="robustness.html">robustness</a> · <a href="ground_truth.html">ground truth</a> · <a href="progress.html">burnup</a> · <a href="../leaderboard.html">leaderboard</a> · <a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/README.md">repo</a></nav><h1>Provenance of the process</h1><div class=v>benchmark version 1.0.0 · splits v1.0</div><div class=v>updated 2026-07-30 07:28 UTC · git 5e34208b8d2c</div></header><h2>Test suite</h2><p><b>290</b> test functions across <b>57</b> files (counted from source at build time) — unit, integration (incl. leakage, splits audit, freshness, contract conformance, per-baseline runners), e2e smoke, and data-integrity checks that run only where the real data lives.</p><h2>Continuous integration</h2><div class=tablewrap><table><tr><td><a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/.github/workflows/ci.yml"><code>.github/workflows/ci.yml</code></a></td><td>ruff + mypy + pytest (torch-free) on 3.10/3.12; the leakage audit re-runs as a named step so a leaky split fails legibly</td></tr><tr><td><a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/.github/workflows/nightly.yml"><code>.github/workflows/nightly.yml</code></a></td><td>the same gate on fresh runners nightly — catches dependency/runner drift</td></tr></table></div><h2>Hooks</h2><div class=tablewrap><table><tr><td><a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/.githooks/pre-commit"><code>.githooks/pre-commit</code></a></td><td>runs the freshness gate when rendered views are staged — a stale RESULTS.md / leaderboard.html / audit page cannot be committed</td></tr><tr><td><a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/.pre-commit-config.yaml"><code>.pre-commit-config.yaml</code></a></td><td>ruff lint+format, mypy, hygiene hooks, and the same results-fresh gate for pre-commit users</td></tr></table></div><h2>Change log</h2><div class=tablewrap><table><tr><td><a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/CHANGELOG.md"><code>CHANGELOG.md</code></a></td><td>versioned change log</td></tr></table></div><p>Progress itself is an append-only ledger: the sweep loop commits a snapshot (<code>chore(results): sweep progress snapshot — … done … pending …</code>) with the coverage summary embedded in every message, so the history of the matrix is in <code>git log</code>.</p><footer>EvEMTBench results audit · every number on this site is read from committed artifacts at build time · regenerate: <code>PYTHONPATH=src python hpc/make_audit.py</code> · gate: <a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/hpc/check_results_fresh.py"><code>hpc/check_results_fresh.py</code></a> · <a href="https://github.com/EvEMTBench/evemtbench-benchmark/blob/main/README.md">repository</a></footer><script>
+    // Click-to-sort, tbody-scoped (header in thead). Toggles ▲/▼ + aria-sort on the active column.
+    document.querySelectorAll('table.sortable').forEach(t=>{
+      const heads=t.querySelectorAll('thead th'); const body=t.tBodies[0];
+      if(!heads.length||!body) return;
+      heads.forEach((th,i)=>th.addEventListener('click',()=>{
+        const asc=th.dataset.asc=th.dataset.asc==='1'?'':'1';
+        const num=v=>{const m=parseFloat((v||'').replace('±',' ').trim());return isNaN(m)?-1:m};
+        heads.forEach(h=>{if(h!==th){h.removeAttribute('aria-sort');h.textContent=h.textContent.replace(/[ ▲▼]+$/,'');}});
+        th.textContent=th.textContent.replace(/[ ▲▼]+$/,'')+(asc?' ▲':' ▼');
+        th.setAttribute('aria-sort',asc?'ascending':'descending');
+        [...body.rows].sort((a,b)=>{const x=num(a.cells[i].innerText),y=num(b.cells[i].innerText);return asc?x-y:y-x})
+          .forEach(r=>body.appendChild(r));
+      }));
+    });
+    // Topology-comparison test-set toggle (test ↔ benchmark): show one cmpset at a time.
+    const cts=document.getElementById('cmpts');
+    if(cts) cts.addEventListener('change',()=>{
+      document.querySelectorAll('.cmpset').forEach(s=>{s.style.display=s.dataset.cmpts===cts.value?'':'none';});
+    });
+    // Combined filters on the detail tables: version / topology / test-set / model / protocol.
+    const FILTERS=[['fv','v'],['fgrid','grid'],['fts','ts'],['fbase','base'],['fproto','proto']];
+    const val=id=>{const e=document.getElementById(id);return e?e.value:'__all__';};
+    function applyFilters(){
+      let shown=0;
+      document.querySelectorAll('tr[data-v]').forEach(r=>{
+        const ok=FILTERS.every(([id,key])=>{const v=val(id);return v==='__all__'||r.dataset[key]===v;});
+        r.style.display=ok?'':'none'; if(ok)shown++;
+      });
+      document.querySelectorAll('section.task').forEach(s=>{
+        const vis=[...s.querySelectorAll('tr[data-v]')].some(r=>r.style.display!=='none');
+        s.style.display=vis?'':'none';
+      });
+      const c=document.getElementById('fcount'); if(c)c.textContent=`(${shown} rows shown)`;
+    }
+    FILTERS.forEach(([id])=>{const e=document.getElementById(id);if(e)e.addEventListener('change',applyFilters);});
+    applyFilters();
+    </script></body></html>

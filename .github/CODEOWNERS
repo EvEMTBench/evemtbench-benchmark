@@ -1,0 +1,10 @@
+# Code owners — requested reviewers for matching paths (GitHub).
+# Default owner for everything in the repo:
+* @julianoelhaf
+
+# Frozen scientific contract — changes here require extra care (label/metric/split/version).
+/src/evemtbench/evaluation/    @julianoelhaf
+/src/evemtbench/tasks/labels/  @julianoelhaf
+/src/evemtbench/splits/        @julianoelhaf
+/src/evemtbench/contract/      @julianoelhaf
+/src/evemtbench/version.py     @julianoelhaf

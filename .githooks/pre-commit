@@ -1,0 +1,36 @@
+#!/bin/bash
+# Pre-commit gate: block commits that would leave RESULTS.md / leaderboard.html / audit/ out of sync with a
+# fresh rebuild from outputs/. Mirrors akmaier/Agent4CT's registry gate. Install with:
+#   bash hpc/install_hooks.sh   (sets git config core.hooksPath .githooks)
+#
+# Only fires when one of those rendered views is staged; otherwise it is a no-op. The checker itself
+# skips cleanly where outputs/ is absent (dev machines / CI), so this never blocks unrelated work.
+set -uo pipefail
+
+staged="$(git diff --cached --name-only 2>/dev/null || true)"
+if ! grep -qE '^(RESULTS\.md|leaderboard\.html|coverage_snapshot\.json|audit/.*\.html|results/.*|paper/manuscript/generated/.*\.tex)$' <<<"$staged"; then
+  exit 0
+fi
+
+# Machine profile first (caller-wins `:=` defaults, so an explicit $PY survives), then a
+# generic python as the last resort.
+if [ -f "hpc/clusters/local.env" ]; then
+  # shellcheck disable=SC1091
+  source "hpc/clusters/local.env"
+fi
+if [ -z "${PY:-}" ]; then
+  for c in python3 python; do
+    if command -v "$c" >/dev/null 2>&1; then PY="$c"; break; fi
+  done
+fi
+
+if ! "$PY" hpc/check_results_fresh.py; then
+  echo
+  echo "pre-commit: the freshness gate failed. Either the results views are stale" >&2
+  echo "  (regenerate with: \$PY hpc/check_results_fresh.py --fix, stage, re-commit)" >&2
+  echo "  or \$PY ('$PY') cannot import the repo deps — set PY or create" >&2
+  echo "  hpc/clusters/local.env (see hpc/clusters/alex.env)." >&2
+  echo "  (bypass for a one-off with: git commit --no-verify — discouraged)" >&2
+  exit 1
+fi
+exit 0

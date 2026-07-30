@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "benchmark": 4509,
+    "test": 1481,
+    "train": 6915,
+    "val": 1482
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "cigre_mv",
+  "protocol": "held_out",
+  "seed": 20306606,
+  "splits_version": "0.1"
+}

@@ -1,0 +1,137 @@
+{
+  "contract_version": "1.0.0",
+  "note": "Machine-readable companion to SPEC.md. Holds what JSON Schema cannot express (label primitives, enumerated vocab, geometry rule, per-profile params). The event vocab MUST be byte-equal to a fresh generation from src/psp_helper/schemas/enums.py (SoT); a producer test enforces this. Released 1.0.0: both profiles confirmed against real on-disk data, validator green, and the real windowing pipeline emits conformant data.",
+
+  "geometry": {
+    "rule": "l == round(window_length_seconds * sampling_frequency)",
+    "dtype": "float32",
+    "layout": "C-order (n, l, f)",
+    "channels_per_cubicle": 6,
+    "channel_order": "recorded per dataset in meta.channels; NOT fixed by the Core (voltage-first and current-first datasets both exist)"
+  },
+
+  "_grammar_divergence_evidence": "Real data confirms the two profiles use DIFFERENT feature-name grammars: EvEMTBench 'Bus_1_Line_1-2A_Isec_L1_A' (Isec/Usec, id '1-2A') vs PROTECT-90 'Bus_1_Line_01_02A_cur_L1_A' (cur/vol, zero-padded id '01_02A'). A single Core regex cannot cover both. Therefore the Core mandates the structured channels descriptor (quantity normalized to I/V) as the machine interface; the per-profile regex is documentation only.",
+
+  "event_vocab": {
+    "_generated_from": "src/psp_helper/schemas/enums.py",
+    "event_family": ["normal", "fault", "switching", "other"],
+    "event_type_fault": [
+      "flt_1phg_shc", "flt_2ph_shc", "flt_2phg_shc", "flt_3ph_shc",
+      "flt_1phg_hif", "flt_1phg_hif_w_arc",
+      "flt_1phg_incipient", "flt_1phg_shc_w_arc", "flt_1phg_incipient_w_arc"
+    ],
+    "event_type_switching": [
+      "switch_cable_on", "switch_cable_off", "switch_load_on", "switch_load_off",
+      "switch_cap_on", "switch_cap_off", "switch_ohl_on", "switch_ohl_off",
+      "switch_motor_start", "switch_inrush_lv", "switch_inrush_hv",
+      "switch_gen_trip", "switch_ibr_trip"
+    ],
+    "event_type_fallback": ["no_event", "unknown"],
+    "fault_category": ["shc", "hif", "incipient"],
+    "window_status": [
+      "clean", "pre_fault", "fault_start", "in_fault", "fault_end",
+      "post_fault", "cleared_fault", "pre_switch", "switch_event",
+      "transient_state", "post_switch", "unknown"
+    ],
+    "phase_tag": ["A", "B", "C", "AB", "BC", "CA", "ABC", "UNKNOWN"],
+    "fault_prefix": "flt_"
+  },
+
+  "y_columns": {
+    "_note": "LOGICAL types + nullability (never numpy-dtype equality; the serializer downcasts). Each consumer DERIVES its task labels from these primitives; the Core does not mandate a fault-class taxonomy.",
+    "_grouping_key": "sample_id (episode). Splits MUST be episode-level.",
+    "required": [
+      {"name": "sample_id",        "logical": "int",   "nullable": false, "role": "episode grouping key"},
+      {"name": "window_idx",       "logical": "int",   "nullable": false},
+      {"name": "event_type",       "logical": "enum:event_type", "nullable": false, "role": "primitive"},
+      {"name": "event_family",     "logical": "enum:event_family", "nullable": false, "role": "primitive"},
+      {"name": "status",           "logical": "enum:window_status", "nullable": false, "role": "primitive"},
+      {"name": "overlap_ratio",    "logical": "float", "nullable": false, "role": "activity signal"},
+      {"name": "y_event_present",  "logical": "int8",  "nullable": false, "domain": [0, 1]},
+      {"name": "y_fault_present",  "logical": "int8",  "nullable": false, "domain": [0, 1]},
+      {"name": "y_phase_A",        "logical": "int8",  "nullable": false, "domain": [0, 1], "note": "0 for non-fault (fillna(0))"},
+      {"name": "y_phase_B",        "logical": "int8",  "nullable": false, "domain": [0, 1]},
+      {"name": "y_phase_C",        "logical": "int8",  "nullable": false, "domain": [0, 1]},
+      {"name": "y_is_grounded",    "logical": "int8",  "nullable": false, "domain": [0, 1]},
+      {"name": "y_fault_line",     "logical": "str",   "nullable": true,  "role": "episode-constant; null on non-line/non-fault"},
+      {"name": "y_fault_location", "logical": "float", "nullable": true,  "role": "% along line 1..99; null off line faults"}
+    ],
+    "optional": [
+      {"name": "window_start_time","logical": "float", "nullable": false},
+      {"name": "window_duration",  "logical": "float", "nullable": false},
+      {"name": "dt_start",         "logical": "float", "nullable": false},
+      {"name": "y_fault_category", "logical": "enum:fault_category", "nullable": true},
+      {"name": "y_switch_present", "logical": "int8",  "nullable": false, "domain": [0, 1]},
+      {"name": "y_switch_category","logical": "str",   "nullable": true},
+      {"name": "y_switch_target_bus","logical": "str", "nullable": true},
+      {"name": "y_switch_action",  "logical": "str",   "nullable": true}
+    ],
+    "profile_extra": {
+      "PROTECT-90": [
+        {"name": "sc_type",      "logical": "int", "domain": [0, 1, 2, 3], "note": "LLL/LL/SLG/LLG"},
+        {"name": "phase_select", "logical": "int"},
+        {"name": "fault_target", "logical": "str"},
+        {"name": "sc_location",  "logical": "float"}
+      ]
+    }
+  },
+
+  "channel_descriptor": {
+    "_note": "Formal schema in meta.schema.json ('channels'). Primary machine interface for channel selection.",
+    "per_channel_fields": ["index", "cubicle", "bus", "element_type", "element_id", "quantity", "phase", "unit"],
+    "feature_groups_min": ["currents", "voltages"]
+  },
+
+  "filenames": {
+    "x": "^X_(?P<topo>.+)_W(?P<W>[0-9.]+)_S(?P<S>[0-9.]+)\\.raw$",
+    "y": "^y_(?P<topo>.+)_W(?P<W>[0-9.]+)_S(?P<S>[0-9.]+)\\.parquet$",
+    "manifest": "<X>.raw.manifest.json",
+    "meta": "<X>.raw.meta.json",
+    "done_marker": "<X>.raw.manifest.done",
+    "dir_layout": "<{family}_root>/windows/<raw_foldername>/"
+  },
+
+  "derived_taxonomies": {
+    "_note": "NOT part of the Core; documented so consumers agree on primitives. Each is derivable from y_columns primitives.",
+    "evemtbench_collapsed_9": "event_type restricted to the 9 fault strings (see evemtbench FAULT_CLASS_CLASSES)",
+    "phase_resolved_19": "event_type + y_phase_* + y_is_grounded -> label -> id via psp_helper.constants.FAULT_LABEL_TO_ID (used by dl-fault + fault-classification-localization)",
+    "protect90_sc_type_4": "sc_type in {0..3} (+ phase_select)"
+  },
+
+  "profiles": {
+    "PROTECT-90": {
+      "status": "CONFIRMED",
+      "_confirmed_from": "real meta.json+manifest at $WORK/datasets/PROTECT-90/windows/PROTECT-90 (W0p020 + W0p050)",
+      "topology": "hv_double_line_90kv",
+      "raw_foldername": "PROTECT-90",
+      "sampling_frequency": 6400,
+      "n_channels": 48,
+      "cubicles": 8,
+      "zenodo_doi": "10.5281/zenodo.18418330",
+      "channel_order": "current-first (cur L1,L2,L3 then vol L1,L2,L3)",
+      "feature_name_regex": "^Bus_(?P<bus>\\d+)_Line_(?P<from>\\d+)_(?P<to>\\d+)(?P<circuit>[AB])_(?P<qty>cur|vol)_L(?P<phase>[123])_(?P<unit>[AV])$",
+      "example_feature_names": ["Bus_1_Line_01_02A_cur_L1_A", "Bus_1_Line_01_02A_vol_L3_V", "Bus_2_Line_01_02A_cur_L1_A"],
+      "feature_groups_present": ["currents", "voltages", "lines", "transformers", "loads", "ext_grid", "ibr", "winds", "capbanks", "generators"],
+      "note": "The 90kv windower PRESERVES the published cur/vol naming and zero-padded '01_02A' line ids. This DIFFERS from EvEMTBench (Isec/Usec, '1-2A') — proof the Core must not fix one grammar; the structured channels descriptor normalizes quantity to I/V.",
+      "fault_taxonomy": "protect90_sc_type_4",
+      "geometry_example": "W=0.05, fs=6400 -> l=320 (confirmed)"
+    },
+    "EvEMTBench-v0.2": {
+      "status": "CONFIRMED",
+      "_confirmed_from": "real meta.json+manifest at $WORK/datasets/evemtbench/{benchmark,adapt_grid}/windows/DoubleLine (W0p050 + W0p020 both present)",
+      "topologies": ["hv_double_line_110kv", "mv_cigre_distribution_20kv", "hv_testgrid_110kv", "ehv_ieee39_transmission_345kv"],
+      "families": ["benchmark", "adapt_grid", "train"],
+      "sampling_frequency": 9600,
+      "window_length_choices": [0.05, 0.02],
+      "window_length": 0.05,
+      "step_length_seconds": 0.005,
+      "channel_order": "current-first (Isec L1,L2,L3 then Usec L1,L2,L3)",
+      "feature_name_regex": "^Bus_(?P<bus>\\d+)_(?P<type>Line|Transformer|Load|ExtGrid|Ibr|Wind|CapBank|Generator)_(?P<id>.+?)_(?P<qty>Isec|Usec|I0|U0)_(?P<phase>L[0-3])_(?P<unit>[AV])$",
+      "line_bay_id_form": "<from>-<to><circuit>, e.g. 1-2A, 2-3B (the observability oracle uses only type=Line cubicles)",
+      "example_feature_names": ["Bus_1_Line_1-2A_Isec_L1_A", "Bus_1_Line_1-2A_Usec_L3_V", "Bus_1_Transformer_1-ExtGrid1_Isec_L1_A"],
+      "feature_groups_present": ["currents", "voltages", "lines", "transformers", "loads", "ext_grid", "ibr", "winds", "capbanks", "generators"],
+      "fault_taxonomy": "evemtbench_collapsed_9",
+      "observability": "LOCAL/LINE/GLOBAL main-line oracle, implemented in evemtbench"
+    }
+  }
+}

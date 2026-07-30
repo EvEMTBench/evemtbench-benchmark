@@ -1,0 +1,50 @@
+{
+  "class_histograms": {
+    "test": {
+      "flt_1phg_incipient": 59,
+      "flt_1phg_incipient_w_arc": 55,
+      "flt_1phg_shc": 61,
+      "flt_1phg_shc_w_arc": 60,
+      "flt_2ph_shc": 49,
+      "flt_2phg_shc": 54,
+      "flt_3ph_shc": 61,
+      "no_event": 20380
+    },
+    "train": {
+      "flt_1phg_incipient": 273,
+      "flt_1phg_incipient_w_arc": 253,
+      "flt_1phg_shc": 288,
+      "flt_1phg_shc_w_arc": 281,
+      "flt_2ph_shc": 230,
+      "flt_2phg_shc": 248,
+      "flt_3ph_shc": 281,
+      "no_event": 95104
+    },
+    "val": {
+      "flt_1phg_incipient": 58,
+      "flt_1phg_incipient_w_arc": 54,
+      "flt_1phg_shc": 62,
+      "flt_1phg_shc_w_arc": 60,
+      "flt_2ph_shc": 49,
+      "flt_2phg_shc": 53,
+      "flt_3ph_shc": 60,
+      "no_event": 20379
+    }
+  },
+  "counts": {
+    "benchmark": 0,
+    "test": 20779,
+    "train": 96958,
+    "val": 20775
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "template_110kv",
+  "protocol": "multi_grid_pretrain",
+  "seed": 20275131,
+  "splits_version": "1.0",
+  "stratify_by": "event_type"
+}

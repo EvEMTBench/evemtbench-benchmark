@@ -1,0 +1,36 @@
+# Pre-commit hooks — mirror the CI gates locally.  Install once:  pre-commit install
+# (keeps hpc/install_hooks.sh's results-freshness gate; adds ruff lint+format, mypy, hygiene).
+repos:
+  - repo: https://github.com/pre-commit/pre-commit-hooks
+    rev: v5.0.0
+    hooks:
+      - id: end-of-file-fixer
+      - id: trailing-whitespace
+      - id: check-yaml
+      - id: check-toml
+      - id: check-merge-conflict
+      - id: check-added-large-files
+        args: ["--maxkb=1024"]
+
+  - repo: https://github.com/astral-sh/ruff-pre-commit
+    rev: v0.8.6
+    hooks:
+      - id: ruff
+        args: ["--fix"]
+      - id: ruff-format
+
+  # mypy + the results-freshness gate run in the local (system) env so they see the installed
+  # package + outputs/ — the HPC shell runner has no isolated-venv network for these.
+  - repo: local
+    hooks:
+      - id: mypy
+        name: mypy (src)
+        entry: mypy src
+        language: system
+        types: [python]
+        pass_filenames: false
+      - id: results-fresh
+        name: RESULTS.md / leaderboard.html / audit freshness gate
+        entry: python hpc/check_results_fresh.py
+        language: system
+        pass_filenames: false

@@ -1,0 +1,95 @@
+# Data — never committed (see data/manifests for identity, docs/datasheet for provenance)
+/data_cache/
+*.raw
+*.raw.manifest.done
+*.parquet
+*.pickle
+*.tar
+*.tar.gz
+
+# Experiment outputs
+# (gitignore has NO inline comments — a trailing "# ..." becomes part of the pattern and
+#  silently matches nothing; keep every comment on its own line)
+# (no trailing slash: also ignores a symlink named `outputs` -> the HPCVAULT shared tree)
+/outputs
+# throwaway DEST_OUT for verification runs (isolated from /outputs/)
+/.verify_out/
+# examples/byo_model.py default scratch out (never the official tree)
+/outputs_byo/
+# retired result sets (e.g. pre-M7 uniform-split runs) — kept OUT of outputs/ so the
+# recursive leaderboard/coverage scans never resurrect them
+/outputs_archive/
+# results/<version>/ is a COMMITTED derived view (aggregated CSV+JSON + the LaTeX result tables),
+# built by hpc/make_results_bundle.py and freshness-gated — tracked, NOT ignored.
+# legacy MVP logs; keep dir, drop contents
+/multirun/
+/hpc/hpc_logs/*
+!/hpc/hpc_logs/.gitkeep
+
+# Paper (LaTeX) — sources are tracked; build artifacts + heavy binaries are not.
+# (gitignore has NO inline comments — keep every comment on its own line.)
+# latexmk / bibtex build artifacts under paper/manuscript/ (regenerable by the build)
+paper/manuscript/*.aux
+paper/manuscript/*.bbl
+paper/manuscript/*.blg
+paper/manuscript/*.log
+paper/manuscript/*.out
+paper/manuscript/*.fls
+paper/manuscript/*.fdb_latexmk
+paper/manuscript/*.synctex.gz
+paper/manuscript/*.pdf
+paper/planning/*.pdf
+# external prior-art PDFs + spreadsheet binaries under paper/reference/ (catalogued in
+# paper/reference/README.md; kept local so git stays lean). The derived TEXT stays tracked.
+paper/reference/*.pdf
+paper/reference/*.xlsx
+
+# Python
+__pycache__/
+*.py[cod]
+# torch/tempfile scratch dirs if a job ever runs without TMPDIR set (backstop; see docs/lessons.md)
+/tmp*/
+*.egg-info/
+.eggs/
+build/
+dist/
+.venv*/
+venv/
+.env
+
+# Tooling caches
+.pytest_cache/
+.ruff_cache/
+.mypy_cache/
+.coverage
+htmlcov/
+
+# Editors / OS
+.idea/
+.vscode/
+.DS_Store
+
+# Fixtures ARE committed (tiny, intentional) — do not ignore tests/fixtures
+!tests/fixtures/**
+# ...but never the compiled bytecode Python drops there (the `**` above re-includes it otherwise)
+tests/fixtures/**/__pycache__/
+
+# Stale run logs
+*.log
+
+# leaderboard.html is committed so it stays in sync with RESULTS.md
+hpc/.nfs*
+
+# Local Claude / private agent settings (skills ARE tracked; local settings are not)
+.claude/settings.local.json
+CLAUDE.local.md
+
+# Secrets (.env already ignored above; cover variants, keep an example template)
+.env.*
+!.env.example
+
+# Machine-local scratch / paths
+local/
+.local/
+# untracked machine profile (data root, interpreter, W&B entity) — see hpc/clusters/alex.env
+hpc/clusters/local.env

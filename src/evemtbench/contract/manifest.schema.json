@@ -1,0 +1,56 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "https://git5.cs.fau.de/juoelhaf/power-grid-and-ai-helper-functions/contract/manifest.schema.json",
+  "title": "psp_helper windowed-dataset manifest.json (Core, CONTRACT_VERSION 1.0)",
+  "description": "Schema for the '<X>.raw.manifest.json' sidecar written by build_windows_manifest. A reserved-keys policy applies: unknown top-level keys are permitted (additive MINOR changes must not break old validators), so 'additionalProperties' is intentionally NOT false at the top level.",
+  "type": "object",
+  "required": ["status", "shape", "feature_hash", "config_fingerprint"],
+  "properties": {
+    "status": {
+      "description": "Completion marker. Only 'complete' is consumable.",
+      "type": "string",
+      "enum": ["complete"]
+    },
+    "x_path": { "type": "string" },
+    "y_path": { "type": "string" },
+    "shape": {
+      "description": "Windowed array shape (n windows, l samples per window, f channels).",
+      "type": "object",
+      "required": ["n", "l", "f"],
+      "properties": {
+        "n": { "type": "integer", "minimum": 0 },
+        "l": { "type": "integer", "minimum": 1 },
+        "f": { "type": "integer", "minimum": 1 }
+      }
+    },
+    "feature_hash": {
+      "description": "sha256 hex of the newline-joined feature_names (see io/feature_meta + windows/manifest.feature_hash_from_meta).",
+      "type": "string",
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "config_fingerprint": {
+      "description": "The recorded, self-describing generation parameters. Geometry (window_length, step_length_seconds) is a RECORDED PARAMETER, not a frozen constant; l MUST equal round(window_length * sampling_frequency).",
+      "type": "object",
+      "required": ["topology", "window_length", "step_length_seconds"],
+      "properties": {
+        "topology": { "type": "string" },
+        "window_length": { "type": "number", "exclusiveMinimum": 0 },
+        "step_length_seconds": { "type": "number", "exclusiveMinimum": 0 },
+        "sampling_frequency": {
+          "description": "Hz. Recommended so l=round(W*fs) is checkable from the manifest alone.",
+          "type": "number",
+          "exclusiveMinimum": 0
+        },
+        "contract_version": {
+          "description": "The CONTRACT_VERSION this dataset was written against (semver). Added in Core 1.0.",
+          "type": "string",
+          "pattern": "^[0-9]+\\.[0-9]+\\.[0-9]+(-[0-9A-Za-z.]+)?$"
+        },
+        "profile": {
+          "description": "Named SPEC profile this dataset conforms to, e.g. 'PROTECT-90' or 'EvEMTBench-v0.2'.",
+          "type": "string"
+        }
+      }
+    }
+  }
+}

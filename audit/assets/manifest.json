@@ -1,0 +1,164 @@
+{
+  "generated_by": "hpc/make_audit_assets.py (run manually when data/tasks change)",
+  "note": "Committed figure provenance. Pages embed only figures listed here; the freshness gate ignores audit/assets/ (figures are inputs, not derived views).",
+  "topologies": {
+    "cigre_mv": {
+      "figure": "topo_cigre_mv.svg",
+      "n_edges": 24,
+      "n_nodes": 31,
+      "source": "aux overlay graph.pickle (benchmark/CigreMVGrid)"
+    },
+    "double_line": {
+      "figure": "topo_double_line.svg",
+      "n_edges": 10,
+      "n_nodes": 17,
+      "source": "aux overlay graph.pickle (benchmark/DoubleLine)"
+    },
+    "ieee39": {
+      "figure": "topo_ieee39.svg",
+      "n_edges": 61,
+      "n_nodes": 59,
+      "source": "aux overlay graph.pickle (benchmark/IEEE39BusSystem)"
+    },
+    "testgrid_110kv": {
+      "figure": "topo_testgrid_110kv.svg",
+      "n_edges": 17,
+      "n_nodes": 22,
+      "source": "aux overlay graph.pickle (benchmark/TestGrid110kV)"
+    }
+  },
+  "waveforms": {
+    "event_classification": {
+      "cubicle": 3,
+      "event_type": "switch_inrush_hv",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_event_classification.svg",
+      "grid": "double_line",
+      "sample_id": "51",
+      "split": "test",
+      "window_index": 1173
+    },
+    "event_detection": {
+      "cubicle": 3,
+      "event_type": "flt_1phg_incipient",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_event_detection.svg",
+      "grid": "double_line",
+      "sample_id": "2",
+      "split": "test",
+      "window_index": 46
+    },
+    "event_state": {
+      "cubicle": 3,
+      "event_type": "switch_cap_off",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_event_state.svg",
+      "grid": "double_line",
+      "sample_id": "64",
+      "split": "test",
+      "window_index": 1472
+    },
+    "fault_category": {
+      "cubicle": 3,
+      "event_type": "flt_2phg_shc",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_category.svg",
+      "grid": "double_line",
+      "sample_id": "84",
+      "split": "test",
+      "window_index": 1932
+    },
+    "fault_class": {
+      "cubicle": 3,
+      "event_type": "flt_1phg_incipient_w_arc",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_class.svg",
+      "grid": "double_line",
+      "sample_id": "197",
+      "split": "test",
+      "window_index": 4531
+    },
+    "fault_detection": {
+      "cubicle": 3,
+      "event_type": "flt_1phg_incipient",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_detection.svg",
+      "grid": "double_line",
+      "sample_id": "2",
+      "split": "test",
+      "window_index": 46
+    },
+    "fault_grounded": {
+      "cubicle": 3,
+      "event_type": "flt_1phg_shc_w_arc",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_grounded.svg",
+      "grid": "double_line",
+      "sample_id": "29",
+      "split": "test",
+      "window_index": 667
+    },
+    "fault_location": {
+      "cubicle": 3,
+      "event_type": "flt_1phg_shc",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_location.svg",
+      "grid": "double_line",
+      "sample_id": "23",
+      "split": "test",
+      "window_index": 529
+    },
+    "fault_origin": {
+      "cubicle": 3,
+      "event_type": "flt_3ph_shc",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_origin.svg",
+      "grid": "double_line",
+      "sample_id": "272",
+      "split": "test",
+      "window_index": 6256
+    },
+    "fault_phase": {
+      "cubicle": 3,
+      "event_type": "flt_2ph_shc",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_fault_phase.svg",
+      "grid": "double_line",
+      "sample_id": "45",
+      "split": "test",
+      "window_index": 1035
+    },
+    "switch_detection": {
+      "cubicle": 3,
+      "event_type": "switch_cap_on",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_switch_detection.svg",
+      "grid": "double_line",
+      "sample_id": "181",
+      "split": "test",
+      "window_index": 4163
+    },
+    "switch_type": {
+      "cubicle": 3,
+      "event_type": "switch_inrush_lv",
+      "family": "adapt_grid",
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "figure": "wave_switch_type.svg",
+      "grid": "double_line",
+      "sample_id": "1",
+      "split": "test",
+      "window_index": 23
+    }
+  }
+}

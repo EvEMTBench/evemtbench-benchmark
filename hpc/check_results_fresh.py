@@ -1,0 +1,284 @@
+"""Freshness gate — committed rendered views must byte-match a fresh rebuild from outputs/.
+
+This is the cure for "rendered views drift from the data" (e.g. the absent-class F1 that read
+0.000 for weeks): the deterministic builders — ``make_results.build_results``,
+``leaderboard.render_html`` and ``make_audit.build_audit_pages`` — are the single source of
+truth, and the committed artifacts must equal their output. The one volatile field (the
+"updated <ts>[ · git <sha>]" line) is normalized away before comparison.
+
+Covered views: ``RESULTS.md``, ``coverage_snapshot.json``, ``leaderboard.html``, ``audit/*.html``,
+the committed provenance index ``audit/provenance/<version>/index.json``, and the public results
+bundle ``results/<version>/`` (aggregated CSV+JSON + the LaTeX tables).
+
+Behaviour:
+* Exit 0 if every committed view matches a fresh build.
+* Exit 0 (skip) if ``outputs/`` is absent/empty — dev machines / CI cannot rebuild the
+  gitignored data, so the gate is a no-op there. It is meaningful only where ``outputs/``
+  lives (the loop host).
+* Exit 1 on drift (including a committed audit page a rebuild no longer produces), printing a
+  short unified diff and how to fix.
+* ``--fix`` regenerates every view (via the normal builders) instead of failing.
+
+Run from anywhere; it operates at the repo root.
+
+    python hpc/check_results_fresh.py          # verify
+    python hpc/check_results_fresh.py --fix     # regenerate
+"""
+
+from __future__ import annotations
+
+import argparse
+import difflib
+import json
+import os
+import re
+import sys
+from pathlib import Path
+
+# The code always lives in the real repo (kept on sys.path for imports). The repo whose ARTIFACTS
+# we check is overridable via EVEMTBENCH_REPO — used by tests; production leaves it unset.
+_REPO = Path(__file__).resolve().parents[1]
+for p in (_REPO / "src", _REPO / "hpc", _REPO / "hpc" / "paper_artifacts"):
+    if str(p) not in sys.path:
+        sys.path.insert(0, str(p))
+
+
+def _repo() -> Path:
+    return Path(os.environ.get("EVEMTBENCH_REPO") or _REPO)
+
+
+# The only non-deterministic line in the HTML views: the render timestamp (leaderboard) /
+# timestamp + build sha (audit). Strip it before diffing.
+_VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
+
+
+def _normalize(text: str) -> str:
+    return _VOLATILE.sub("", text)
+
+
+def _outputs_present() -> bool:
+    out = _repo() / "outputs"
+    return out.is_dir() and next(out.rglob("result.json"), None) is not None
+
+
+def _fresh_results() -> str:
+    from make_results import build_results
+
+    return build_results()
+
+
+def _fresh_leaderboard() -> str:
+    from evemtbench.leaderboard import _bibtex_from_cff, render_html, scan_results
+    from evemtbench.version import BENCHMARK_VERSION
+
+    rows = scan_results("outputs")
+    # generated_at=None => no timestamp line: the comparison is against deterministic content.
+    return render_html(
+        rows, version=BENCHMARK_VERSION, generated_at=None, citation=_bibtex_from_cff()
+    )
+
+
+# Audit pages that are committed but deliberately NOT byte-checked: they derive from git
+# HISTORY (which grows with every snapshot commit), not from outputs/ — gating them would make
+# them perpetually one tick stale. Rebuilt by the loops; labelled "informational" on-page.
+_UNGATED = {"progress.html"}
+
+
+def _fresh_audit_views() -> tuple[dict[str, str], dict[str, str]]:
+    """(audit pages, provenance index) from make_audit.fresh_views — ONE outputs scan for both
+    gated views (the provenance index is a separate JSON view, keyed by its audit-relative
+    path). The gate runs on every rendered-view commit, so the shared scan matters."""
+    from make_audit import fresh_views
+
+    return fresh_views("outputs", generated_at=None)
+
+
+def _fresh_results_bundle() -> dict[str, str]:
+    """The committed public results bundle (results/<version>/…: aggregated CSV+JSON + the LaTeX
+    tables + README) — a separate gated view, keyed by its repo-relative path, no timestamp."""
+    from make_results_bundle import build_results_bundle
+
+    return build_results_bundle("outputs")
+
+
+def _fresh_snapshot() -> str:
+    from evemtbench.coverage import render_snapshot
+
+    return render_snapshot("outputs")
+
+
+_GEN_REL = Path("paper") / "manuscript" / "generated"
+
+
+def _paper_fragment_checks(repo: Path) -> list[tuple[str, Path, str]]:
+    """The manuscript's generated fragments are a LIVE gated view (like RESULTS.md): every
+    committed fragment — held_out result tables, supplement tables, cross-grid transfer tables,
+    and the static spec tables — must byte-match a fresh rebuild from outputs/, and ``--fix``
+    regenerates them. They populate from the current sweep, so the manuscript numbers are
+    provisional (they update as the sweep completes) rather than frozen."""
+    gen = repo / _GEN_REL
+    if not gen.is_dir():
+        return []
+    from paper_lib import (
+        build_paper_tables,
+        build_spec_tables,
+        build_supplement_tables,
+        build_transfer_tables,
+    )
+
+    fresh = {
+        **build_paper_tables(),
+        **build_supplement_tables(),
+        **build_transfer_tables(),
+        **build_spec_tables(),
+    }
+    return [
+        (f"paper/generated/{name}", gen / name, content) for name, content in sorted(fresh.items())
+    ]
+
+
+def _short_diff(name: str, committed: str, fresh: str, limit: int = 40) -> str:
+    d = list(
+        difflib.unified_diff(
+            committed.splitlines(),
+            fresh.splitlines(),
+            fromfile=f"committed/{name}",
+            tofile=f"fresh/{name}",
+            lineterm="",
+        )
+    )
+    body = "\n".join(d[:limit])
+    return body + (f"\n… (+{len(d) - limit} more diff lines)" if len(d) > limit else "")
+
+
+def main(argv: list[str] | None = None) -> int:
+    ap = argparse.ArgumentParser(description="Verify committed results match a fresh rebuild.")
+    ap.add_argument("--fix", action="store_true", help="regenerate the files instead of failing")
+    args = ap.parse_args(argv)
+    repo = _repo()
+
+    if not _outputs_present():
+        print(
+            "check_results_fresh: outputs/ absent or empty — skipping "
+            "(gate runs only where data lives)."
+        )
+        return 0
+
+    os.chdir(repo)  # the builders glob 'outputs/...' relative to cwd
+
+    # The snapshot's embedded self-check gates here (the loops' --write-snapshot calls are
+    # `|| true`-guarded, so THIS is where a failed invariant actually blocks publication).
+    snapshot_fresh = _fresh_snapshot()
+    self_check = json.loads(snapshot_fresh).get("self_check", {})
+    if not self_check.get("ok", True):
+        for c in self_check.get("checks", []):
+            if not c.get("ok"):
+                print(f"✗ snapshot self-check FAILED: {c['id']} — {c['detail']}")
+        print(
+            "check_results_fresh: the coverage snapshot's embedded invariants failed — "
+            "refusing to certify the views (fix the plumbing, then rerun)."
+        )
+        return 1
+
+    audit_fresh, prov_fresh = _fresh_audit_views()
+    results_fresh = _fresh_results_bundle()
+    audit_dir = repo / "audit"
+    if audit_dir.is_dir():
+        stray = sorted(
+            p.name
+            for p in audit_dir.glob("*.html")
+            if p.name not in audit_fresh and p.name not in _UNGATED
+        )
+        # The provenance index (audit/provenance/<version>/index.json) is keyed by its
+        # audit-relative path; a rebuild for the current version no longer produces a stale
+        # older-version index, so flag any provenance JSON a rebuild does not emit as stray.
+        stray += sorted(
+            str(p.relative_to(audit_dir))
+            for p in audit_dir.glob("provenance/**/*.json")
+            if str(p.relative_to(audit_dir)) not in prov_fresh
+        )
+    else:
+        stray = []
+    # results/<version>/ strays: committed files a rebuild no longer emits (e.g. after a version
+    # bump the prior results/<oldversion>/ tree is retired). Keyed by repo-relative path.
+    results_root = repo / "results"
+    results_stray = (
+        sorted(
+            str(p.relative_to(repo))
+            for p in results_root.rglob("*")
+            if p.is_file() and str(p.relative_to(repo)) not in results_fresh
+        )
+        if results_root.is_dir()
+        else []
+    )
+
+    if args.fix:
+        from evemtbench.leaderboard import main as lb_main
+        from make_audit import main as audit_main
+        from make_results_bundle import main as results_main
+
+        (repo / "RESULTS.md").write_text(_fresh_results())
+        (repo / "coverage_snapshot.json").write_text(_fresh_snapshot())
+        lb_main(["--outputs", "outputs", "--out", "leaderboard.html"])  # writes WITH a timestamp
+        audit_main(["--outputs", "outputs", "--out", str(audit_dir)])  # ditto (ts + git sha)
+        results_main(["--outputs", "outputs", "--out", str(repo)])  # results/<version>/ bundle
+        for name in stray:  # a rebuild no longer produces these pages
+            (audit_dir / name).unlink()
+            print(f"check_results_fresh: removed stray audit page {name}")
+        for rel in results_stray:  # a rebuild no longer produces these results files
+            (repo / rel).unlink()
+            print(f"check_results_fresh: removed stray results file {rel}")
+        for _name, path, content in _paper_fragment_checks(repo):
+            path.write_text(content)  # post-freeze: fragments regenerate with the other views
+        print(
+            "check_results_fresh: regenerated RESULTS.md + coverage_snapshot.json + "
+            "leaderboard.html + audit/ + results/."
+        )
+        return 0
+
+    checks: list[tuple[str, Path, str]] = [
+        ("RESULTS.md", (repo / "RESULTS.md"), _fresh_results()),
+        ("coverage_snapshot.json", (repo / "coverage_snapshot.json"), snapshot_fresh),
+        ("leaderboard.html", (repo / "leaderboard.html"), _fresh_leaderboard()),
+    ]
+    checks += [
+        (f"audit/{name}", audit_dir / name, content)
+        for name, content in sorted(audit_fresh.items())
+    ]
+    checks += [
+        (f"audit/{name}", audit_dir / name, content) for name, content in sorted(prov_fresh.items())
+    ]
+    checks += [
+        (name, repo / name, content) for name, content in sorted(results_fresh.items())
+    ]  # results/<version>/… keyed by repo-relative path
+    checks += _paper_fragment_checks(repo)  # the manuscript's live table view
+    stale: list[str] = []
+    for name, path, fresh in checks:
+        committed = path.read_text() if path.exists() else ""
+        if _normalize(committed) != _normalize(fresh):
+            stale.append(name)
+            print(f"\n✗ {name} is STALE (committed != fresh rebuild):")
+            print(_short_diff(name, _normalize(committed), _normalize(fresh)))
+    for name in stray:
+        stale.append(f"audit/{name}")
+        print(f"\n✗ audit/{name} is STALE: committed but no longer produced by a rebuild.")
+    for rel in results_stray:
+        stale.append(rel)
+        print(f"\n✗ {rel} is STALE: committed but no longer produced by a rebuild.")
+
+    if stale:
+        print(
+            f"\ncheck_results_fresh: {', '.join(stale)} disagree with a fresh build.\n"
+            "Fix: `python hpc/check_results_fresh.py --fix` (or rerun make_results.py + "
+            "evemtbench-leaderboard + make_audit.py), then stage the regenerated files."
+        )
+        return 1
+    print(
+        "check_results_fresh: RESULTS.md + coverage_snapshot.json + leaderboard.html + audit/ + "
+        "results/ match a fresh rebuild. ✓"
+    )
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

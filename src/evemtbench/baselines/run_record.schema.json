@@ -1,0 +1,278 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "evemtbench/run_record.schema.json",
+  "title": "EvEMTBench run_record.json \u2014 per-cell provenance record",
+  "description": "Written by evemtbench.baselines.runner next to each cell's result.json. Required keys are the set every record in the corpus carries; 'normalize' (added mid-v0.2) and 'host'/'data'/'cuda_device' are optional so records written before provenance hardening still validate. Additive policy: new keys may appear (additionalProperties true); removing or renaming a required key is a breaking change.",
+  "type": "object",
+  "additionalProperties": true,
+  "required": [
+    "benchmark_version",
+    "splits_version",
+    "git_sha",
+    "lockfile_sha256",
+    "seeds",
+    "args",
+    "attestation",
+    "versions",
+    "compute",
+    "per_seed_compute",
+    "checkpoints",
+    "python",
+    "platform",
+    "timestamp"
+  ],
+  "properties": {
+    "benchmark_version": {
+      "type": "string"
+    },
+    "splits_version": {
+      "type": "string"
+    },
+    "git_sha": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{40}$"
+    },
+    "lockfile_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$"
+    },
+    "seeds": {
+      "type": "array",
+      "items": {
+        "type": "integer"
+      },
+      "minItems": 1
+    },
+    "args": {
+      "type": "object"
+    },
+    "normalize": {},
+    "attestation": {
+      "type": "object",
+      "required": [
+        "fit_on",
+        "model_selection_on",
+        "held_out_untouched",
+        "statement"
+      ],
+      "properties": {
+        "fit_on": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "model_selection_on": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "held_out_untouched": {
+          "type": "array",
+          "items": {
+            "type": "string"
+          }
+        },
+        "statement": {
+          "type": "string"
+        }
+      }
+    },
+    "versions": {
+      "type": "object",
+      "additionalProperties": {
+        "type": [
+          "string",
+          "null"
+        ]
+      }
+    },
+    "n_params": {
+      "type": [
+        "integer",
+        "null"
+      ]
+    },
+    "compute": {
+      "type": "object"
+    },
+    "per_seed_compute": {
+      "type": [
+        "array",
+        "object"
+      ]
+    },
+    "checkpoints": {
+      "type": "object",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "path",
+          "sha256"
+        ],
+        "properties": {
+          "path": {
+            "type": "string"
+          },
+          "sha256": {
+            "type": "string",
+            "pattern": "^[0-9a-f]{64}$"
+          }
+        }
+      }
+    },
+    "python": {
+      "type": "string"
+    },
+    "platform": {
+      "type": "string"
+    },
+    "timestamp": {
+      "type": "number"
+    },
+    "torch": {
+      "type": [
+        "string",
+        "null"
+      ]
+    },
+    "cuda_available": {
+      "type": "boolean"
+    },
+    "cuda_device": {
+      "type": "string"
+    },
+    "host": {
+      "type": "object",
+      "properties": {
+        "hostname": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slurm_job_id": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "slurm_nodelist": {
+          "type": [
+            "string",
+            "null"
+          ]
+        },
+        "cluster": {
+          "type": [
+            "string",
+            "null"
+          ]
+        }
+      }
+    },
+    "data": {
+      "type": "object",
+      "properties": {
+        "splits": {
+          "type": "object",
+          "properties": {
+            "protocol_dir": {
+              "type": "string"
+            },
+            "dir": {
+              "type": "string"
+            },
+            "version": {
+              "type": "string"
+            },
+            "files": {
+              "type": "object",
+              "additionalProperties": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "partitions": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "grid": {
+                "type": "string"
+              },
+              "family": {
+                "type": "string"
+              },
+              "x_path": {
+                "type": "string"
+              },
+              "shape": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "feature_hash": {
+                "type": [
+                  "string",
+                  "null"
+                ]
+              },
+              "config_fingerprint": {
+                "type": [
+                  "object",
+                  "null"
+                ]
+              },
+              "manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "env": {
+          "type": "object"
+        }
+      }
+    },
+    "harness_control": {
+      "type": "object",
+      "description": "Per test set: the positive control (true labels through evaluate() must hit the headline ceiling). Optional: added with the deep-audit work.",
+      "additionalProperties": {
+        "type": "object",
+        "required": [
+          "headline",
+          "value",
+          "ceiling",
+          "ok"
+        ],
+        "properties": {
+          "headline": {
+            "type": "string"
+          },
+          "value": {
+            "type": "number"
+          },
+          "ceiling": {
+            "type": "number"
+          },
+          "ok": {
+            "type": "boolean",
+            "const": true
+          }
+        }
+      }
+    }
+  }
+}

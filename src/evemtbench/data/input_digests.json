@@ -1,0 +1,116 @@
+{
+  "entries": {
+    "cigre_mv/adapt_grid": {
+      "feature_hash": "01f2d9d3829c05dc9f384551f4beafbc589f370e2418aa0e6133714c37610ad3",
+      "manifest_sha256": "99636279d5155967fd7cacd6ebba5470f0919a04ade868535adcc0e57e496e32",
+      "shape": {
+        "f": 270,
+        "l": 480,
+        "n": 227838
+      },
+      "x_file": "X_mv_cigre_distribution_20kv_W0p050_S0p005.raw"
+    },
+    "cigre_mv/benchmark": {
+      "feature_hash": "01f2d9d3829c05dc9f384551f4beafbc589f370e2418aa0e6133714c37610ad3",
+      "manifest_sha256": "58189657cdf25d985a3d3d0ab58450e89237f35bffc897a12c9dc53c083c1742",
+      "shape": {
+        "f": 270,
+        "l": 480,
+        "n": 103707
+      },
+      "x_file": "X_mv_cigre_distribution_20kv_W0p050_S0p005.raw"
+    },
+    "double_line/adapt_grid": {
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "manifest_sha256": "b2f2f31cbc244a8c84bffc13db48c51434c1501b5a1d281310919183b1e6b532",
+      "shape": {
+        "f": 66,
+        "l": 480,
+        "n": 229977
+      },
+      "x_file": "X_hv_double_line_110kv_W0p050_S0p005.raw"
+    },
+    "double_line/benchmark": {
+      "feature_hash": "2ac89ada5d45fca6ce25430c65d930a0c7aa747dd81fa41aec96143ff3757795",
+      "manifest_sha256": "19a74cca9579ed9668f868c96a230a7d8682d3d23e13798e43af6baf01358e00",
+      "shape": {
+        "f": 66,
+        "l": 480,
+        "n": 25323
+      },
+      "x_file": "X_hv_double_line_110kv_W0p050_S0p005.raw"
+    },
+    "ieee39/adapt_grid": {
+      "feature_hash": "103517b01a72b8020b12d564db904632ae219123cb7514980973bba6b61517cb",
+      "manifest_sha256": "bb88bb87bf8eb2580b6323e617a5bf9d2d5cb426d270db046b69361d1e87fade",
+      "shape": {
+        "f": 594,
+        "l": 480,
+        "n": 230000
+      },
+      "x_file": "X_ehv_ieee39_transmission_345kv_W0p050_S0p005.raw"
+    },
+    "ieee39/benchmark": {
+      "feature_hash": "103517b01a72b8020b12d564db904632ae219123cb7514980973bba6b61517cb",
+      "manifest_sha256": "2d0ddfc90d079380d00ed4db8847681670331660665085021b53123c2a3f1114",
+      "shape": {
+        "f": 594,
+        "l": 480,
+        "n": 223284
+      },
+      "x_file": "X_ehv_ieee39_transmission_345kv_W0p050_S0p005.raw"
+    },
+    "template_110kv/multi_grid": {
+      "feature_hash": "27f0e2c4052d5b3a77b9778cafe12d9f92550c21362c498c812e5eee1090f1b0",
+      "manifest_sha256": "a39ac612e6895dd8006db4bc95c5287f797c9a2bc8f7037b75dc03db3b754ff3",
+      "shape": {
+        "f": 12,
+        "l": 480,
+        "n": 3185776
+      },
+      "x_file": "X_hv_template_110kv_W0p050_S0p005.raw"
+    },
+    "template_20kv/multi_grid": {
+      "feature_hash": "27f0e2c4052d5b3a77b9778cafe12d9f92550c21362c498c812e5eee1090f1b0",
+      "manifest_sha256": "4e726fe2ec477270c7b6f8057a5f80dfe173950d3cf7a3d32eafbe38833b0a1c",
+      "shape": {
+        "f": 12,
+        "l": 480,
+        "n": 2740519
+      },
+      "x_file": "X_mv_template_20kv_W0p050_S0p005.raw"
+    },
+    "template_345kv/multi_grid": {
+      "feature_hash": "27f0e2c4052d5b3a77b9778cafe12d9f92550c21362c498c812e5eee1090f1b0",
+      "manifest_sha256": "188f0a88ffc5f462e9d77cc48f4ae7b7e607074815295a0de2d3fd16ff50d5e4",
+      "shape": {
+        "f": 12,
+        "l": 480,
+        "n": 3988361
+      },
+      "x_file": "X_ehv_template_345kv_W0p050_S0p005.raw"
+    },
+    "testgrid_110kv/adapt_grid": {
+      "feature_hash": "6ed870c9f523cb740f9848e3edcccc6fcb06c48ef085c38d998b257128e11aa1",
+      "manifest_sha256": "1b9303dea51f682f795559a40a9fda1ee3b585aa0eab36e3030469188561b1db",
+      "shape": {
+        "f": 150,
+        "l": 480,
+        "n": 223997
+      },
+      "x_file": "X_hv_testgrid_110kv_W0p050_S0p005.raw"
+    },
+    "testgrid_110kv/benchmark": {
+      "feature_hash": "6ed870c9f523cb740f9848e3edcccc6fcb06c48ef085c38d998b257128e11aa1",
+      "manifest_sha256": "1622ca268c8aeef5d2a48a782262f60718bf98007f6eda7aea0cb2b8f5379720",
+      "shape": {
+        "f": 150,
+        "l": 480,
+        "n": 56005
+      },
+      "x_file": "X_hv_testgrid_110kv_W0p050_S0p005.raw"
+    }
+  },
+  "generated_by": "python -m evemtbench.data.input_digests --write",
+  "note": "Digest pins for the windowed benchmark inputs (the bytes are not committed; their identity is). Regenerate with --write ONLY on a deliberate dataset change; integrity cross-checks every run record against this table."
+}

@@ -1,0 +1,71 @@
+{
+  "class_histograms": {
+    "test": {
+      "flt_1phg_incipient": 97,
+      "flt_1phg_incipient_w_arc": 99,
+      "flt_1phg_shc": 99,
+      "flt_1phg_shc_w_arc": 103,
+      "flt_2ph_shc": 105,
+      "flt_2phg_shc": 101,
+      "flt_3ph_shc": 97,
+      "switch_cap_off": 103,
+      "switch_cap_on": 104,
+      "switch_inrush_hv": 99,
+      "switch_inrush_lv": 95,
+      "switch_load_off": 103,
+      "switch_load_on": 92,
+      "switch_ohl_off": 100,
+      "switch_ohl_on": 103
+    },
+    "train": {
+      "flt_1phg_incipient": 454,
+      "flt_1phg_incipient_w_arc": 459,
+      "flt_1phg_shc": 461,
+      "flt_1phg_shc_w_arc": 484,
+      "flt_2ph_shc": 486,
+      "flt_2phg_shc": 470,
+      "flt_3ph_shc": 452,
+      "switch_cap_off": 482,
+      "switch_cap_on": 482,
+      "switch_inrush_hv": 462,
+      "switch_inrush_lv": 446,
+      "switch_load_off": 480,
+      "switch_load_on": 433,
+      "switch_ohl_off": 464,
+      "switch_ohl_on": 484
+    },
+    "val": {
+      "flt_1phg_incipient": 97,
+      "flt_1phg_incipient_w_arc": 98,
+      "flt_1phg_shc": 99,
+      "flt_1phg_shc_w_arc": 104,
+      "flt_2ph_shc": 104,
+      "flt_2phg_shc": 101,
+      "flt_3ph_shc": 97,
+      "switch_cap_off": 103,
+      "switch_cap_on": 103,
+      "switch_inrush_hv": 99,
+      "switch_inrush_lv": 96,
+      "switch_load_off": 103,
+      "switch_load_on": 93,
+      "switch_ohl_off": 99,
+      "switch_ohl_on": 104
+    }
+  },
+  "counts": {
+    "benchmark": 1101,
+    "test": 1500,
+    "train": 6999,
+    "val": 1500
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "double_line",
+  "protocol": "held_out",
+  "seed": 20325215,
+  "splits_version": "0.2",
+  "stratify_by": "event_type"
+}

@@ -1,0 +1,34 @@
+cff-version: 1.2.0
+message: "If you use this benchmark, please cite the benchmark paper and the dataset (separate DOIs)."
+title: "EvEMTBench: A Protocol-Driven ML Benchmark for Power System Protection"
+type: software
+authors:
+  - family-names: Oelhaf
+    given-names: Julian
+  - family-names: Kordowich
+    given-names: Georg
+  - family-names: Loebel
+    given-names: Jonathan
+  - family-names: Bergler
+    given-names: Christian
+  - family-names: Bayer
+    given-names: Siming
+  - family-names: Maier
+    given-names: Andreas
+  - family-names: Jaeger
+    given-names: Johann
+repository-code: "https://github.com/EvEMTBench/evemtbench-benchmark"
+license: MIT
+version: 1.0.0
+# A per-release Zenodo DOI will be added here on the first tagged release so the benchmark
+# software is citable independently of the dataset and the paper.
+# doi: 10.5281/zenodo.XXXXXXX
+references:
+  - type: data
+    title: "EvEMTBench: A Simulation-Based Dataset of Faults and Events for ML in Power Systems"
+    authors:
+      - family-names: Kordowich
+        given-names: Georg
+      - family-names: Oelhaf
+        given-names: Julian
+    notes: "Dataset artifact (IEEE DataPort / Zenodo), CC-BY-4.0. DOI to be added."

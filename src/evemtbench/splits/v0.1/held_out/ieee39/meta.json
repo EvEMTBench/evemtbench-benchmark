@@ -1,0 +1,17 @@
+{
+  "counts": {
+    "benchmark": 9711,
+    "test": 1477,
+    "train": 6892,
+    "val": 1477
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "ieee39",
+  "protocol": "held_out",
+  "seed": 20284363,
+  "splits_version": "0.1"
+}

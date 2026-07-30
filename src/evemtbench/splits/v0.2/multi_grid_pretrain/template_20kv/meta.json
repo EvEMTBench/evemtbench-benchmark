@@ -1,0 +1,56 @@
+{
+  "class_histograms": {
+    "test": {
+      "flt_1phg_hif": 31,
+      "flt_1phg_hif_w_arc": 38,
+      "flt_1phg_incipient": 32,
+      "flt_1phg_incipient_w_arc": 35,
+      "flt_1phg_shc": 33,
+      "flt_1phg_shc_w_arc": 32,
+      "flt_2ph_shc": 34,
+      "flt_2phg_shc": 33,
+      "flt_3ph_shc": 36,
+      "no_event": 17566
+    },
+    "train": {
+      "flt_1phg_hif": 147,
+      "flt_1phg_hif_w_arc": 178,
+      "flt_1phg_incipient": 150,
+      "flt_1phg_incipient_w_arc": 167,
+      "flt_1phg_shc": 158,
+      "flt_1phg_shc_w_arc": 150,
+      "flt_2ph_shc": 162,
+      "flt_2phg_shc": 155,
+      "flt_3ph_shc": 171,
+      "no_event": 81971
+    },
+    "val": {
+      "flt_1phg_hif": 32,
+      "flt_1phg_hif_w_arc": 38,
+      "flt_1phg_incipient": 32,
+      "flt_1phg_incipient_w_arc": 36,
+      "flt_1phg_shc": 34,
+      "flt_1phg_shc_w_arc": 32,
+      "flt_2ph_shc": 35,
+      "flt_2phg_shc": 33,
+      "flt_3ph_shc": 37,
+      "no_event": 17565
+    }
+  },
+  "counts": {
+    "benchmark": 0,
+    "test": 17870,
+    "train": 83409,
+    "val": 17874
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "template_20kv",
+  "protocol": "multi_grid_pretrain",
+  "seed": 20343994,
+  "splits_version": "0.2",
+  "stratify_by": "event_type"
+}
