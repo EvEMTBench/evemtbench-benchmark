@@ -257,6 +257,80 @@ def test_snapshot_self_check_clean_and_range_violation(tmp_path):
     assert any("1.7" in str(x) for x in bad["value_ranges"]["detail"])
 
 
+def _first_transfer_row(rows, source):
+    return next(r for r in rows if r.get("source") == source)
+
+
+def test_range_check_is_source_qualified(tmp_path):
+    """A transfer cell's range check must read ITS OWN source directory.
+
+    Regression: the check built ``Cell(task, protocol, grid, baseline)`` without ``source``, so
+    ``cell_dir`` never appended ``pretrain-<source>`` and every non-default-source row was validated
+    against the default-source cell's result.json. On the v1.0.0 corpus that silently exempted 768
+    of 1876 rows. The planted violation below lives ONLY in the 110 kV directory, so it is invisible
+    unless the source is threaded through.
+    """
+    rows = cov.build_snapshot(tmp_path, version="v")["cells"]
+    row = _first_transfer_row(rows, "template_110kv")
+    cell = Cell(row["task"], row["protocol"], row["grid"], row["baseline"], source=row["source"])
+    default_cell = Cell(row["task"], row["protocol"], row["grid"], row["baseline"])
+    assert cov.cell_dir(tmp_path, cell, version="v") != cov.cell_dir(
+        tmp_path, default_cell, version="v"
+    )
+
+    # Same target+baseline, different sources: only the 110 kV one is out of range. The default
+    # source is written in-range, so a source-less lookup finds nothing wrong.
+    for c, ba in ((default_cell, 0.5), (cell, 1.7)):
+        for ts in row["expected_test_sets"]:
+            p = cov.cell_dir(tmp_path, c, version="v") / ts
+            p.mkdir(parents=True, exist_ok=True)
+            (p / "result.json").write_text(
+                json.dumps({"aggregate": {"balanced_accuracy": {"mean": ba}}})
+            )
+
+    sc = cov.build_snapshot(tmp_path, version="v")["self_check"]
+    ranges = {c["id"]: c for c in sc["checks"]}["value_ranges"]
+    assert not ranges["ok"] and not sc["ok"]
+    detail = " ".join(str(x) for x in ranges["detail"])
+    assert "1.7" in detail
+    # the message must say WHICH source violated, else it is unattributable among the three
+    assert "pretrain-template_110kv" in detail
+
+
+def test_done_status_implies_the_range_check_can_read_the_cell(tmp_path):
+    """`status == done` and the range check must resolve the SAME directory.
+
+    This is the invariant the source= bug broke. It cannot be tested by planting an unreadable
+    result (``cell_status`` would then not call the row done — the two now share ``_load_result``
+    over one path, by construction). So assert the invariant directly: every done row, including
+    every non-default transfer source, is readable at the path the range check uses.
+    """
+    row_src = "template_345kv"
+    rows = cov.build_snapshot(tmp_path, version="v")["cells"]
+    row = _first_transfer_row(rows, row_src)
+    cell = Cell(row["task"], row["protocol"], row["grid"], row["baseline"], source=row["source"])
+    for ts in row["expected_test_sets"]:
+        p = cov.cell_dir(tmp_path, cell, version="v") / ts
+        p.mkdir(parents=True, exist_ok=True)
+        (p / "result.json").write_text(
+            json.dumps({"aggregate": {"balanced_accuracy": {"mean": 0.5}}})
+        )
+
+    rows = cov.build_snapshot(tmp_path, version="v")["cells"]
+    done = [r for r in rows if r["status"] == "done"]
+    assert done, "fixture wrote no done row"
+    for r in done:
+        c = Cell(r["task"], r["protocol"], r["grid"], r["baseline"], source=r["source"])
+        for ts in r["expected_test_sets"]:
+            assert (
+                cov._load_result(cov.cell_dir(tmp_path, c, version="v") / ts / "result.json")
+                is not None
+            ), f"done row unreadable at its source-qualified path: {r}"
+    # and the row we wrote is the 345 kV one, not the default-source cell
+    assert any(r["source"] == row_src and r["status"] == "done" for r in rows)
+    assert cov.build_snapshot(tmp_path, version="v")["self_check"]["ok"]
+
+
 def test_check_snapshot_cli_exit_codes(tmp_path):
     with pytest.raises(SystemExit) as e:
         cov.main(["--out", str(tmp_path), "--version", "v", "--check-snapshot"])

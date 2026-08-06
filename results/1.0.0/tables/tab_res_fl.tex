@@ -3,11 +3,12 @@
 \centering
 \small
 \setlength{\tabcolsep}{4.5pt}
-\caption{Fault localisation (\ac{fl}) --- reference baseline (best of RF/MLP/GRU/CNN/ResNet, selected on the validation split; a beatable reference, full per-baseline breakdown in the Supplementary), headline metric (\acs{mae}\,\% $\downarrow$) per grid and observability view, for the two \texttt{held\_out} test sets (in-distribution vs.\ never-trained benchmark family). Cells are mean\,$\pm$\,95\% CI (Student's $t$); \pending{}~= pending (no result yet); \notapp{}~= not defined for this view. Full per-baseline tables in the Supplementary.}
+\caption{Fault localisation (\ac{fl}) --- reference baseline (best of RF/MLP/GRU/CNN/ResNet, selected on the validation split; a beatable reference, full per-baseline breakdown in the Supplementary), headline metric (\acs{mae}\,\% $\downarrow$) per grid and observability view, for the two \texttt{held\_out} test sets (in-distribution vs.\ never-trained \texttt{eval\_grid} family). Cells are mean\,$\pm$\,95\% CI (Student's $t$); \pending{}~= pending (no result yet); \notapp{}~= not defined for this view. Full per-baseline tables in the Supplementary.}
 \label{tab:res_fl}
+\resizebox{\ifdim\width>\textwidth \textwidth\else \width\fi}{!}{%
 \begin{tabular}{l ccc ccc}
 \toprule
- & \multicolumn{3}{c}{\textbf{In-distribution (test)}} & \multicolumn{3}{c}{\textbf{Benchmark (transfer)}} \\
+ & \multicolumn{3}{c}{\textbf{In-distribution (test)}} & \multicolumn{3}{c}{\textbf{Eval-Grid (never trained)}} \\
 \cmidrule(lr){2-4}\cmidrule(lr){5-7}
 \textbf{Grid} & \textbf{local} & \textbf{line} & \textbf{global} & \textbf{local} & \textbf{line} & \textbf{global} \\
 \midrule
@@ -16,5 +17,5 @@ Double Line (110\,kV)      & 18.600 $\pm$ 0.213 & 16.095 $\pm$ 0.030 & 15.869 $\
 Prot.\ Ref.\ (110\,kV)     & 18.768 $\pm$ 0.171 & 17.141 $\pm$ 0.065 & 16.994 $\pm$ 0.043 & 10.855 $\pm$ 0.572 & 6.545 $\pm$ 0.540 & 6.538 $\pm$ 0.115 \\
 IEEE 39-Bus (345\,kV)      & 22.484 $\pm$ 0.027 & 18.681 $\pm$ 0.137 & 20.697 $\pm$ 0.115 & 21.403 $\pm$ 0.013 & 9.396 $\pm$ 0.257 & 20.389 $\pm$ 0.724 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table*}

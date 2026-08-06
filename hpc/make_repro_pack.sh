@@ -47,7 +47,11 @@ echo "staging clean export of HEAD ($(git rev-parse --short=12 HEAD)) ..."
 git archive HEAD | tar -x -C "$STAGE"
 
 # Keep only the reviewer-facing artifacts (the audit is the entry point).
-KEEP=(audit RESULTS.md coverage_snapshot.json requirements.lock README.md LICENSE docs CITATION.cff)
+# `env` carries results-v<version>.lock — the environment the numbers were actually computed in.
+# requirements.lock ships too, but only because its sha256 is the lockfile_sha256 in every v1.0.0
+# run record; it is NOT the reproduction recipe (no torch). See docs/determinism.md.
+KEEP=(audit RESULTS.md coverage_snapshot.json env requirements.lock requirements-ci-py3.10.lock
+      requirements-ci-py3.12.lock README.md LICENSE docs CITATION.cff)
 mkdir -p "$STAGE/$PACK"
 for item in "${KEEP[@]}"; do
   [ -e "$STAGE/$item" ] && mv "$STAGE/$item" "$STAGE/$PACK/"

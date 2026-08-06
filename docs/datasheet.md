@@ -20,6 +20,15 @@ under fixed tasks, splits, and metrics.
 ## Composition
 - **Signals:** three-phase V and I at each measurement cubicle, 9600 Hz; v0.2 windows are 0.05 s
   (480 samples) at 0.005 s stride. Per-cubicle channel order `[Iₐ,I_b,I_c,Vₐ,V_b,V_c]`.
+  **Sign convention:** all current measurements are oriented **towards the branch element**
+  (producer convention — a model that flips this sign is not evaluating the same quantity).
+  Each exported simulation is 4801 samples long (0.5 s × 9600 Hz + 1; both endpoints included).
+- **Unit of an episode.** For the reference grids one episode = one simulation (`sample_id` is the
+  producer's `sim_idx`). For the `multi_grid` templates the windows are stored in the portable
+  two-terminal view, so one episode = **one line of one simulation**
+  (`sample_id = sim_idx × 10⁴ + line_idx`): ≈10 000 simulations per voltage level become
+  119 153 / 138 512 / 173 407 episodes at 20 / 110 / 345 kV. Compare corpus sizes in the matching
+  unit — the dataset paper counts simulations.
 - **Grids:** CIGRE MV (20 kV/50 Hz), Double Line (110 kV/50 Hz), Protection Reference
   (110 kV/50 Hz), IEEE 39-Bus (345 kV/**60 Hz**, the only 60 Hz grid).
 - **Event types (~23) in 3 active families** (`event_type` / `event_family` columns):
@@ -37,9 +46,14 @@ under fixed tasks, splits, and metrics.
   `sample_id` (= the episode). Settings schemas vary by grid (19–130 columns).
 
 ## Collection / provenance
-Generated with DIgSILENT PowerFactory EMT simulations (10 µs step, 1.5 s; first 1.0 s discarded;
-last 0.5 s exported). Authoring paths in `general/result_file_path` are Windows-style provenance
-metadata only — never resolved by the loader (files are located by `sim_idx`).
+Generated with DIgSILENT PowerFactory EMT simulations (10 µs step, 1.5 s; first 1.0 s discarded so
+initialisation transients settle; last 0.5 s exported). 22 event types are simulated (13 operating
+events + 9 fault types), each event type available at the voltage levels its grid elements support.
+Simulations whose load flow or EMT run failed are dropped in post-processing, so the surviving label
+file is `settings_clean.csv` (one row per `sim_idx`) — the per-episode counts below are therefore
+slightly under the nominal 10 000 per dataset. Authoring paths in `general/result_file_path` are
+Windows-style provenance metadata only — never resolved by the loader (files are located by
+`sim_idx`).
 
 ## Preprocessing / labeling
 Window labels are derived deterministically by the windowing pipeline from `settings.csv` event

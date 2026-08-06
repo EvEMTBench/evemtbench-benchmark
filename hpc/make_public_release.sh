@@ -70,6 +70,10 @@ leak_scan() {
   return "$bad"
 }
 if [ "${1:-}" = "--scan-only" ]; then
+  # Explicit usage error: under `set -u` a missing target otherwise dies with "$2: unbound
+  # variable", which reads like a script bug rather than a missing argument. Exit 2 keeps it
+  # distinguishable from exit 1 = "scan found something".
+  [ -n "${2:-}" ] || { echo "usage: $0 --scan-only <dir-or-file>" >&2; exit 2; }
   if leak_scan "$2"; then
     echo "LEAK SCAN FAILED — forbidden strings above." >&2
     exit 1
@@ -111,7 +115,8 @@ done
 # --- Self-consistency: everything the public repo advertises must actually ship -----------------
 REQUIRED=(
   LICENSE LICENSES/DATA-LICENSE.md CITATION.cff README.md CONTRIBUTING.md CHANGELOG.md
-  pyproject.toml requirements.lock
+  pyproject.toml requirements.lock requirements-ci-py3.10.lock requirements-ci-py3.12.lock
+  env/results-v1.0.0.lock env/results-scoring.constraints
   src/evemtbench/version.py src/evemtbench/splits/v1.0
   RESULTS.md leaderboard.html coverage_snapshot.json
   "results/$VERSION" audit/index.html "audit/provenance/$VERSION/index.json"

@@ -29,6 +29,13 @@
         "n_seeds": 1,
         "std": 0.0
       },
+      "macro_f1_supported": {
+        "ci95": null,
+        "mean": 0.3333333333333333,
+        "n_defined": 1,
+        "n_seeds": 1,
+        "std": 0.0
+      },
       "missed_fault_rate": {
         "ci95": null,
         "mean": 1.0,
@@ -60,6 +67,13 @@
         "std": 0.0
       },
       "macro_f1": {
+        "ci95": null,
+        "mean": 0.3333333333333333,
+        "n_defined": 1,
+        "n_seeds": 1,
+        "std": 0.0
+      },
+      "macro_f1_supported": {
         "ci95": null,
         "mean": 0.3333333333333333,
         "n_defined": 1,
@@ -167,6 +181,13 @@
         "n_seeds": 1,
         "std": 0.0
       },
+      "macro_f1_supported": {
+        "ci95": null,
+        "mean": 0.3732193732193732,
+        "n_defined": 1,
+        "n_seeds": 1,
+        "std": 0.0
+      },
       "missed_fault_rate": {
         "ci95": null,
         "mean": 0.9,
@@ -198,6 +219,13 @@
         "std": 0.0
       },
       "macro_f1": {
+        "ci95": null,
+        "mean": 0.5555555555555556,
+        "n_defined": 1,
+        "n_seeds": 1,
+        "std": 0.0
+      },
+      "macro_f1_supported": {
         "ci95": null,
         "mean": 0.5555555555555556,
         "n_defined": 1,

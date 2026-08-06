@@ -45,7 +45,7 @@ def test_selftest_catches_a_silenced_alignment(monkeypatch):
     # the package re-exports the evaluate FUNCTION, shadowing the submodule attribute
     eval_mod = importlib.import_module("evemtbench.evaluation.evaluate")
 
-    def permissive(metadata, predictions):
+    def permissive(metadata, predictions, *, allow_extra=False):
         import numpy as np
 
         merged = metadata.merge(

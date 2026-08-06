@@ -45,7 +45,17 @@ def load_grid_graph(
     grid: str | GridSpec, family: str = "benchmark", root: str | os.PathLike | None = None
 ) -> nx.Graph:
     """Load the topology graph for ``grid``/``family`` from the aux overlay. Fails loud if absent
-    (run ``python -m evemtbench.data.extract_aux`` first)."""
+    (run ``python -m evemtbench.data.extract_aux`` first).
+
+    **Trust boundary — read before pointing ``root`` anywhere new.** ``graph.pickle`` is loaded with
+    :func:`pickle.load`, which executes arbitrary code during unpickling. That is acceptable here
+    only because the file is a *first-party artifact*: it is extracted from the official per-grid
+    tarballs by :mod:`evemtbench.data.extract_aux` and is as trusted as the dataset itself. It is
+    NOT a safe reader for a third-party or user-supplied file — never point ``root`` at an untrusted
+    directory, and do not accept a ``graph.pickle`` from a benchmark submission. The pickle format
+    is inherited from the upstream data generator; the graphs are only used for topology
+    summaries and reporting, never on the scoring path, so a submission never needs to supply one.
+    """
     _require_networkx()  # needed to unpickle the nx graph object
     path = _graph_path(grid, family, root)
     if not path.exists():

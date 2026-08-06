@@ -14,7 +14,7 @@ Every file here is byte-checked against a fresh rebuild by the freshness gate
 
 ## `aggregated_results.csv` / `aggregated_results.json`
 
-One record per (task × protocol × grid × baseline × test_set × metric) — 31472
+One record per (task × protocol × grid × baseline × test_set × metric) — 34528
 records across 4164 cells for this version. Columns / keys:
 
 - `version`

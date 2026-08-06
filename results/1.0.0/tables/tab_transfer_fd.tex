@@ -3,8 +3,9 @@
 \centering
 \small
 \setlength{\tabcolsep}{4.5pt}
-\caption{Fault detection (\ac{fd}) --- cross-grid transfer reference baseline (best of MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported benchmark set: \emph{fine-tune} on the target grid's validation split, \emph{zero-shot} on the pre-training source's \texttt{multi\_grid} validation --- so the zero-shot choice is grid-independent), headline metric (balanced accuracy $\uparrow$), pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) then \emph{zero-shot} vs.\ \emph{fine-tuned} on each target grid, scored on the never-trained benchmark family per observability view. Cells are mean\,$\pm$\,95\% CI; \pending{}~= pending (no result yet); \oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent \emph{global} width).}
+\caption{Fault detection (\ac{fd}) --- cross-grid transfer reference baseline (best of MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported \texttt{eval\_grid} set: \emph{fine-tune} on the target grid's validation split, \emph{zero-shot} on the pre-training source's \texttt{multi\_grid} validation --- so the zero-shot choice is grid-independent), headline metric (balanced accuracy $\uparrow$), pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) then \emph{zero-shot} vs.\ \emph{fine-tuned} on each target grid, scored on the never-trained \texttt{eval\_grid} family per observability view. Cells are mean\,$\pm$\,95\% CI; \pending{}~= pending (no result yet); \oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent \emph{global} width).}
 \label{tab:transfer_fd}
+\resizebox{\ifdim\width>\textwidth \textwidth\else \width\fi}{!}{%
 \begin{tabular}{ll ccc ccc}
 \toprule
  & & \multicolumn{3}{c}{\textbf{Zero-shot}} & \multicolumn{3}{c}{\textbf{Fine-tune}} \\
@@ -27,5 +28,5 @@ IEEE 39-Bus (345\,kV)  & 20\,kV   & 0.950 $\pm$ 0.005 & 0.905 $\pm$ 0.030 & \oos
                        & 110\,kV  & 0.934$\,{\scriptscriptstyle[0.860,\,1.000]}$ & 0.901 $\pm$ 0.072 & \oos & 0.974 $\pm$ 0.013 & 0.987 $\pm$ 0.009 & \oos \\
                        & 345\,kV  & 0.978 $\pm$ 0.002 & 0.956 $\pm$ 0.015 & \oos & 0.967 $\pm$ 0.026 & 0.991 $\pm$ 0.007 & \oos \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table*}

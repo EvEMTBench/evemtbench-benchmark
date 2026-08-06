@@ -17,6 +17,17 @@ Tasks = **{FD, FC, FL} × {local, line, global}** = 9 task ids per grid
 | Fault **classification** (FC) | `fault_classification` | multiclass | **9** | fault-active windows whose fault type is in the 9-class vocab |
 | Fault **location** (FL) | `fault_location` | regression | — | fault-active windows of **line**-fault episodes (`y_fault_location` defined; NaN on bus faults) |
 
+> **The fault tasks are ORACLE tasks — read the "valid samples" column as part of the task
+> definition, not as a filtering detail.** Only fault episodes are scored, so FD's negatives are the
+> *pre-onset windows of episodes that do fault*; and at `local`/`line` the input cubicles are chosen
+> by the ground-truth faulted line (`y_fault_line`). FD is therefore **line-conditioned onset
+> detection**, not grid-wide detection, and FL presupposes a correctly identified faulted line. This
+> is intentional — it holds information constant so representations can be compared (§2.4) — but it
+> means deployed performance is **overstated** by construction: a model that trips on any disturbance
+> scores near-perfectly on `fault_detection_local` and would be unusable as a relay. See
+> [task_cards/fault_detection.md](task_cards/fault_detection.md) and
+> [task_cards/relay_selectivity.md](task_cards/relay_selectivity.md).
+
 - **FC vocabulary (frozen, 9 classes):** the 7 universal SHC/incipient subtypes + the 2 MV-only HIF
   subtypes (`flt_1phg_hif`, `flt_1phg_hif_w_arc`), appended last so indices 0–6 are stable. HV/EHV
   grids simply have zero HIF support. See [taxonomy.md](taxonomy.md).
@@ -55,6 +66,35 @@ Design: [design/pretrain_transfer.md](design/pretrain_transfer.md).
   `event_type`) of the `multi_grid` family of the pre-training grid; **no benchmark family** (in-corpus).
   Produces the checkpoints the transfer protocols initialise from. Committed under
   `splits/v<SPLITS_VERSION>/multi_grid_pretrain/<grid>/`.
+
+  > **Known deviation from the dataset paper's recommendation — pre-training corpus only.**
+  > The dataset paper recommends *simulation-level* splits for `adapt_grid` (what we do) and
+  > ***topology*-level splits for `multi_grid`**. The `multi_grid` split is **neither**, because a
+  > `multi_grid` episode is *one line of one simulation* (the portable two-terminal view; see
+  > [design/pretrain_transfer.md](design/pretrain_transfer.md)). Measured from the committed split
+  > files:
+  >
+  > | template | simulations | episodes | mean lines/sim | lines/sim range |
+  > |---|---|---|---|---|
+  > | `template_20kv`  | 9 753 | 119 153 | 12.2 | 1–28 |
+  > | `template_110kv` | 9 879 | 138 512 | 14.0 | – |
+  > | `template_345kv` | 9 895 | 173 407 | 17.5 | 6–32 |
+  >
+  > (≈10 000 simulations per voltage level, ≈96 per generated topology → ≈105 topologies, matching
+  > the dataset paper.) A random 70/15/15 episode split therefore puts **sibling lines of the same
+  > simulation** — same event, same operating state, same 0.5 s of grid history seen at other
+  > terminals — into different partitions, and reuses every topology across all three.
+  > Consequence: **`multi_grid_pretrain` `val`/`test` measure neither cross-simulation nor
+  > cross-topology generalisation.** No reported benchmark number comes from them — every scored
+  > metric lives on a reference grid whose topology and simulations never appear in `multi_grid`,
+  > and whose own splits are simulation-level as recommended — but the zero-shot *checkpoint
+  > selection* signal reads the 20 kV pre-training `val`, so treat it as an optimistic selection
+  > criterion, never as cross-topology evidence. Grouping by simulation (and by topology) is the
+  > fix and a prerequisite for the planned cross-topology protocol; the topology id comes from the
+  > aux overlay (`general/grid_graph` in `settings_clean.csv`, see `data/extract_aux.py`), the
+  > simulation id is already the high part of the `multi_grid` `sample_id`
+  > (`sample_id = sim_idx × 10⁴ + line_idx`). Adopting it invalidates the current pre-trained
+  > checkpoints (144 pre-training + 1 152 transfer cells).
 - **`transfer_zeroshot`** — initialise from that checkpoint and evaluate a reference grid's
   `adapt_grid` `test` and `benchmark` families with **no target training** (target topology unseen).
 - **`transfer_finetune`** — initialise from the checkpoint, fine-tune on the reference grid's

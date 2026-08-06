@@ -14,6 +14,21 @@
 
 ## Notes / claims
 
+- **What this task is, and is not.** FD is **line-conditioned onset detection**, not end-to-end
+  grid-wide fault detection or relay selection. Two design choices make that so, and both are
+  deliberate (the *oracle* framing, framework §2.4):
+  1. **Only fault episodes are scored** (`tasks/valid_samples.py`: `y_fault_line` not null). No
+     switching or normal episode ever enters FD, so the negatives are exclusively the **pre-onset
+     windows of episodes that do go on to fault**. The question is therefore "has the fault started
+     yet?", not "is anything wrong on this grid?".
+  2. **At `local`/`line`, the input window is selected by the ground-truth faulted line**
+     (`tasks/task.py::_observe`, keyed on the episode-constant `y_fault_line`). The model is shown
+     the right terminals; it is not asked to find them.
+  Consequence to keep in mind when reading the leaderboard: a model that trips on *any* disturbance
+  scores near-perfectly on `fault_detection_local` under this oracle — it only ever sees in-zone
+  faults — and would be unusable as a relay. Deployed performance is **overstated** by construction;
+  the numbers compare *representations under matched information*, which is what the benchmark is
+  for. See [relay_selectivity.md](relay_selectivity.md) for the un-oracled formulation.
 - `held_out` scores **two** test sets: the in-distribution `adapt_grid` `test` split and the
   never-trained-on `benchmark` family. Report both — they can diverge sharply.
 - Never compare across observability settings without stating which (fairness rule, framework §2.4).

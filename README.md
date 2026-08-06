@@ -126,9 +126,13 @@ Baselines: `majority`, `threshold` (overcurrent; FD binary + `local` only), `ran
 
 ## Reproducibility
 
-- `requirements.lock` (uv) pins CI deps; HPC layers the package onto the `py_dl` conda base.
+- Two environments, two pins: `env/results-v1.0.0.lock` records the conda prefix the **published
+  results** ran in (torch + CUDA included); `requirements-ci-py3.{10,12}.lock` hash-pin the
+  **CI test gate** (torch-free). HPC layers the package onto the `py_dl` conda base.
+- All 1876 run records independently agree with the results-env capture
+  (`hpc/verify_results_env.py`) — two independent captures agreeing is the actual guarantee.
 - Committed `splits/v1.0/` are the source of truth and regenerate deterministically.
-- Every run emits `run_record.json` (seeds, git sha, lockfile hash, env). See
+- Every run emits `run_record.json` (seeds, git sha, lockfile + results-env hashes, env). See
   [docs/versioning.md](docs/versioning.md) and [docs/determinism.md](docs/determinism.md).
 
 ## HPC

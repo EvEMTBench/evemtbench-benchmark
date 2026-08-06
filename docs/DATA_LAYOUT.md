@@ -46,6 +46,10 @@ requires **exactly one** `X_*.raw` per dir — the single-config-read fix is an 
 ```text
 $EVEMTBENCH_AUX_ROOT/<family>/<RawFolder>/
 ├── graph.pickle       # networkx MultiGraph of the topology (nodes=buses, edges=lines/trafos)
+│                      # TRUSTED first-party artifact: read with pickle.load (executes code on
+│                      # unpickle), so it is safe only because extract_aux produced it from the
+│                      # official tarballs. Never load one from an untrusted root or a submission
+│                      # — it is used for topology reporting only, never on the scoring path.
 └── settings.csv       # one row per episode: event parameters incl. fault resistance
 ```
 

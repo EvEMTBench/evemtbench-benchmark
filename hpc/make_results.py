@@ -12,6 +12,7 @@ from __future__ import annotations
 import collections
 import glob
 import json
+import sys
 
 from evemtbench.data.roots import GRIDS
 from evemtbench.evaluation.significance import ci95_halfwidth
@@ -86,6 +87,21 @@ _LOWER_BETTER = {
 _OBS_ORDER = {"local": 0, "line": 1, "global": 2}
 
 
+_WARNED: set[str] = set()
+
+
+def warn_once(msg: str) -> None:
+    """Print ``[warn] <msg>`` to stderr once per process (dedup by exact message).
+
+    Silent degradations in the results/selection path (a swallowed corrupt result.json, a
+    selection falling back from validation to the reported set) must be loud enough to show up
+    in build/CI/SLURM logs without touching stdout or any byte-compared rendered artifact."""
+    if msg in _WARNED:
+        return
+    _WARNED.add(msg)
+    print(f"[warn] {msg}", file=sys.stderr, flush=True)
+
+
 def load_rows(grid: str) -> dict:
     """(task_id, baseline) -> {test_set: doc} for one grid, from outputs/<version>/..."""
     rows: dict = collections.defaultdict(dict)
@@ -93,8 +109,8 @@ def load_rows(grid: str) -> dict:
         try:
             d = json.load(open(f))
             rows[(d["task"], d["baseline"])][d["test_set"]] = d
-        except Exception:
-            pass
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            warn_once(f"skipping unreadable/malformed result.json: {f} ({type(e).__name__}: {e})")
     return rows
 
 

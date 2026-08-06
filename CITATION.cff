@@ -25,10 +25,25 @@ version: 1.0.0
 # doi: 10.5281/zenodo.XXXXXXX
 references:
   - type: data
-    title: "EvEMTBench: A Simulation-Based Dataset of Faults and Events for ML in Power Systems"
+    title: "A simulation based dataset of faults and events for machine learning in power systems"
     authors:
       - family-names: Kordowich
         given-names: Georg
+      - family-names: Loebel
+        given-names: Jonathan
       - family-names: Oelhaf
         given-names: Julian
-    notes: "Dataset artifact (IEEE DataPort / Zenodo), CC-BY-4.0. DOI to be added."
+      - family-names: Maier
+        given-names: Andreas
+      - family-names: Bayer
+        given-names: Siming
+      - family-names: Bergler
+        given-names: Christian
+      - family-names: Jaeger
+        given-names: Johann
+    url: "https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/"
+    notes: >-
+      The EvEMTBench dataset this benchmark evaluates on: point-on-wave EMT waveforms,
+      window-level labels, per-episode settings and topology graphs. Hosted on FAUDataCloud,
+      CC-BY-4.0; DOI 10.48742/fau.1fkx-ef11 reserved. The dataset paper is under review at
+      Scientific Data; the data-generation code (PowerFactory) is archived separately.

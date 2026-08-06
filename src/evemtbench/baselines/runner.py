@@ -5,7 +5,9 @@ with the official metrics. Across seeds, report mean ± std + a 95% CI (t-based)
 ``outputs/<benchmark_version>/<task>/<protocol>/<grid>/``:
 
 * ``predictions_seed{n}.parquet`` — the canonical predictions file (auditable by the CLI),
-* ``result.json``                 — per-seed + aggregated metrics + stratified breakdowns,
+* ``result.json``                 — per-seed + seed-aggregated metrics + seed-aggregated
+  stratified breakdowns (both built by ``evaluation/aggregate.py``, which the offline
+  re-evaluation pass shares so a rebuild is byte-identical),
 * ``run_record.json``             — seeds, git sha, lockfile hash, env versions, args, and the
   no-tuning attestation (fit on train, select on val, held-out sets predict-only).
 
@@ -29,10 +31,15 @@ from pathlib import Path
 import numpy as np
 
 from ..coverage import PRETRAIN_GRID
-from ..evaluation.evaluate import EvalResult, _nan_to_none, evaluate
+from ..evaluation.aggregate import (
+    aggregate_seed_breakdowns,
+    aggregate_seed_metrics,
+    build_result_doc,
+    render_result_json,
+)
+from ..evaluation.evaluate import EvalResult, evaluate
 from ..evaluation.metrics import METRIC_DIRECTION
 from ..evaluation.predictions_io import predictions_frame
-from ..evaluation.significance import ci95_halfwidth
 from ..splits.protocols import TRANSFER_PROTOCOLS, default_input_normalize
 from ..tasks.task import load_task
 from ..version import BENCHMARK_VERSION, SPLITS_VERSION
@@ -144,11 +151,54 @@ def _git_sha() -> str | None:
         return None
 
 
+def _repo_root() -> Path:
+    return Path(__file__).resolve().parents[3]
+
+
+def _sha256_file(path: Path) -> str | None:
+    return hashlib.sha256(path.read_bytes()).hexdigest() if path.is_file() else None
+
+
 def _lockfile_hash() -> str | None:
-    lock = Path(__file__).resolve().parents[3] / "requirements.lock"
-    if lock.is_file():
-        return hashlib.sha256(lock.read_bytes()).hexdigest()
-    return None
+    """sha256 of the CI dependency lock — the *test-gate* pin, not the results pin.
+
+    Kept under its original name and pointing at its original file because every record in the
+    v1.0.0 corpus already carries this hash; repointing it would silently redefine a published
+    field. What the results were actually computed with is ``results_env_sha256`` below.
+    """
+    return _sha256_file(_repo_root() / "requirements.lock")
+
+
+def cell_identity(
+    task_id: str, protocol: str, grid: str, baseline_tag: str, pretrain_grid: str | None
+) -> tuple[str, str]:
+    """``(display_name, cell_key)`` identifying one cell for the ONLINE tracking channel.
+
+    Must be one-to-one with the cell's output directory. ``_tracking.run_id_for`` hashes
+    ``cell_key`` and ``start_run`` resumes on a matching id, so a key shared by two cells makes the
+    second resume into the first — one history, one summary, the loser's config overwritten.
+    Transfer cells therefore carry the same ``pretrain-<source>`` qualification that ``base_dir``
+    and ``coverage.cell_dir`` use, under the same condition, so the default (20 kV) source keeps its
+    legacy source-less key and already-logged runs keep their ids.
+    """
+    suffix = (
+        f"/pretrain-{pretrain_grid}"
+        if protocol in TRANSFER_PROTOCOLS and pretrain_grid != PRETRAIN_GRID
+        else ""
+    )
+    name = f"{task_id}/{protocol}/{grid}/{baseline_tag}{suffix}"
+    return name, f"{BENCHMARK_VERSION}/{name}"
+
+
+def _results_env_hash() -> str | None:
+    """sha256 of ``env/results-v<version>.lock`` — the captured RESULTS environment.
+
+    This is the pin a third party should compare against: it records the conda prefix that produced
+    outputs/<version>, including torch and the CUDA stack, which the CI lock deliberately omits.
+    Cross-checked per cell by the ``versions`` block written alongside it (same record), so a
+    mismatch between this file and the interpreter that ran is detectable after the fact.
+    """
+    return _sha256_file(_repo_root() / "env" / f"results-v{BENCHMARK_VERSION}.lock")
 
 
 def _dist_version(name: str) -> str | None:
@@ -158,37 +208,11 @@ def _dist_version(name: str) -> str | None:
         return None
 
 
-def _aggregate(per_seed_metrics: list[dict[str, float]]) -> dict[str, dict[str, float | None]]:
-    keys = per_seed_metrics[0].keys()
-    summary: dict[str, dict[str, float | None]] = {}
-    for k in keys:
-        vals = np.array([m[k] for m in per_seed_metrics], dtype=float)
-        finite = vals[np.isfinite(vals)]
-        n_defined, n_seeds = int(finite.size), int(vals.size)
-        if n_defined == 0:
-            # Metric is structurally undefined for this whole partition across every seed
-            # (e.g. balanced_accuracy on a single-class subset). Record nulls + n_defined=0
-            # so the result distinguishes "undefined" from a genuine 0.0, and skip the
-            # all-NaN nanmean/nanstd that would otherwise warn "Mean of empty slice".
-            summary[k] = {
-                "mean": None,
-                "std": None,
-                "ci95": None,
-                "n_defined": 0,
-                "n_seeds": n_seeds,
-            }
-        else:
-            # Average over the defined seeds only (no nan-aware reducer, hence no warning).
-            # ci95: t-based half-width over the defined seeds (ddof=1 — the stored std stays
-            # population/ddof=0). None when < 2 seeds: no seed-variance estimate, never a fake ±0.
-            summary[k] = {
-                "mean": float(finite.mean()),
-                "std": float(finite.std()),
-                "ci95": ci95_halfwidth(finite),
-                "n_defined": n_defined,
-                "n_seeds": n_seeds,
-            }
-    return summary
+# Moved to evaluation/aggregate.py so the runner and the offline re-evaluation pass build a
+# result.json
+# through ONE implementation (byte-identity by construction, not by assertion). Alias kept: the name
+# is referenced elsewhere in this module and by the audit's code-anchor manifest.
+_aggregate = aggregate_seed_metrics
 
 
 def _save_checkpoint(model, base_dir: Path, seed: int) -> dict | None:
@@ -379,19 +403,20 @@ def main(argv: list[str] | None = None) -> None:
     from ._log import set_log_file
 
     set_log_file(base_dir / "train.log")
-    cell_key = (
-        f"{BENCHMARK_VERSION}/{task.definition.task_id}/{task.protocol}/{task.grid}/{baseline_tag}"
+    _cell_name, cell_key = cell_identity(
+        task.definition.task_id, task.protocol, task.grid, baseline_tag, args.pretrain_grid
     )
     _cluster = os.environ.get("SLURM_CLUSTER_NAME") or os.environ.get("CLUSTER")
     wandb_info = _tracking.start_run(
         cell_key=cell_key,
-        name=f"{task.definition.task_id}/{task.protocol}/{task.grid}/{baseline_tag}",
+        name=_cell_name,
         config={
             **vars(args),
             "benchmark_version": BENCHMARK_VERSION,
             "splits_version": SPLITS_VERSION,
             "git_sha": _git_sha(),
             "lockfile_sha256": _lockfile_hash(),
+            "results_env_sha256": _results_env_hash(),
             "normalize": normalize,
             "cluster": _cluster,
             "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
@@ -406,6 +431,12 @@ def main(argv: list[str] | None = None) -> None:
             f"v{BENCHMARK_VERSION}",
             _cluster,
             (_git_sha() or "")[:8],
+            *(
+                [f"pretrain-{args.pretrain_grid}"]
+                if args.protocol in TRANSFER_PROTOCOLS
+                else []  # tagged for every transfer run, incl. the default source, so the online
+                # view can filter by source without knowing which one is the legacy default
+            ),
         ],
     )
 
@@ -419,6 +450,9 @@ def main(argv: list[str] | None = None) -> None:
 
     per_seed_metrics: dict[str, list[dict[str, float]]] = {ts: [] for ts in test_sets}
     per_seed_results: dict[str, list[dict]] = {ts: [] for ts in test_sets}
+    per_seed_breakdowns: dict[str, list[dict]] = {ts: [] for ts in test_sets}
+    # Retained ONLY for n_samples (a property of the eval view, seed-invariant). The breakdowns that
+    # used to be read off this object are now aggregated across all seeds.
     last_result: dict[str, EvalResult | None] = {ts: None for ts in test_sets}
     per_seed_compute: list[dict] = []
     checkpoints: dict[str, dict] = {}
@@ -498,6 +532,7 @@ def main(argv: list[str] | None = None) -> None:
             result = evaluate(task, preds, test_set=ts)
             per_seed_metrics[ts].append(result.metrics)
             per_seed_results[ts].append({"seed": seed, "metrics": result.metrics})
+            per_seed_breakdowns[ts].append(result.breakdowns)
             last_result[ts] = result
             _tracking.log_seed_final(seed, ts, result.metrics)
             print(
@@ -512,31 +547,30 @@ def main(argv: list[str] | None = None) -> None:
     aggs: dict[str, dict] = {}
     for ts in test_sets:
         out_dir = base_dir / ts
-        agg = _aggregate(per_seed_metrics[ts])
+        agg = aggregate_seed_metrics(per_seed_metrics[ts])
         aggs[ts] = agg
         lr_ = last_result[ts]
-        result_doc = {
-            "benchmark_version": BENCHMARK_VERSION,
-            "task": task.definition.task_id,
-            "protocol": task.protocol,
-            "grid": task.grid,
-            "baseline": baseline_tag,
-            # pre-training source grid for transfer cells (None otherwise) — lets the leaderboard /
-            # paper builders distinguish 20/110/345 kV-sourced transfer at the same target.
-            "pretrain_grid": (args.pretrain_grid if args.protocol in TRANSFER_PROTOCOLS else None),
-            "test_set": ts,
-            "n_test": lr_.n_samples if lr_ else 0,
-            "seeds": args.seeds,
-            "n_params": n_params,  # capacity: trainable params (None for classical)
-            "compute": compute_summary,  # per-cell training cost (GPU-hours reporting)
-            "per_seed": per_seed_results[ts],
-            "aggregate": agg,
-            "breakdowns": lr_.breakdowns if lr_ else {},
-        }
-        sanitized = _nan_to_none(json.loads(json.dumps(result_doc, default=float)))
-        (out_dir / "result.json").write_text(
-            json.dumps(sanitized, indent=2, sort_keys=True, allow_nan=False)
+        result_doc = build_result_doc(
+            benchmark_version=BENCHMARK_VERSION,
+            task=task.definition.task_id,
+            protocol=task.protocol,
+            grid=task.grid,
+            baseline=baseline_tag,
+            pretrain_grid=(args.pretrain_grid if args.protocol in TRANSFER_PROTOCOLS else None),
+            test_set=ts,
+            # n_samples is a property of the eval view, identical for every seed — the last result
+            # is a safe source for it, unlike the breakdowns that used to ride along with it.
+            n_test=lr_.n_samples if lr_ else 0,
+            seeds=args.seeds,
+            n_params=n_params,
+            compute=compute_summary,
+            per_seed=per_seed_results[ts],
+            aggregate=agg,
+            # Aggregated across ALL seeds, with the same mean/std/ci95 machinery as `aggregate`.
+            # Previously this was the LAST seed's breakdowns sitting next to a 5-seed aggregate.
+            breakdowns=aggregate_seed_breakdowns(per_seed_breakdowns[ts]),
         )
+        (out_dir / "result.json").write_text(render_result_json(result_doc))
 
     # No-tuning attestation (the benchmark rule the paper cites): the held-out target views are
     # always predict-only. Zero-shot never trains on the target at all; fine-tune trains only on the
@@ -579,6 +613,7 @@ def main(argv: list[str] | None = None) -> None:
         "splits_version": SPLITS_VERSION,
         "git_sha": _git_sha(),
         "lockfile_sha256": _lockfile_hash(),
+        "results_env_sha256": _results_env_hash(),
         "seeds": args.seeds,
         "args": vars(args),
         "normalize": normalize,  # resolved input normalization (per_window for transfer/pretrain)

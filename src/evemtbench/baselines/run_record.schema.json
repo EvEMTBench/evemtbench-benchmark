@@ -40,7 +40,16 @@
         "string",
         "null"
       ],
-      "pattern": "^[0-9a-f]{64}$"
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 of requirements.lock — the CI dependency pin (test gate). NOT the environment the results were computed in; see results_env_sha256."
+    },
+    "results_env_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 of env/results-v<benchmark_version>.lock — the captured RESULTS environment (conda prefix incl. torch + CUDA stack). Optional: added after the v1.0.0 sweep, so records written before it are backfilled by hpc/backfill_results_env.py only when their 'versions'/'python'/'torch' match the capture exactly. Null for third-party runs from a tree without env/."
     },
     "seeds": {
       "type": "array",

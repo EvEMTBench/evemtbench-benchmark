@@ -45,8 +45,19 @@ def split_episodes(
 
     ``strata=None`` → a single seeded permutation (uniform). ``strata`` (episode id → class label,
     e.g. ``event_type``) → a **stratified group split**: each class is partitioned 70/15/15
-    independently so rare, grid-restricted classes (HIF, gen_trip, …) appear in every split. Both
-    paths are byte-reproducible for a given seed (sorted ids; classes consumed in sorted order).
+    independently, so rare, grid-restricted classes (HIF, gen_trip, …) are spread across the
+    partitions instead of landing wholesale in one. Both paths are byte-reproducible for a given
+    seed (sorted ids; classes consumed in sorted order).
+
+    **Limit of that guarantee, stated precisely:** the per-class sizes are rounded independently
+    (``round(0.70*m)``, ``round(0.15*m)``, remainder), so a class needs **m >= 6 episodes** to be
+    present in all three partitions. Below that some partition is empty for that class: m=1 →
+    (1,0,0); m=2 → (1,0,1); m=3 → (2,0,1) — no val; m=4 → (3,1,0) and m=5 → (4,1,0) — no test. This
+    is not hypothetical arithmetic to be relied on: it is what
+    ``test_stratified_split_small_classes`` pins. Every committed v1.0 split has >= 31 episodes per
+    class per partition, so no published split is affected — but a future grid with a genuinely
+    rare class would silently lose it from a partition, and per-class metrics there would read n/a
+    rather than wrong. The rounding is NOT changed here: doing so would alter the committed splits.
     """
     ids = np.array(sorted(int(i) for i in episode_ids), dtype=np.int64)
     rng = np.random.default_rng(seed)
@@ -116,9 +127,11 @@ def generate_held_out(
     ``multi_grid_pretrain`` protocol passes ``train_family="multi_grid", benchmark_family=None``
     (in-corpus split of the
     pre-training family, no separate held-out family). With ``stratify_by`` (e.g. ``"event_type"``)
-    the train-family split is class-stratified so rare classes appear in every partition; default
-    None reproduces the uniform split byte-for-byte. The per-grid seed is namespaced by protocol so
-    different protocols' splits of the same grid are independent.
+    the train-family split is class-stratified so rare classes are spread across the partitions
+    rather than landing wholesale in one (presence in *all three* requires >= 6 episodes of the
+    class — see :func:`split_episodes`); default None reproduces the uniform split byte-for-byte.
+    The per-grid seed is namespaced by protocol so different protocols' splits of the same grid are
+    independent.
     """
     g = get_grid(grid)
     seed = _grid_seed(protocol + "_" + g.key) if seed is None else seed

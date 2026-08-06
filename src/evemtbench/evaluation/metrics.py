@@ -29,6 +29,7 @@ REGRESSION_METRICS = ("mae", "rmse", "r2", "median_abs_error")
 METRIC_DIRECTION: dict[str, int] = {
     "balanced_accuracy": +1,
     "macro_f1": +1,
+    "macro_f1_supported": +1,
     "accuracy": +1,
     "missed_fault_rate": -1,
     "missed_event_rate": -1,
@@ -39,6 +40,31 @@ METRIC_DIRECTION: dict[str, int] = {
     "median_abs_error": -1,
     "r2": +1,
 }
+
+
+def macro_f1_supported(y_true: np.ndarray, y_pred: np.ndarray) -> float:
+    """Macro-F1 averaged over ONLY the classes with support in this evaluation set.
+
+    A companion to ``macro_f1``, not a replacement for it. ``macro_f1`` is frozen benchmark contract
+    and stays exactly as specified in the paper: per-class F1 with zero-division mapped to 0,
+    averaged over the full frozen vocabulary. That definition is deliberate — it keeps the number
+    comparable across grids — but it also means a grid where only 3 of 5 classes can occur is capped
+    at 0.6, so the value is not an achievable-skill measure on grids with partial class support (FC
+    with MV-only HIF classes, EC with grid-specific event types).
+
+    This variant answers the other question — how well the model did on the classes that were
+    actually there — by averaging over ``support > 0`` in ``y_true``. Reported alongside, so neither
+    reading is lost and the contract is untouched.
+
+    For multiclass it equals the ``nanmean`` of the emitted per-class ``f1_<class>`` values: sklearn
+    computes each label's F1 over all samples independently, so restricting ``labels`` changes only
+    which are averaged. NaN (never 0.0) on an empty set — undefined, not zero skill.
+    """
+    y_true = np.asarray(y_true)
+    labels = np.unique(y_true)
+    if labels.size == 0:
+        return float("nan")
+    return float(f1_score(y_true, y_pred, average="macro", labels=labels.tolist(), zero_division=0))
 
 
 def _rates(y_true: np.ndarray, y_pred: np.ndarray) -> tuple[float, float]:
@@ -76,6 +102,10 @@ def compute_binary_metrics(
             out[name] = false_alarm
         else:
             raise KeyError(f"unknown metric {name!r}")
+    # Emitted additively (like the per-class f1_<class> keys), NOT via metric_names: the frozen
+    # td.metrics tuples, BINARY/MULTICLASS_METRICS and HEADLINE_PRIORITY stay untouched, so
+    # headline selection and the metric contract are unaffected.
+    out["macro_f1_supported"] = macro_f1_supported(y_true, y_pred)
     return out
 
 
@@ -149,4 +179,7 @@ def compute_multiclass_metrics(
         )
         for i, (c, score) in enumerate(zip(classes, per, strict=True)):
             out[f"f1_{c}"] = float("nan") if support[i] == 0 else float(score)
+    # See compute_binary_metrics: additive, so the frozen macro_f1 contract is untouched. Equals the
+    # nanmean of the f1_<class> values just emitted.
+    out["macro_f1_supported"] = macro_f1_supported(y_true, y_pred)
     return out

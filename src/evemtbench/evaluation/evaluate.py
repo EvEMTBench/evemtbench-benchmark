@@ -29,7 +29,7 @@ from .metrics import (
     compute_multiclass_metrics,
     compute_regression_metrics,
 )
-from .predictions_io import align_to_view
+from .predictions_io import align_to_view, check_prediction_values
 from .stratify import stratified_metrics
 
 # Multiclass tasks → their frozen class vocabulary (so absent classes still score and stay
@@ -75,24 +75,45 @@ class EvalResult:
         return json.dumps(sanitized, indent=indent, sort_keys=True, allow_nan=False)
 
 
-def evaluate(task: Task, predictions: pd.DataFrame, *, test_set: str = "test") -> EvalResult:
+def evaluate(
+    task: Task, predictions: pd.DataFrame, *, test_set: str = "test", allow_extra: bool = False
+) -> EvalResult:
     """Evaluate ``predictions`` against one held-out view using the task's official metrics.
 
     ``test_set`` selects the view: ``"test"`` (adapt_grid in-distribution) or ``"benchmark"``
     (the held-out benchmark family). Recorded on the result for attribution.
+
+    Submitted values are validated before scoring (``check_prediction_values``): a public benchmark
+    must fail loudly on an ill-formed submission rather than return a number for it. ``allow_extra``
+    is forwarded to ``align_to_view``; leave it False for anything score-bearing.
     """
     td = task.definition
     test = task.view(test_set)
     is_regression = td.label_kind is LabelKind.REGRESSION
+    # Frozen vocabulary size, so an out-of-range class id is rejected rather than silently dropped
+    # by the confusion matrix. Binary tasks are {0, 1}; regression has no vocabulary.
+    if is_regression:
+        n_classes = None
+    elif td.label_kind is LabelKind.BINARY:
+        n_classes = 2
+    else:
+        # None when a multiclass function has no registered vocabulary: skip the range check rather
+        # than invent a bound (every current MULTICLASS function is in _CLASS_VOCAB).
+        n_classes = len(_CLASS_VOCAB.get(td.function) or ()) or None
 
     def _cast(arr):
         # Regression keeps floats; classification rounds to the nearest class id rather than
         # truncating toward zero, so a third-party float prediction like 2.9999999 scores as 3.
+        # Values are validated first, so the round can no longer turn NaN into INT64_MIN or move a
+        # non-integral value into a neighbouring class.
         arr = np.asarray(arr)
         return arr.astype(float) if is_regression else np.round(arr).astype(int)
 
+    raw_pred = align_to_view(test.metadata, predictions, allow_extra=allow_extra)
+    check_prediction_values(raw_pred, regression=is_regression, n_classes=n_classes)
+
     y_true = _cast(test.labels)
-    y_pred = _cast(align_to_view(test.metadata, predictions))
+    y_pred = _cast(raw_pred)
 
     if td.label_kind is LabelKind.BINARY:
 

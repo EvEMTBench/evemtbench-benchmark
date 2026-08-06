@@ -29,7 +29,7 @@ for _p in (_HPC, _REPO / "src"):
 
 from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRID, PRETRAIN_GRIDS  # noqa: E402
 from evemtbench.evaluation.metrics import METRIC_DIRECTION  # noqa: E402
-from make_results import BASELINES, ci_val, load_rows, mean_val  # noqa: E402
+from make_results import BASELINES, ci_val, load_rows, mean_val, warn_once  # noqa: E402
 
 GEN_DIR = _REPO / "paper" / "manuscript" / "generated"
 FIG_DIR = _REPO / "paper" / "manuscript" / "figures"
@@ -73,7 +73,19 @@ _BASELINE_LABEL = {
     "cnn": r"\ac{cnn}",
     "resnet": r"\ac{resnet}",
 }
-_TS_LABEL = {"test": "in-distribution (test)", "benchmark": "never-trained benchmark family"}
+# Scale-down-ONLY width backstop for the wide SI tables: shrinks a tabular that would overrun
+# \textwidth, leaves a narrow one untouched (adjustbox is absent from the offline tectonic bundle,
+# hence the raw \ifdim). Every user must close the extra group with `\end{tabular}}`.
+_SHRINK_TO_FIT = "\\resizebox{\\ifdim\\width>\\textwidth \\textwidth\\else \\width\\fi}{!}{%\n"
+
+# DISPLAY labels for the two held_out test sets. The manuscript calls the never-trained family
+# `eval_grid` to keep it distinct from "the benchmark" (the evaluation framework as a whole); the
+# dataset publication calls it Benchmark and the on-disk/code handle stays `benchmark` — which is
+# why only the rendered label changes here, never TEST_SETS or any result-path key.
+_TS_LABEL = {
+    "test": "in-distribution (test)",
+    "benchmark": "never-trained \\texttt{eval\\_grid} family",
+}
 
 # ---- F10: clip Student-t intervals to a bounded metric's support for display -------------------
 # Balanced accuracy, accuracy, and the F1 family live in [0,1]; a symmetric t-interval at n=5 can
@@ -200,6 +212,12 @@ def _best_cell(rows: dict, stem: str, view: str, test_set: str, metric: str) -> 
     choice = best_cell_choice(rows, f"{stem}_{view}", test_set, metric)
     if choice is None:
         return r"\pending"
+    if choice["selected_on"] == "test":
+        warn_once(
+            f"held_out cell {stem}_{view}/{test_set} ({metric}): no validation re-score for any "
+            f"learned baseline; '{choice['baseline']}' selected on the reported set "
+            "(legacy fallback)"
+        )
     return _fmt_mean_ci(choice["mean"], choice["ci"], metric)
 
 
@@ -244,19 +262,18 @@ def result_table(key: str) -> str:
         "selected on the validation split; a beatable reference, full per-baseline breakdown "
         "in the Supplementary), headline metric "
         f"({metric_label}) per grid and observability view, for the two \\texttt{{held\\_out}} "
-        "test sets (in-distribution vs.\\ never-trained benchmark family). Cells are "
+        "test sets (in-distribution vs.\\ never-trained \\texttt{eval\\_grid} family). Cells are "
         "mean\\,$\\pm$\\,95\\% CI (Student's $t$); " + ci_note + "\\pending{}~= pending (no result "
         "yet); \\notapp{}~= not defined for this view. Full per-baseline tables in the "
         "Supplementary.}\n"
-        f"\\label{{tab:res_{key}}}\n"
-        "\\begin{tabular}{l ccc ccc}\n\\toprule\n"
+        f"\\label{{tab:res_{key}}}\n" + _SHRINK_TO_FIT + "\\begin{tabular}{l ccc ccc}\n\\toprule\n"
         " & \\multicolumn{3}{c}{\\textbf{In-distribution (test)}} & "
-        "\\multicolumn{3}{c}{\\textbf{Benchmark (transfer)}} \\\\\n"
+        "\\multicolumn{3}{c}{\\textbf{Eval-Grid (never trained)}} \\\\\n"
         "\\cmidrule(lr){2-4}\\cmidrule(lr){5-7}\n"
         "\\textbf{Grid} & \\textbf{local} & \\textbf{line} & \\textbf{global} & "
         "\\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
     )
 
 
@@ -295,8 +312,8 @@ def supp_table(key: str, test_set: str) -> str:
         "\\notapp{}~= not defined for this (function, view) or baseline.}\n"
         f"\\label{{tab:supp_{key}_{test_set}}}\n"
         # scale down to the text width only if the natural table is wider (graphicx; no-op otherwise)
-        "\\resizebox{\\ifdim\\width>\\textwidth \\textwidth\\else \\width\\fi}{!}{%\n"
-        f"\\begin{{tabular}}{{l {'ccc ' * len(GRID_ROWS)}}}\n\\toprule\n"
+        + _SHRINK_TO_FIT
+        + f"\\begin{{tabular}}{{l {'ccc ' * len(GRID_ROWS)}}}\n\\toprule\n"
         f" & {grid_heads} \\\\\n{cmids}\n"
         f"\\textbf{{Baseline}} & {obs_heads} \\\\\n\\midrule\n"
         f"{body}\n"
@@ -356,26 +373,30 @@ def _transfer_val_index(outputs: str | Path = "outputs") -> dict:
 
     idx: dict = {}
     base = f"{outputs}/{BENCHMARK_VERSION}"
+
+    def _warn_bad(f: str, e: Exception) -> None:
+        warn_once(f"skipping unreadable/malformed val result.json: {f} ({type(e).__name__}: {e})")
+
     for f in glob.glob(f"{base}/*/multi_grid_pretrain/*/*/val/result.json"):
         try:
             d = json.load(open(f))
-        except Exception:
-            continue
-        idx[("multi_grid_pretrain", d["grid"], d["task"], d["baseline"])] = d
+            idx[("multi_grid_pretrain", d["grid"], d["task"], d["baseline"])] = d
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            _warn_bad(f, e)
     # transfer_finetune val: legacy source-less path (=> 20 kV) and source-tokened (pretrain-<src>)
     for f in glob.glob(f"{base}/*/transfer_finetune/*/*/val/result.json"):
         try:
             d = json.load(open(f))
-        except Exception:
-            continue
-        idx[("transfer_finetune", d["grid"], d["task"], d["baseline"], PRETRAIN_GRID)] = d
+            idx[("transfer_finetune", d["grid"], d["task"], d["baseline"], PRETRAIN_GRID)] = d
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            _warn_bad(f, e)
     for f in glob.glob(f"{base}/*/transfer_finetune/*/*/pretrain-*/val/result.json"):
         try:
             d = json.load(open(f))
-        except Exception:
-            continue
-        src = Path(f).parent.parent.name.replace("pretrain-", "")  # .../pretrain-<src>/val/…
-        idx[("transfer_finetune", d["grid"], d["task"], d["baseline"], src)] = d
+            src = Path(f).parent.parent.name.replace("pretrain-", "")  # .../pretrain-<src>/val/…
+            idx[("transfer_finetune", d["grid"], d["task"], d["baseline"], src)] = d
+        except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
+            _warn_bad(f, e)
     return idx
 
 
@@ -403,20 +424,38 @@ def best_transfer_row(
     if val_idx is None:
         val_idx = _transfer_val_index()
     if protocol == "transfer_zeroshot":
-        sel_base = _argbest_baseline(
-            metric, lambda b: val_idx.get(("multi_grid_pretrain", source, task_id, b))
-        )
+
+        def val_of(b: str):
+            return val_idx.get(("multi_grid_pretrain", source, task_id, b))
+
     elif protocol == "transfer_finetune":
-        sel_base = _argbest_baseline(
-            metric, lambda b: val_idx.get(("transfer_finetune", grid, task_id, b, source))
-        )
+
+        def val_of(b: str):
+            return val_idx.get(("transfer_finetune", grid, task_id, b, source))
+
     else:
-        sel_base = None
+
+        def val_of(b: str):
+            return None
+
+    sel_base = _argbest_baseline(metric, val_of)
     if sel_base is not None:
+        # a baseline with a benchmark row but no val doc can never win this cell (e.g. a re-score
+        # rejected by the positive control) — say so instead of shrinking the candidate pool mutely
+        for b in sorted(bench):
+            if val_of(b) is None:
+                warn_once(
+                    f"transfer cell {task_id}/{grid}/{protocol}/src={source}: baseline '{b}' has "
+                    "a benchmark row but no val doc — excluded from validation selection"
+                )
         return bench.get(sel_base)  # None -> \pending if the winner lacks a benchmark cell here
     # fallback: no val re-score for this (source, protocol) -> legacy selection on the benchmark set
     if not bench:
         return None
+    warn_once(
+        f"transfer cell {task_id}/{grid}/{protocol}/src={source}: no val re-score for any "
+        "baseline; winner selected on the reported benchmark set (legacy fallback)"
+    )
     return max(bench.values(), key=lambda r: direction * r.mean(metric))
 
 
@@ -476,24 +515,27 @@ def transfer_table(
     return (
         header + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
         f"\\caption{{{name} --- cross-grid transfer reference baseline (best of "
-        "MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported benchmark "
-        "set: \\emph{fine-tune} on the target grid's validation split, \\emph{zero-shot} on the "
+        "MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported "
+        "\\texttt{eval\\_grid} set: \\emph{fine-tune} on the target grid's validation split, "
+        "\\emph{zero-shot} on the "
         "pre-training source's \\texttt{multi\\_grid} validation --- so the zero-shot choice is "
         f"grid-independent), headline metric ({metric_label}), pre-trained on each "
         "\\texttt{multi\\_grid} source (20/110/345\\,kV) then \\emph{zero-shot} vs.\\ "
-        "\\emph{fine-tuned} on each target grid, scored on the never-trained benchmark family per "
+        "\\emph{fine-tuned} on each target grid, scored on the never-trained "
+        "\\texttt{eval\\_grid} family per "
         "observability view. Cells are mean\\,$\\pm$\\,95\\% CI; \\pending{}~= pending (no result "
         "yet); \\oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent "
         "\\emph{global} width).}\n"
         f"\\label{{tab:transfer_{key}}}\n"
-        "\\begin{tabular}{ll ccc ccc}\n\\toprule\n"
+        + _SHRINK_TO_FIT
+        + "\\begin{tabular}{ll ccc ccc}\n\\toprule\n"
         " & & \\multicolumn{3}{c}{\\textbf{Zero-shot}} & "
         "\\multicolumn{3}{c}{\\textbf{Fine-tune}} \\\\\n"
         "\\cmidrule(lr){3-5}\\cmidrule(lr){6-8}\n"
         "\\textbf{Grid} & \\textbf{Src} & \\textbf{local} & \\textbf{line} & \\textbf{global} & "
         "\\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
     )
 
 
@@ -579,10 +621,13 @@ IEEE 39-Bus System       & 345\,kV & 60\,Hz & 420\,ch \\
 \end{table}
 """,
     "dataset_families": r"""\begin{table*}[t]
-\caption{Dataset families as a generalisation ladder (dataset-paper name; benchmark code
+\caption{Dataset families as a generalisation ladder (family name; benchmark code
 handle in \texttt{typewriter}; \texttt{train} and \texttt{fine\_tune} are accepted as
-legacy read-aliases of \texttt{multi\_grid} and \texttt{adapt\_grid}). Rows increase in
-what is held fixed between training and test. The Benchmark family is
+legacy read-aliases of \texttt{multi\_grid} and \texttt{adapt\_grid}). The dataset
+publication calls the evaluation-only family \emph{Benchmark}, which is also its on-disk
+handle; this article writes it \texttt{eval\_grid} to keep it distinct from the benchmark
+as a whole. Rows increase in
+what is held fixed between training and test. The Eval-Grid family is
 \emph{evaluation-only}: it is never used for training, validation, model selection,
 early stopping, normalisation, or threshold/hyperparameter tuning.}
 \label{tab:dataset_families}
@@ -593,7 +638,7 @@ early stopping, normalisation, or threshold/hyperparameter tuning.}
 \midrule
 Train (\texttt{multi\_grid}) & all three parameter classes; diverse random topologies & cross-topology training + evaluation \planned \\
 Fine-tune (\texttt{adapt\_grid}) & fixed topology; random events + operating states & in-grid training + in-distribution test (\texttt{held\_out}) \\
-Benchmark (\texttt{benchmark}) & fixed topology + operating point; discrete event-parameter sweep & never-trained systematic transfer evaluation \\
+Eval-Grid (\texttt{eval\_grid}) & fixed topology + operating point; discrete event-parameter sweep & never-trained systematic transfer evaluation \\
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -707,7 +752,7 @@ def protection_rate_table() -> str:
         "\\label{tab:supp_protection}\n"
         "\\begin{tabular}{l l cc cc}\n\\toprule\n"
         " & & \\multicolumn{2}{c}{\\textbf{In-distribution (test)}} & "
-        "\\multicolumn{2}{c}{\\textbf{Never-trained (benchmark)}} \\\\\n"
+        "\\multicolumn{2}{c}{\\textbf{Never-trained (\\texttt{eval\\_grid})}} \\\\\n"
         "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\n"
         "\\textbf{Function·view} & \\textbf{Grid} & \\textbf{missed} & \\textbf{false-alarm} & "
         "\\textbf{missed} & \\textbf{false-alarm} \\\\\n\\midrule\n"
@@ -739,11 +784,10 @@ def fc_per_class_f1_table() -> str:
         "the two HIF subtypes are \\ac{mv}-only, so their per-grid support (Table~"
         "\\ref{tab:supp_fc_support}) is zero on the \\ac{hv}/\\ac{ehv} grids. Cells are "
         "mean\\,$\\pm$\\,95\\% CI over seeds.}\n"
-        "\\label{tab:supp_fc_perclass}\n"
-        "\\begin{tabular}{l cccc}\n\\toprule\n"
+        "\\label{tab:supp_fc_perclass}\n" + _SHRINK_TO_FIT + "\\begin{tabular}{l cccc}\n\\toprule\n"
         f"\\textbf{{Fault class}} & {heads} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+        + "\n\\bottomrule\n\\end{tabular}}\n\\end{table}\n"
     )
 
 
@@ -767,7 +811,7 @@ def _episode_counts(grid: str) -> dict:
 
 def dataset_split_table() -> str:
     """SI table: episode counts per grid for the held_out split families (train/val/test from the
-    Fine-tune/adapt_grid family, plus the never-trained Benchmark family)."""
+    Fine-tune/adapt_grid family, plus the never-trained eval_grid family)."""
     body = []
     for g, glabel in GRID_ROWS:
         c = _episode_counts(g)
@@ -781,11 +825,12 @@ def dataset_split_table() -> str:
         "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{6pt}\n"
         "\\caption{Held-out split composition: number of \\emph{episodes} per grid (each episode "
         "yields $91$ windows at $50\\,\\text{ms}$ / $5\\,\\text{ms}$). Train/validation/test "
-        "are the $70/15/15$ episode-level split of the Fine-tune (adapt-grid) family; Benchmark is "
-        "the entire never-trained family.}\n"
+        "are the $70/15/15$ episode-level split of the Fine-tune (adapt-grid) family; "
+        "\\texttt{eval\\_grid} is the entire never-trained family.}\n"
         "\\label{tab:supp_splits}\n"
         "\\begin{tabular}{l rrrr}\n\\toprule\n"
-        "\\textbf{Grid} & \\textbf{train} & \\textbf{val} & \\textbf{test} & \\textbf{benchmark} \\\\\n"
+        "\\textbf{Grid} & \\textbf{train} & \\textbf{val} & \\textbf{test} & "
+        "\\textbf{\\texttt{eval\\_grid}} \\\\\n"
         "\\midrule\n" + "\n".join(body) + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
@@ -802,7 +847,11 @@ def _fc_class_support(grid: str, test_set: str = "test") -> dict:
     for f in sorted(glob.glob(pat)):
         try:
             bd = json.load(open(f)).get("breakdowns", {}).get("event_type", {})
-        except Exception:
+        except (OSError, json.JSONDecodeError, AttributeError) as e:
+            warn_once(
+                f"skipping unreadable/malformed FC-support result.json: {f} "
+                f"({type(e).__name__}: {e})"
+            )
             continue
         if bd:
             return {name: (bd.get(name) or {}).get("n") for _k, name in _FC_SUPPORT_CLASSES}
@@ -831,11 +880,10 @@ def fc_support_table() -> str:
         "\\caption{Per-class support (test-set window count) for the 9 FC classes per grid. A count "
         "of $0$ means the class is absent on that grid (the two HIF subtypes are \\ac{mv}-only), so "
         "its per-class $\\text{F}_1$ is undefined rather than zero.}\n"
-        "\\label{tab:supp_fc_support}\n"
-        "\\begin{tabular}{l rrrr}\n\\toprule\n"
+        "\\label{tab:supp_fc_support}\n" + _SHRINK_TO_FIT + "\\begin{tabular}{l rrrr}\n\\toprule\n"
         f"\\textbf{{Fault class}} & {heads} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
+        + "\n\\bottomrule\n\\end{tabular}}\n\\end{table}\n"
     )
 
 
@@ -886,10 +934,11 @@ def diagnostic_overview_table() -> str:
         "per baseline (no single `best') for the full picture; \\pending{}~= pending. The "
         "never-trained, per-class, and protection-grade breakdowns are in the leaderboard.}\n"
         "\\label{tab:supp_diagnostics}\n"
-        f"\\begin{{tabular}}{{L{{3.4cm}} l {'c ' * len(_DIAG_BASELINES)}}}\n\\toprule\n"
+        + _SHRINK_TO_FIT
+        + f"\\begin{{tabular}}{{L{{3.4cm}} l {'c ' * len(_DIAG_BASELINES)}}}\n\\toprule\n"
         f"\\textbf{{Function}} & \\textbf{{Grid}} & {heads} \\\\\n\\midrule\n"
         + body
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
     )
 
 

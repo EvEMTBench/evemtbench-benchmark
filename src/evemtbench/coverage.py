@@ -292,10 +292,27 @@ def snapshot_self_check(
     for r in cell_rows:
         if r["status"] != "done":
             continue
-        cell = Cell(r["task"], r["protocol"], r["grid"], r["baseline"])
+        # source=... is load-bearing: cell_dir appends `pretrain-<source>` for transfer cells whose
+        # source is not the default, so dropping it silently redirected every 110 kV / 345 kV row to
+        # the 20 kV directory — two thirds of all transfer cells were never range-checked, while the
+        # 20 kV cell was re-checked up to three times.
+        cell = Cell(r["task"], r["protocol"], r["grid"], r["baseline"], source=r["source"])
+        label = f"{r['task']}/{r['protocol']}/{r['grid']}/{r['baseline']}" + (
+            f"/pretrain-{r['source']}" if r["source"] else ""
+        )
         for ts in r["expected_test_sets"]:
             doc = _load_result(cell_dir(out, cell, version=version) / ts / "result.json")
             if doc is None:
+                # Invariant guard, not an expected branch: `cell_status` calls a cell done only when
+                # _load_result succeeds for every expected test set at THIS path, so reaching here
+                # means status and the range check disagree about where the cell lives. That is
+                # exactly the failure the source= bug above produced, and the old bare `continue`
+                # is why it produced no symptom — a misdirected lookup was indistinguishable from a
+                # clean pass. Report it rather than skip it.
+                range_problems.append(
+                    f"{label}/{ts}: status=done but result.json missing/unreadable/empty "
+                    f"(status/range-check path disagreement)"
+                )
                 continue
             for metric, agg in doc.get("aggregate", {}).items():
                 mean = agg.get("mean") if isinstance(agg, dict) else None
@@ -310,10 +327,7 @@ def snapshot_self_check(
                     and mean > 1.0 + 1e-9
                 )
                 if bad:
-                    range_problems.append(
-                        f"{r['task']}/{r['protocol']}/{r['grid']}/{r['baseline']}/{ts}: "
-                        f"{metric}={mean!r} out of range"
-                    )
+                    range_problems.append(f"{label}/{ts}: {metric}={mean!r} out of range")
     checks.append(
         {
             "id": "value_ranges",

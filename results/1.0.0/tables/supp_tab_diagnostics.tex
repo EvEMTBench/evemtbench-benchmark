@@ -5,6 +5,7 @@
 \setlength{\tabcolsep}{4pt}
 \caption{Extended (diagnostic) functions: per-baseline balanced accuracy ($\uparrow$) on the in-distribution test set, each function at its natural observability view. Reported per baseline (no single `best') for the full picture; \pending{}~= pending. The never-trained, per-class, and protection-grade breakdowns are in the leaderboard.}
 \label{tab:supp_diagnostics}
+\resizebox{\ifdim\width>\textwidth \textwidth\else \width\fi}{!}{%
 \begin{tabular}{L{3.4cm} l c c c c c c }
 \toprule
 \textbf{Function} & \textbf{Grid} & \textbf{majority} & \textbf{\ac{rf}} & \textbf{\ac{mlp}} & \textbf{\ac{gru}} & \textbf{\ac{cnn}} & \textbf{\ac{resnet}} \\
@@ -44,5 +45,5 @@ Switch type (8-class, global) & CIGR\'E MV (20\,kV) & 0.143 & 0.605 $\pm$ 0.005 
  & Prot.\ Ref.\ (110\,kV) & 0.200 & 0.658 $\pm$ 0.005 & 0.694 $\pm$ 0.002 & 0.747 $\pm$ 0.006 & 0.729 $\pm$ 0.003 & 0.835 $\pm$ 0.056 \\
  & IEEE 39-Bus (345\,kV) & 0.200 & 0.872 $\pm$ 0.002 & 0.719 $\pm$ 0.005 & 0.669 $\pm$ 0.016 & 0.682 $\pm$ 0.011 & 0.689 $\pm$ 0.022 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table*}

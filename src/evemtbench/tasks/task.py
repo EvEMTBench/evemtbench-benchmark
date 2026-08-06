@@ -13,6 +13,7 @@ yields a uniform 6-channel view.
 from __future__ import annotations
 
 import hashlib
+import json
 import os
 from collections.abc import Callable
 from dataclasses import dataclass, field
@@ -21,6 +22,7 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from ..contract import CONTRACT_SHA256
 from ..data.roots import GridSpec, get_grid
 from ..data.windows import WindowSet, load_windows
 from ..splits.loader import read_held_out_splits, read_splits, split_dir
@@ -66,6 +68,70 @@ class _ViewSource:
     # For the portable double_line view only: per-row terminal-order (0=EndA near, 1=EndB near),
     # canonicalising [near, far] by bus id to match the reference oracle. ``None`` otherwise.
     near_end: np.ndarray | None = None
+
+
+def _write_json_atomic(path: Path, payload: dict) -> None:
+    """Write a small JSON sidecar via tmp + ``os.replace`` so a concurrent reader never sees a
+    partial file. Best-effort: an unwritable cache dir must not kill training (the payload is a
+    performance optimisation), but a *corrupt* sidecar is never produced."""
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix(f".{os.getpid()}.json.tmp")
+        tmp.write_text(json.dumps(payload, sort_keys=True, separators=(",", ":")))
+        os.replace(tmp, path)
+    except OSError:
+        pass
+
+
+def _verify_cache_sidecar(path: Path, side: Path, ident: dict | None, expected_bytes: int) -> None:
+    """Validate an existing projection-cache entry before it is trusted.
+
+    Raises on a size or identity mismatch. A missing sidecar is tolerated (entries built before
+    sidecars existed, and staged copies where only the ``.f32`` was transferred) but the size check
+    still applies — that is the one check that catches a truncated NFS/rsync write, which numpy's
+    memmap will happily map when the file is long enough and silently accept when it is not short.
+    """
+    actual = path.stat().st_size
+    if actual != expected_bytes:
+        raise RuntimeError(
+            f"projection cache {path.name} is {actual} bytes, expected {expected_bytes} "
+            f"— truncated or foreign entry; delete it and rebuild (hpc/build_cache.sh)"
+        )
+    if not side.is_file():
+        return
+    try:
+        rec = json.loads(side.read_text())
+    except (OSError, json.JSONDecodeError):
+        return  # unreadable sidecar: the size check above still ran, and the name encodes identity
+    if ident is not None and rec.get("identity") not in (None, ident):
+        got = rec.get("identity") or {}
+        differing = sorted(k for k in set(ident) | set(got) if got.get(k) != ident.get(k))
+        raise RuntimeError(
+            f"projection cache {path.name} identity mismatch: the entry was built for different "
+            f"input data (differing keys: {differing}). Two dataset builds are colliding in one "
+            f"cache root — do not overwrite; use a version-scoped cache root or clear it."
+        )
+
+
+def _transform_key(transform) -> str | None:
+    """Cross-process-stable identity of a channel-stats transform, or ``None`` if it has none.
+
+    The key lands in a content-addressed *filename*, so it must be reproducible in another process:
+    ``id()``/``repr()`` are unusable. A plain function's ``__name__`` qualifies, and returning the
+    historical spellings (``"none"`` for no transform, otherwise the function name) keeps every
+    already-persisted stats file valid.
+
+    ``None`` for anything without a stable name — a ``functools.partial`` (no ``__name__`` at all,
+    which the previous ``getattr(transform, "__name__", "none")`` silently aliased to the *no
+    transform* key) and a lambda (every lambda is ``"<lambda>"``, so two different ones collided).
+    Callers treat ``None`` as "do not cache", which is slower but cannot serve wrong statistics.
+    """
+    if transform is None:
+        return "none"
+    name = getattr(transform, "__name__", None)
+    if not name or name == "<lambda>":
+        return None
+    return name
 
 
 def _stats_dirs() -> list[Path]:
@@ -193,22 +259,82 @@ class TaskView:
             return np.ascontiguousarray(self._cache[positions], dtype=np.float32)
         return self._project_positions(positions)
 
+    def cache_identity(self) -> dict | None:
+        """The full set of inputs the cached bytes are a function of, or ``None`` if uncacheable.
+
+        This is the cache's *identity*, and it has to name the window CONTENT, not just its shape.
+        The earlier key was (view name, grid set, observability, shape, sample_id vector), which two
+        different builds of the dataset can share: sample ids are per-episode counters, so a
+        regenerated corpus with the same episodes and geometry produced the same key for different
+        waveforms. Since the cache is persistent and rsync-shared into ``$CROOT``
+        (``hpc/build_cache.sh``), a stale entry would then be reused silently — the worst failure
+        mode available, because nothing downstream can detect it.
+
+        Added: ``window_idx`` (with ``sample_id`` it identifies the window, not just the episode),
+        each source's ``manifest_sha256`` + ``feature_hash`` + family (the input bytes and channel
+        layout), the window-contract sha, and ``near_end`` where it exists (it reorders the
+        double_line terminals, so it changes the projected content). ``x_path`` is deliberately
+        excluded: it differs between the vault master and a ``$TMPDIR`` staged copy of the same
+        bytes, and keying on it would defeat staging.
+        """
+        if self._dense is not None or len(self) == 0:
+            return None
+        n, length, c = self.feature_shape
+        srcs = []
+        for s in self._sources:
+            prov = s.ws.provenance or {}
+            near = s.near_end
+            srcs.append(
+                {
+                    "grid": s.grid,
+                    "family": prov.get("family"),
+                    "manifest_sha256": prov.get("manifest_sha256"),
+                    "feature_hash": prov.get("feature_hash"),
+                    "layout": s.ws.view,
+                    "near_end": (
+                        hashlib.sha256(
+                            np.ascontiguousarray(near, dtype=np.int8).tobytes()
+                        ).hexdigest()[:16]
+                        if near is not None
+                        else None
+                    ),
+                }
+            )
+        return {
+            "view": self.name,
+            "grids": "-".join(sorted({s.grid for s in self._sources})),
+            "observability": self._sources[0].td.observability.value,
+            "shape": [n, length, c],
+            "contract_sha256": CONTRACT_SHA256,
+            "rows_sha256": hashlib.sha256(
+                np.ascontiguousarray(self.metadata["sample_id"].to_numpy()).tobytes()
+                + b"|"
+                + np.ascontiguousarray(self.metadata["window_idx"].to_numpy()).tobytes()
+            ).hexdigest(),
+            "sources": sorted(srcs, key=lambda d: (d["grid"], d["family"] or "")),
+        }
+
     def cache_filename(self) -> str | None:
         """Content-addressed projection-cache filename for this view, or ``None`` if uncacheable
         (empty/dense). Stable across jobs — identical content yields the identical name — so a
         *persistent* cache dir deduplicates across jobs/seeds/baselines, and across tasks that share
         an observability+split (same key). Single source of truth for the cache identity, reused by
-        :mod:`evemtbench.data.staging`."""
-        if self._dense is not None or len(self) == 0:
+        :mod:`evemtbench.data.staging`.
+
+        The hash covers :meth:`cache_identity` in full; the human-readable prefix is unchanged so
+        cache directories stay browsable. NOTE: widening the identity changes every filename, so the
+        persistent cache must be rebuilt (``hpc/build_cache.sh``) — that is the intended cost of no
+        longer being able to collide with a different dataset build."""
+        ident = self.cache_identity()
+        if ident is None:
             return None
-        n, length, c = self.feature_shape
-        grids = "-".join(sorted({s.grid for s in self._sources}))
-        obs = self._sources[0].td.observability.value
-        sid_bytes = np.ascontiguousarray(self.metadata["sample_id"].to_numpy()).tobytes()
+        n, length, c = ident["shape"]
         key = hashlib.sha1(
-            f"{self.name}|{grids}|{obs}|{n}x{length}x{c}|".encode() + sid_bytes
+            json.dumps(ident, sort_keys=True, separators=(",", ":")).encode()
         ).hexdigest()[:16]
-        return f"proj_{self.name}_{grids}_{obs}_{n}x{length}x{c}_{key}.f32"
+        return (
+            f"proj_{self.name}_{ident['grids']}_{ident['observability']}_{n}x{length}x{c}_{key}.f32"
+        )
 
     def stats_filename(self, transform_key: str, batch_size: int = 8192) -> str | None:
         """Content-addressed filename for persisted channel-stats, or ``None`` if the view is
@@ -231,7 +357,16 @@ class TaskView:
 
         If ``$EVEMTBENCH_CACHE_READONLY=1`` a missing cache **raises** instead of being built — GPU
         training jobs set this so they never spend GPU time building the cache from the shared
-        filesystem. That one-time build belongs in the CPU prep job (``hpc/build_cache.sh``)."""
+        filesystem. That one-time build belongs in the CPU prep job (``hpc/build_cache.sh``).
+
+        Every entry carries a ``.json`` sidecar holding its :meth:`cache_identity` and expected byte
+        count, re-checked here before the memmap is accepted. The filename hash already encodes the
+        identity, so the sidecar is a belt-and-braces check against the cases a name cannot cover: a
+        truncated or partially-written file (numpy only raises when the file is *shorter* than the
+        requested shape — a longer or same-length-wrong-content file maps silently), and a hash
+        collision or a hand-copied entry. A sidecar mismatch raises rather than silently rebuilding,
+        because on a shared cache root it means two different datasets are colliding and the right
+        response is to stop, not to overwrite someone else's bytes."""
         if not cache_dir or self._cache is not None or self._dense is not None or len(self) == 0:
             return
         n, length, c = self.feature_shape
@@ -239,6 +374,9 @@ class TaskView:
         fname = self.cache_filename()
         assert fname is not None  # non-None by the guard above (non-empty, non-dense view)
         path = cdir / fname
+        side = path.with_suffix(".json")
+        expected_bytes = n * length * c * 4  # float32
+        ident = self.cache_identity()
         if not path.exists():  # build once; concurrent baselines reuse it (atomic rename below)
             if os.environ.get("EVEMTBENCH_CACHE_READONLY") == "1":
                 raise RuntimeError(
@@ -253,7 +391,12 @@ class TaskView:
                 mm[pos] = self._project_positions(pos)
             mm.flush()
             del mm
+            # Sidecar first, then the payload: the payload's existence is what gates reuse, so
+            # publishing it last means a reader never sees data without its identity.
+            _write_json_atomic(side, {"identity": ident, "bytes": expected_bytes})
             os.replace(tmp, path)
+        else:
+            _verify_cache_sidecar(path, side, ident, expected_bytes)
         self._cache = np.memmap(path, dtype=np.float32, mode="r", shape=(n, length, c))
 
     def iter_batches(self, batch_size: int, *, order: np.ndarray | None = None):
@@ -275,9 +418,12 @@ class TaskView:
         (e.g. ``add_zero_sequence`` to compute stats over the augmented channel set).
 
         Stats are **seed-independent**, so the result is memoized on the view (keyed by the
-        transform) — the runner reuses one Task across all seeds, so this full read+project pass
-        runs once per cell instead of once per ``fit()``. The numpy reduction is unchanged, so the
-        memoized value is bit-identical to recomputing it (keeps results comparable across cells).
+        transform *and* ``batch_size``, matching the on-disk identity — see :meth:`stats_filename`)
+        — the runner reuses one Task across all seeds, so this full read+project pass runs once per
+        cell instead of once per ``fit()``. The numpy reduction is unchanged, so the memoized value
+        is bit-identical to recomputing it (keeps results comparable across cells). A transform with
+        no stable cross-process name (lambda / ``functools.partial``) is neither memoized nor
+        persisted; see :func:`_transform_key`.
 
         The memo additionally persists to disk (2026-07-18, GPU audit follow-up: this pass cost up
         to 635 s per cell on ieee39 wide views, recomputed every cell and chain link). The file is
@@ -290,10 +436,19 @@ class TaskView:
         produce identical bytes; loaded values are bit-identical to a fresh compute.
         """
         cache = self.__dict__.setdefault("_stats_cache", {})
-        key = getattr(transform, "__name__", "none")
-        if key in cache:
+        # The memo key must carry EVERYTHING the value depends on, which is exactly what the on-disk
+        # filename already carried: the transform AND batch_size (the float64 reduction is
+        # chunk-partitioned, so a different batch_size is not guaranteed bit-identical). Keying on
+        # the transform alone returned the first batch_size's stats for every later call.
+        tkey = _transform_key(transform)
+        key = (tkey, batch_size)
+        if tkey is not None and key in cache:
             return cache[key]
-        fname = self.stats_filename(key, batch_size) if hasattr(self, "stats_filename") else None
+        fname = (
+            self.stats_filename(tkey, batch_size)
+            if tkey is not None and hasattr(self, "stats_filename")
+            else None
+        )
         if fname is not None:
             for d in _stats_dirs():
                 loaded = _load_stats(d / fname)
@@ -313,7 +468,12 @@ class TaskView:
         assert csum is not None and csq is not None  # a non-empty view yields >=1 batch
         mean = (csum / cnt).astype(np.float32)
         std = np.sqrt(np.maximum(csq / cnt - (csum / cnt) ** 2, 0)).astype(np.float32) + 1e-6
-        cache[key] = (mean[None, None, :], std[None, None, :])
+        result = (mean[None, None, :], std[None, None, :])
+        if tkey is None:
+            # No stable identity for this transform ⇒ neither memoize nor persist. Recomputing is
+            # slower but correct; a wrong cache hit is not.
+            return result
+        cache[key] = result
         if fname is not None:
             for d in _stats_dirs():  # best-effort: a full/unwritable FS never kills training
                 try:

@@ -52,8 +52,15 @@ Path: `outputs/<benchmark_version>/<task>/<protocol>/<grid>/<baseline>/<test_set
   "n_params": 116736,
   "compute": {"n_params": 116736, "n_seeds": 5, "fit_seconds_mean": 74.2, "effective_epochs_mean": 21.0, "peak_mem_bytes_max": 812000000},
   "per_seed": [{"seed": 0, "metrics": {"balanced_accuracy": 0.91, "...": 0.0}}],
-  "aggregate": {"balanced_accuracy": {"mean": 0.90, "std": 0.01, "n_defined": 5, "n_seeds": 5}},
-  "breakdowns": {"...": {}}
+  "aggregate": {"balanced_accuracy": {"mean": 0.90, "std": 0.01, "ci95": 0.012, "n_defined": 5, "n_seeds": 5}},
+  "breakdowns": {
+    "event_type": {
+      "flt_1phg_shc": {
+        "n": 1207, "n_seeds": 5,
+        "metrics": {"balanced_accuracy": {"mean": 0.74, "std": 0.002, "ci95": 0.003, "n_defined": 5, "n_seeds": 5}}
+      }
+    }
+  }
 }
 ```
 
@@ -64,6 +71,17 @@ see [metrics.md](metrics.md). `n_params` (trainable-parameter count) and `comput
 (per-cell training cost) are recorded for capacity/efficiency transparency — capacity is reported,
 not equalized; both are optional for third-party submissions.
 
+`breakdowns` is **seed-aggregated over the same seeds as `aggregate`**, with each entry under
+`metrics` shaped exactly like a top-level `aggregate` entry, so a stratum metric and a headline
+metric read identically. `n` is the stratum's support (a property of the eval set, so equal across
+seeds) and `n_seeds` counts the seeds that reported the group. Strata are `grid`, `event_family`,
+`event_type`, `origin` (and `resistance_bin` when aux settings are attached).
+
+> **Changed 2026-08 (v1.0.0 artifacts regenerated).** Before this, `breakdowns` held the values of
+> whichever seed ran *last*, sitting next to a 5-seed `aggregate`, with nothing recording that
+> mismatch. Headline numbers were never affected. The metrics themselves are unchanged; the field was
+> recomputed from the stored per-seed predictions by `evemtbench-reevaluate` — no model was retrained.
+
 ## 4. Reproducibility requirements (for a valid submission)
 
 - **Harness self-test:** `evemtbench-evaluate --self-test` must pass in your environment first
@@ -73,10 +91,13 @@ not equalized; both are optional for third-party submissions.
   with `python -m evemtbench.splits.generator`). No training on `test`/`benchmark`.
 - **Seeds:** report ≥3 seeds; submit `mean ± std` + the `ci95` half-width. (The reference
   baselines report **5**; rendered tables show mean ± 95% CI.)
-- **Environment:** pin via `requirements.lock`; every run emits `run_record.json` (seeds, git sha,
-  executing host/SLURM job, input split-file + window-manifest hashes,
-  lockfile hash, env, torch/CUDA, and the **no-tuning attestation** — fit on train, select on val,
-  held-out sets predict-only) — include it. See [determinism.md](determinism.md).
+- **Environment:** record yours the way we record ours — as a capture, not an aspiration. Our
+  results environment is `env/results-v1.0.0.lock` (and the CI gate is pinned separately in
+  `requirements-ci-py3.*.lock`; the two are not the same thing — see
+  [determinism.md](determinism.md)). Every run emits `run_record.json` (seeds, git sha, executing
+  host/SLURM job, input split-file + window-manifest hashes, lockfile + results-env hashes, the
+  captured `numpy`/`pandas`/`scikit-learn`/`scipy`/torch/CUDA versions, and the **no-tuning
+  attestation** — fit on train, select on val, held-out sets predict-only) — include it.
 - **Per-grid, per-test_set reporting:** never pool metrics across grids; report each
   (grid × test_set) cell. The leaderboard ([metrics.md](metrics.md)) ranks per task section.
 

@@ -17,6 +17,14 @@ observability (the faulted line's two terminal cubicles, 12 ch) — and `EndA` a
 reference grid's projected local/line view → transfer needs no reshape. `global` is grid-specific
 width (48–420 ch) and impossible on the double-line representation, hence local/line only.
 
+**Unit of a `multi_grid` episode.** Because the identity is factored into `y`, one episode (one
+`sample_id`) is **one line of one simulation**, not a whole simulation: `sample_id = sim_idx × 10⁴ +
+line_idx`. Measured from the committed splits: 9 753 / 9 879 / 9 895 simulations (≈10 000 per
+voltage level, as the dataset paper states) expand to 119 153 / 138 512 / 173 407 episodes at
+20 / 110 / 345 kV — a mean of 12.2 / 14.0 / 17.5 observed lines per simulation, rising with
+generated grid size. Quote the right unit when comparing corpus sizes with the dataset paper, and
+see the split-granularity deviation in [../protocol.md](../protocol.md).
+
 - Projection: `tasks/line_view.py::project_double_line` (slice, no oracle). Terminals are
   **bus-canonicalized** (`_double_line_near_end` in `task.py`, using `y.bus_a/bus_b`) so channel *k*
   matches the reference oracle's `[near, far]` ordering (`_termkey`, smaller bus = near).

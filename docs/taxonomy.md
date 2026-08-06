@@ -16,6 +16,15 @@ Derived from **every** windowed label file on disk — all four reference grids 
 **23 distinct `event_type`s = 9 faults + 14 operating events**, in 3 families: `fault`,
 `switching`, `normal`.
 
+> **"levels present" = observed, not capability.** The dataset paper tabulates which events the
+> *generator simulates per voltage level* (22 event types; `no_event` is not an event there). The
+> column below reports what actually **occurs in the four reference grids** of this benchmark, which
+> is narrower wherever a specific grid lacks the element: e.g. synchronous-machine trips are
+> generated at HV *and* EHV, but among our reference grids only IEEE-39 contributes them; IBR trips
+> are MV+HV by design and appear at CIGRÉ MV and TestGrid 110 kV only. Use this column to read the
+> `\notapp` (not-applicable) cells in the result tables; use the dataset paper for what the
+> generator can produce.
+
 ## Fault events (9) — `event_family = fault`, `event_type` prefix `flt_`
 
 | event_type | category | grounded | faulted phases | levels present | episodes |

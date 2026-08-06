@@ -41,6 +41,89 @@ def test_different_window_sets_get_different_caches(fixture_root, held_out_split
     assert len(names) == 3
 
 
+def test_cache_identity_names_the_window_content(fixture_root, held_out_splits):
+    """The identity must pin the input BYTES, not just the shape and episode ids.
+
+    Regression: the key was (view, grids, observability, shape, sample_id vector). Sample ids are
+    per-episode counters, so a regenerated corpus with the same episodes and geometry produced the
+    same key for different waveforms — and since the cache is persistent and rsync-shared into
+    $CROOT, the stale entry would be reused silently.
+    """
+    v = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    ident = v.cache_identity()
+    assert ident is not None
+    # window identity, not just episode identity
+    assert ident["rows_sha256"] and len(ident["rows_sha256"]) == 64
+    # the input bytes + channel layout of every source
+    assert ident["sources"] and all(
+        set(s) >= {"grid", "family", "manifest_sha256", "feature_hash", "layout"}
+        for s in ident["sources"]
+    )
+    assert any(s["manifest_sha256"] for s in ident["sources"]), "manifest hash must be captured"
+    assert ident["contract_sha256"]
+    # x_path is staging-dependent and must NOT be part of the identity
+    assert all("x_path" not in s for s in ident["sources"])
+
+
+def test_cache_key_changes_when_window_idx_changes(fixture_root, held_out_splits):
+    """Same sample_ids and shape, different windows => different cache file.
+
+    This is precisely the collision the old key allowed: window_idx was absent, so two row sets
+    drawn from the same episodes hashed identically.
+    """
+    v = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    before = v.cache_filename()
+    md = v.metadata.copy()
+    md["window_idx"] = md["window_idx"].to_numpy() + 1  # same episodes, different windows
+    v.metadata = md
+    assert v.cache_filename() != before
+
+
+def test_cache_writes_sidecar_and_detects_truncation(fixture_root, held_out_splits, tmp_path):
+    v = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    v.materialize_cache(tmp_path)
+    fn = v.cache_filename()
+    payload, side = tmp_path / fn, (tmp_path / fn).with_suffix(".json")
+    assert side.is_file(), "every built entry must carry its identity sidecar"
+    rec = json.loads(side.read_text())
+    assert rec["identity"] == v.cache_identity()
+    assert rec["bytes"] == payload.stat().st_size
+
+    # A truncated payload must raise rather than be mapped. numpy only errors when the file is
+    # SHORTER than the requested shape, so this is the check that catches a partial rsync/NFS write.
+    payload.write_bytes(payload.read_bytes()[:-4])
+    fresh = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    with pytest.raises(RuntimeError, match="truncated or foreign"):
+        fresh.materialize_cache(tmp_path)
+
+
+def test_cache_identity_mismatch_raises_instead_of_overwriting(
+    fixture_root, held_out_splits, tmp_path
+):
+    """Two dataset builds colliding in one cache root must stop, not silently overwrite."""
+    v = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    v.materialize_cache(tmp_path)
+    side = (tmp_path / v.cache_filename()).with_suffix(".json")
+    rec = json.loads(side.read_text())
+    rec["identity"]["sources"][0]["manifest_sha256"] = "deadbeef" * 8  # a different dataset build
+    side.write_text(json.dumps(rec))
+
+    fresh = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    with pytest.raises(RuntimeError, match="identity mismatch"):
+        fresh.materialize_cache(tmp_path)
+
+
+def test_missing_sidecar_is_tolerated(fixture_root, held_out_splits, tmp_path):
+    """Entries built before sidecars existed (and staged copies where only the .f32 travelled) must
+    still load — the size check still applies, and the filename already encodes the identity."""
+    v = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    v.materialize_cache(tmp_path)
+    (tmp_path / v.cache_filename()).with_suffix(".json").unlink()
+    fresh = _task(fixture_root, held_out_splits, "fault_detection_local").view("train")
+    fresh.materialize_cache(tmp_path)  # must not raise
+    assert fresh._cache is not None
+
+
 def test_persistent_cache_root_env_and_version_scoped(tmp_path, monkeypatch):
     monkeypatch.setenv("EVEMTBENCH_PROJECTION_CACHE_ROOT", str(tmp_path))
     assert staging.persistent_cache_root() == tmp_path / BENCHMARK_VERSION

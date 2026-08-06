@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+import pytest
+
 from evemtbench.splits.audit import audit_partition
 from evemtbench.splits.generator import split_episodes
 from evemtbench.splits.protocols import HELD_OUT_FRACTIONS
@@ -30,6 +32,36 @@ def test_stratified_split_deterministic_and_covers_every_class():
     assert rep["disjoint"] and rep["coverage_ok"] and rep["fractions_ok"]
     for split in ("val", "test"):  # every class present in val AND test
         assert {strata[i] for i in a[split]} == {"A", "B", "C"}
+
+
+@pytest.mark.parametrize(
+    ("m", "expected"),
+    [
+        (1, (1, 0, 0)),
+        (2, (1, 0, 1)),
+        (3, (2, 0, 1)),  # no val
+        (4, (3, 1, 0)),  # no test
+        (5, (4, 1, 0)),  # no test
+        (6, (4, 1, 1)),  # first m present in all three
+    ],
+)
+def test_stratified_split_small_classes(m, expected):
+    """Pin the LIMIT of "rare classes appear in every split".
+
+    Per-class sizes are rounded independently, so a class needs m >= 6 episodes to land in all three
+    partitions. The docstrings used to promise presence in every split unconditionally, which is
+    false below 6 — and would fail silently, since a class missing from a partition just reads n/a
+    rather than wrong. No committed v1.0 split is affected (>= 31 episodes per class per partition);
+    this test is the tripwire for a future grid with a genuinely rare class.
+
+    The arithmetic is deliberately NOT changed: it would alter the committed splits.
+    """
+    ids, strata = _synthetic(m, ["R"])
+    out = split_episodes(ids, HELD_OUT_FRACTIONS, seed=11, strata=strata)
+    assert (len(out["train"]), len(out["val"]), len(out["test"])) == expected
+    assert sum(len(out[s]) for s in ("train", "val", "test")) == m  # nothing dropped
+    present_everywhere = all(out[s] for s in ("train", "val", "test"))
+    assert present_everywhere == (m >= 6)
 
 
 def test_uniform_split_is_the_default_and_deterministic():

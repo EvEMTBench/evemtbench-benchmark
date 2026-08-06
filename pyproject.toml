@@ -15,8 +15,12 @@ authors = [
 ]
 keywords = ["power-systems", "protection", "machine-learning", "benchmark", "EMT", "waveform"]
 
-# NOTE: exact versions are pinned in requirements.lock (the reproducibility contract),
-# not here. These are the import-level dependencies of the package.
+# NOTE: these are the import-level dependencies of the package, deliberately floating. Exact
+# versions live in two *different* files, for two different purposes:
+#   * env/results-v<version>.lock       — the environment the published results were computed in
+#   * requirements-ci-py3.{10,12}.lock  — the hash-pinned CI test gate
+# requirements.lock is the frozen v1.0.0-era CI pin, kept byte-identical because its sha256 is
+# recorded in every v1.0.0 run_record.json. See docs/determinism.md.
 dependencies = [
     "numpy>=1.23",
     "pandas>=1.5",
@@ -53,6 +57,7 @@ evemtbench-run = "evemtbench.baselines.runner:main"
 evemtbench-splits = "evemtbench.splits.generator:main"
 evemtbench-leaderboard = "evemtbench.leaderboard:main"
 evemtbench-significance = "evemtbench.evaluation.significance:main"
+evemtbench-reevaluate = "evemtbench.evaluation.reevaluate:main"
 
 [tool.setuptools]
 package-dir = { "" = "src" }

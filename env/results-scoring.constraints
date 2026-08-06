@@ -1,0 +1,14 @@
+# Constraint set: the packages whose version can move a metric value, pinned to the RESULTS
+# environment (env/results-v1.0.0.lock). Applied when compiling the Python 3.12 CI lock so that
+# leg exercises exactly the numerics the published results and the manuscript report, instead of
+# whatever floats resolve to on the day CI runs.
+#
+# The 3.10 leg is deliberately NOT constrained: these versions predate/postdate 3.10 support in
+# ways that make the set unsolvable there, and its job is to prove the package still imports and
+# passes on the oldest supported interpreter — not to reproduce numbers.
+#
+# Regenerate the pins from the captured env, do not hand-edit.
+numpy==2.4.6
+pandas==3.0.3
+scikit-learn==1.9.0
+scipy==1.17.1

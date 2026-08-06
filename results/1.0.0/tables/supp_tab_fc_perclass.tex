@@ -5,6 +5,7 @@
 \setlength{\tabcolsep}{5pt}
 \caption{Per-class $\text{F}_1$ for fault-type classification (FC, 9-class, \emph{line} view, in-distribution test), validation-selected reference baseline. \undefm{}~= $\text{F}_1$ undefined (no supported \emph{and} no predicted samples); the two HIF subtypes are \ac{mv}-only, so their per-grid support (Table~\ref{tab:supp_fc_support}) is zero on the \ac{hv}/\ac{ehv} grids. Cells are mean\,$\pm$\,95\% CI over seeds.}
 \label{tab:supp_fc_perclass}
+\resizebox{\ifdim\width>\textwidth \textwidth\else \width\fi}{!}{%
 \begin{tabular}{l cccc}
 \toprule
 \textbf{Fault class} & \textbf{CIGR\'E MV (20\,kV)} & \textbf{Double Line (110\,kV)} & \textbf{Prot.\ Ref.\ (110\,kV)} & \textbf{IEEE 39-Bus (345\,kV)} \\
@@ -19,5 +20,5 @@
 1pg-HIF & 0.374 $\pm$ 0.020 & \undefm & \undefm & \undefm \\
 1pg-HIF-arc & 0.384 $\pm$ 0.043 & \undefm & \undefm & \undefm \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}

@@ -391,10 +391,14 @@ GATES: list[Gate] = [
             "contract-conformance tests fail."
         ),
         how_to_read=(
-            "Three pins close the input side: contract SHA (window geometry can't drift), "
-            "lockfile SHA in each run record (environment can't drift silently), and the "
+            "Three pins close the input side: contract SHA (window geometry can't drift), the "
             "per-file feature hash checked when windows are memory-mapped (channel order can't "
-            "drift)."
+            "drift), and the environment. Read the environment pin precisely: a lockfile SHA in a "
+            "run record proves only which file sat in the repo, NOT which interpreter ran — so the "
+            "real check is that each record's independently captured numpy/pandas/scikit-learn/"
+            "scipy/torch versions agree with the captured results environment "
+            "(env/results-v<version>.lock, verified by hpc/verify_results_env.py). Two independent "
+            "captures agreeing is the guarantee; the hash alone is a pointer."
         ),
         run_command="pytest tests/integration/test_contract_conformance.py -q",
         stack=(
@@ -423,9 +427,11 @@ GATES: list[Gate] = [
             ),
             (
                 "src/evemtbench/baselines/runner.py",
-                "def _lockfile_hash() -> str | None:",
-                "The environment pin: sha256(requirements.lock) recorded into every "
-                "run_record.json.",
+                "def _results_env_hash() -> str | None:",
+                "The environment pin: sha256(env/results-v<version>.lock) — the captured conda "
+                "prefix incl. torch + CUDA — recorded into every new run_record.json. The older "
+                "lockfile_sha256 pins the CI dependency set, which contains no torch and so never "
+                "described the results environment.",
             ),
         ),
     ),
@@ -618,7 +624,7 @@ CLAIMS: list[Claim] = [
         hardware="any",
         verified_by=("freshness",),
         status="enforced",
-        paper_anchor="never a single score",
+        paper_anchor="No official aggregate score is calculated",
         contribution=1,
     ),
     Claim(
@@ -640,7 +646,7 @@ CLAIMS: list[Claim] = [
             "tests/integration/test_new_tasks_load.py",
         ),
         status="enforced",
-        paper_anchor="frozen label derivation and a valid-sample mask",
+        paper_anchor="Each task has a frozen target derivation and valid-sample mask",
         contribution=2,
     ),
     Claim(
@@ -659,7 +665,7 @@ CLAIMS: list[Claim] = [
         hardware="—",
         verified_by=("tests/integration/test_line_view.py", "leakage"),
         status="enforced",
-        paper_anchor="three nested observability views",
+        paper_anchor="three nested views",
         contribution=3,
     ),
     Claim(
@@ -680,7 +686,7 @@ CLAIMS: list[Claim] = [
         verified_by=("leakage", "splits_audit"),
         status="enforced",
         paper_anchor="episode-level leakage controls",
-        contribution=4,
+        contribution=1,
     ),
     Claim(
         claim="Transparent, beatable baseline suite from trivial floor to deep learning",
@@ -699,8 +705,11 @@ CLAIMS: list[Claim] = [
         hardware="—",
         verified_by=("floor", "tests/integration/test_runner_cli.py"),
         status="enforced",
-        paper_anchor="majority floor, overcurrent",
-        contribution=5,
+        paper_anchor=(
+            "The reference suite spans trivial, conventional, feature-based, "
+            "and deep-learning approaches"
+        ),
+        contribution=3,
     ),
     Claim(
         claim="The benchmark family is scored but never fitted or model-selected on",
@@ -767,7 +776,7 @@ CLAIMS: list[Claim] = [
         hardware="any",
         verified_by=("contract_pin", "hpc/check_contract_sync.py"),
         status="enforced",
-        paper_anchor="the window contract ($50\\,\\text{ms}$ /",
+        paper_anchor="windows of 480 samples",
     ),
     Claim(
         claim="Every run emits a machine-readable provenance record",
@@ -787,7 +796,7 @@ CLAIMS: list[Claim] = [
         hardware="the machine that ran the cell (self-recorded)",
         verified_by=("integrity", "tests/integration/test_checkpoints_telemetry.py"),
         status="measured",
-        paper_anchor="Every run emits a machine-readable\nprovenance record",
+        paper_anchor="Every run produces a machine-readable provenance record",
     ),
     Claim(
         claim="Paper result tables are machine-generated from result.json (a live gated view)",
@@ -807,7 +816,9 @@ CLAIMS: list[Claim] = [
         hardware="any",
         verified_by=("tests/integration/test_paper_tables.py", "freshness"),
         status="enforced",
-        paper_anchor="full per-baseline breakdown is in the Supplementary",
+        paper_anchor=(
+            "Full results for every baseline are retained in the Supplementary Information"
+        ),
     ),
     Claim(
         claim="Coverage: {n_done} of {n_cells} held_out cells measured",
@@ -884,8 +895,8 @@ CLAIMS: list[Claim] = [
         hardware="—",
         verified_by=(),
         status="deferred",
-        paper_anchor="a topology-aware\n    \\ac{gnn} is planned",
-        contribution=5,
+        paper_anchor="require topology-agnostic models",
+        contribution=None,
     ),
     Claim(
         claim="Cross-topology protocol for topology-agnostic models",
@@ -902,8 +913,8 @@ CLAIMS: list[Claim] = [
         hardware="—",
         verified_by=(),
         status="deferred",
-        paper_anchor="a cross-topology\nprotocol for topology-agnostic models is planned",
-        contribution=4,
+        paper_anchor="topology-held-out evaluation",
+        contribution=None,
     ),
     Claim(
         claim="Open-challenge tracks: robustness, selectivity, cross-cluster, pretrain-transfer",
@@ -956,8 +967,10 @@ CLAIMS: list[Claim] = [
             "tests/integration/test_paper_numbers_covered.py",
         ),
         status="enforced",
-        paper_anchor="release the splits, leakage checks, baselines, and evaluation scripts",
-        contribution=6,
+        paper_anchor=(
+            "We release reference baselines, splits, evaluation software, and provenance records"
+        ),
+        contribution=3,
     ),
 ]
 

@@ -32,6 +32,7 @@ for _p in (_REPO / "src", _REPO / "hpc"):
         sys.path.insert(0, str(_p))
 
 import audit_manifest as MAN  # noqa: E402  (sibling hpc module)
+import verify_results_env as VRE  # noqa: E402  (sibling hpc module; lock parser + package list)
 from evemtbench.contract import CONTRACT_SHA256, EXPECTED_CONTRACT_VERSION  # noqa: E402
 from evemtbench.coverage import (  # noqa: E402
     ALL_BASELINES,
@@ -152,6 +153,11 @@ class RunRecordStats:
     pythons: list[str] = field(default_factory=list)
     torchs: list[str] = field(default_factory=list)
     hosts: list[str] = field(default_factory=list)  # populated by records that carry .host
+    # Agreement between each record's independently captured package versions and the captured
+    # results environment (env/results-v<version>.lock). Computed here rather than read from a
+    # sidecar so the page stays a pure function of outputs/ + the repo, as the freshness gate needs.
+    env_agree: int = 0
+    env_disagree: int = 0
     # Per-cell provenance for the traceability index/links: cell key
     # "<task>/<protocol>/<grid>/<baseline_tag>" -> compact record fields (git_sha, wandb, args,
     # normalize, attestation, host, data, checkpoints, compute).
@@ -173,6 +179,10 @@ def collect_run_records(
     st = RunRecordStats()
     git_shas, lock_shas, pythons, torchs, hosts = set(), set(), set(), set(), set()
     root = Path(outputs) / version
+    # Reuse the verifier's parser + package list; duplicating them here is how the audit and the
+    # check would drift apart.
+    _renv = _REPO / "env" / f"results-v{version}.lock"
+    _pins = VRE.parse_lock(_renv) if _renv.is_file() else {}
     for p in sorted(root.rglob("run_record.json")) if root.is_dir() else []:
         try:
             rec = json.loads(p.read_text())
@@ -190,6 +200,16 @@ def collect_run_records(
             pythons.add(rec["python"])
         if rec.get("torch"):
             torchs.add(str(rec["torch"]))
+        if _pins:
+            got = rec.get("versions") or {}
+            ok = all(got.get(pkg) == _pins.get(pkg) for pkg in VRE._SCORING_PKGS)
+            rt = rec.get("torch")
+            if rt is not None and _pins.get("torch") is not None and rt != _pins["torch"]:
+                ok = False
+            if ok:
+                st.env_agree += 1
+            else:
+                st.env_disagree += 1
         host = (rec.get("host") or {}).get("hostname")
         if host:
             # same shortening rule as _neutral_paths — FQDNs stay out of committed pages
@@ -1128,6 +1148,8 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
     )
     lock = _REPO / "requirements.lock"
     lock_sha = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.exists() else "—"
+    renv = _REPO / "env" / f"results-v{BENCHMARK_VERSION}.lock"
+    renv_sha = hashlib.sha256(renv.read_bytes()).hexdigest() if renv.exists() else "—"
     fmt_list = lambda xs: _esc(", ".join(xs)) if xs else "— (none recorded yet)"  # noqa: E731
     recs = "".join(
         f"<tr><td><b>{_esc(k)}</b></td><td>{v}</td></tr>"
@@ -1139,6 +1161,17 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
                 fmt_list(records.git_shas[:8]) + (" …" if len(records.git_shas) > 8 else ""),
             ),
             ("distinct lockfile SHAs", fmt_list([s[:16] + "…" for s in records.lockfile_shas])),
+            (
+                "agree with the results-env capture",
+                _esc(
+                    f"{records.env_agree} of {records.env_agree + records.env_disagree}"
+                    + (
+                        f" — {records.env_disagree} DISAGREE"
+                        if records.env_disagree
+                        else " (every record's own captured versions match)"
+                    )
+                ),
+            ),
             ("python versions", fmt_list(records.pythons)),
             ("torch versions", fmt_list(records.torchs)),
             ("recorded hosts", fmt_list(records.hosts)),
@@ -1150,7 +1183,19 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
         f"<h2>Determinism &amp; seeds</h2><p>{_esc(MAN.ENVIRONMENT['seed_policy'])}</p>"
         f"<p>{_esc(MAN.ENVIRONMENT['staging'])}</p>"
         "<h2>Pins</h2><ul>"
-        f"<li>dependency lockfile {_src('requirements.lock')} — sha256 <code>{_esc(lock_sha)}</code></li>"
+        f"<li><b>results environment</b> {_src(f'env/results-v{BENCHMARK_VERSION}.lock')} — sha256 "
+        f"<code>{_esc(renv_sha)}</code>. The conda prefix that actually produced these numbers "
+        "(torch + CUDA stack included), captured by <code>hpc/capture_results_env.sh</code>. Every "
+        "run record independently captured its own package versions at run time; agreement between "
+        "the two is verified by <code>hpc/verify_results_env.py</code> — see the row below.</li>"
+        f"<li>CI test-gate locks {_src('requirements-ci-py3.10.lock')} / "
+        f"{_src('requirements-ci-py3.12.lock')} — hash-pinned, installed by CI with "
+        "<code>--require-hashes</code>. Torch-free: they pin the <em>test gate</em>, not the "
+        "results.</li>"
+        f"<li>legacy lockfile {_src('requirements.lock')} — sha256 <code>{_esc(lock_sha)}</code>. "
+        "The v1.0.0-era CI pin, recorded as <code>lockfile_sha256</code> in every run record and "
+        "kept byte-identical for that reason. It describes neither the results environment (no "
+        "torch) nor current CI.</li>"
         f"<li>window contract v{_esc(values['contract_version'])} — pinned sha256 "
         f"<code>{_esc(values['contract_sha'])}</code> ({_src('src/evemtbench/contract/contract.json')})</li>"
         f"<li>committed splits v{_esc(SPLITS_VERSION)} — {_src(f'src/evemtbench/splits/v{SPLITS_VERSION}')}</li></ul>"

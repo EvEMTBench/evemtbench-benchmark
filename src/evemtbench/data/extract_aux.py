@@ -22,19 +22,30 @@ from pathlib import Path
 
 from .roots import FAMILIES, GRIDS, aux_dir, get_grid, resolve_data_root
 
+# The producer names the family differently in tarballs than on disk for one family.
+_FAMILY_TAR_ALIASES: dict[str, tuple[str, ...]] = {"multi_grid": ("multi_grid", "multigrid")}
+
 
 def _find_tar(grid: str, family: str, root: str | os.PathLike | None = None) -> Path:
-    """Locate a grid/family tarball. Naming is usually ``<RawFolder>_<family>.tar.gz`` but some
-    (e.g. ieee39 benchmark) drop the suffix (``IEEE39BusSystem.tar.gz``)."""
+    """Locate a grid/family tarball.
+
+    The producer's naming has varied across releases: the v1.0 corpus ships
+    ``<family>-<RawFolder>.tar.gz`` (``adapt_grid-CigreMVGrid.tar.gz``,
+    ``multigrid-Template20kV.tar.gz``), earlier ones used ``<RawFolder>_<family>.tar.gz`` or a
+    bare ``<RawFolder>.tar.gz``. So match the raw folder name ANYWHERE in the basename (a
+    prefix-only glob silently found nothing on the v1.0 layout) and prefer a candidate that also
+    names the family.
+    """
     g = get_grid(grid)
     fam_dir = resolve_data_root(family, root)
     cands = sorted(
-        glob.glob(str(fam_dir / f"{g.raw_foldername}*.tar.gz"))
-        + glob.glob(str(fam_dir / f"{g.raw_foldername}*.tar"))
+        glob.glob(str(fam_dir / f"*{g.raw_foldername}*.tar.gz"))
+        + glob.glob(str(fam_dir / f"*{g.raw_foldername}*.tar"))
     )
     if not cands:
         raise FileNotFoundError(f"no tarball for {g.raw_foldername} in {fam_dir}")
-    named = [c for c in cands if family in os.path.basename(c)]
+    aliases = _FAMILY_TAR_ALIASES.get(family, (family,))
+    named = [c for c in cands if any(a in os.path.basename(c) for a in aliases)]
     return Path(named[0] if named else cands[0])
 
 

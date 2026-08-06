@@ -5,6 +5,7 @@
 \setlength{\tabcolsep}{5pt}
 \caption{Per-class support (test-set window count) for the 9 FC classes per grid. A count of $0$ means the class is absent on that grid (the two HIF subtypes are \ac{mv}-only), so its per-class $\text{F}_1$ is undefined rather than zero.}
 \label{tab:supp_fc_support}
+\resizebox{\ifdim\width>\textwidth \textwidth\else \width\fi}{!}{%
 \begin{tabular}{l rrrr}
 \toprule
 \textbf{Fault class} & \textbf{CIGR\'E MV (20\,kV)} & \textbf{Double Line (110\,kV)} & \textbf{Prot.\ Ref.\ (110\,kV)} & \textbf{IEEE 39-Bus (345\,kV)} \\
@@ -19,5 +20,5 @@
 1pg-HIF & 1,207 & 0 & 0 & 0 \\
 1pg-HIF-arc & 1,173 & 0 & 0 & 0 \\
 \bottomrule
-\end{tabular}
+\end{tabular}}
 \end{table}

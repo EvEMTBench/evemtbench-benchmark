@@ -162,7 +162,19 @@ _copy_one() {  # $1=cache filename; loud on failure, never silent
   [ -e "$dst" ] && return 0
   tmp="$dst.tmp.$BASHPID"   # BASHPID (not $$): unique per background copy — two concurrent
                             # copies of a view shared across tasks must never share a tmp path
-  if cp "$CROOT/$fn" "$tmp" 2>/dev/null && mv -f "$tmp" "$dst"; then return 0; fi
+  if cp "$CROOT/$fn" "$tmp" 2>/dev/null && mv -f "$tmp" "$dst"; then
+    # Carry the identity sidecar along with the payload so the node-local copy can still be
+    # identity-checked (a missing sidecar is tolerated by the loader, but then only the size check
+    # runs). Best-effort: entries built before sidecars existed simply have none.
+    local sfn="${fn%.f32}.json"
+    if [ -e "$CROOT/$sfn" ] && [ ! -e "$EVEMTBENCH_PROJECTION_CACHE/$sfn" ]; then
+      cp "$CROOT/$sfn" "$EVEMTBENCH_PROJECTION_CACHE/$sfn.tmp.$BASHPID" 2>/dev/null \
+        && mv -f "$EVEMTBENCH_PROJECTION_CACHE/$sfn.tmp.$BASHPID" \
+                 "$EVEMTBENCH_PROJECTION_CACHE/$sfn" 2>/dev/null \
+        || rm -f "$EVEMTBENCH_PROJECTION_CACHE/$sfn.tmp.$BASHPID"
+    fi
+    return 0
+  fi
   rm -f "$tmp"
   echo "!! stage-cell: copy failed for $fn (src present: $([ -e "$CROOT/$fn" ] && echo yes || echo NO);" \
        "dest avail: $(df -h --output=avail "$EVEMTBENCH_PROJECTION_CACHE" 2>/dev/null | tail -1 | tr -d ' '))" >&2

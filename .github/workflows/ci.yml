@@ -27,15 +27,23 @@ jobs:
           enable-cache: true
           cache-dependency-glob: |
             pyproject.toml
-            requirements.lock
+            requirements-ci-py*.lock
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}
 
-      - name: Create venv + install (no heavy torch dep)
+      - name: Create venv + install from the hash-pinned CI lock (no heavy torch dep)
+        # The lock is installed with --require-hashes so the gate is reproducible and a tampered
+        # wheel cannot enter; the package itself is then installed --no-deps, because an editable
+        # local path cannot be hash-pinned and its deps are already satisfied by the lock.
+        # One lock per interpreter: uv resolves per --python-version, so a single hash-pinned file
+        # cannot serve both legs. requirements-ci-py3.12.lock is additionally constrained to the
+        # scoring-package versions of the results environment (env/results-scoring.constraints), so
+        # that leg exercises the numerics the published results were computed with.
         run: |
           uv venv --python ${{ matrix.python-version }}
-          uv pip install -e ".[dev]"
+          uv pip install --require-hashes -r requirements-ci-py${{ matrix.python-version }}.lock
+          uv pip install -e . --no-deps
 
       - name: Lint (ruff check + format)
         run: |
