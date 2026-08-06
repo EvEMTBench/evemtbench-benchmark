@@ -76,6 +76,27 @@ def _fmt_secs(s: float | None) -> str:
     return f"{s:.0f}s"
 
 
+def _row_source(doc: dict, path: Path) -> str | None:
+    """Pre-training source for a transfer row: the doc's field, else the ``pretrain-<src>`` path.
+
+    The runner records the source as ``pretrain_grid``. The offline validation re-score
+    (``hpc/rescore_validation.py``) does not write that field, so its per-source docs used to fall
+    through to the legacy source-less default and label EVERY validation row as the 20 kV source —
+    three distinct runs (cell-root, 110 kV, 345 kV) collapsing onto one key that
+    ``results/<version>/README.md`` documents as unique, which also undercounted the cell total.
+    Recovering the source from the path token mirrors what
+    ``hpc/paper_artifacts/paper_lib.py::_val_index`` already does for selection, so the published
+    rows and the selection index now agree instead of disagreeing.
+    """
+    src = doc.get("pretrain_grid")
+    if src:
+        return src
+    for parent in path.parents:
+        if parent.name.startswith("pretrain-"):
+            return parent.name[len("pretrain-") :]
+    return None
+
+
 def scan_results(outputs_dir: str | Path) -> list[Row]:
     """Parse every ``result.json`` under ``outputs_dir`` into a Row (keyed by its own fields,
     so it is robust to directory layout)."""
@@ -125,7 +146,7 @@ def scan_results(outputs_dir: str | Path) -> list[Row]:
                 metrics=metrics,
                 n_params=doc.get("n_params"),
                 fit_seconds=(doc.get("compute") or {}).get("fit_seconds_mean"),
-                source=doc.get("pretrain_grid"),
+                source=_row_source(doc, p),
             )
         )
     return rows

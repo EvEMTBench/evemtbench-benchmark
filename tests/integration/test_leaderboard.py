@@ -31,6 +31,60 @@ def _write_result(base: Path, task, protocol, grid, baseline, bal_acc, *, test_s
     )
 
 
+def test_transfer_source_falls_back_to_the_pretrain_path_token(tmp_path):
+    """Validation docs carry no ``pretrain_grid`` (hpc/rescore_validation.py does not write it), so
+    without the path fallback every per-source val row collapses onto the legacy source-less key —
+    three distinct runs sharing the key results/<version>/README.md documents as unique."""
+    task, proto, grid, base = "fault_detection_line", "transfer_finetune", "cigre_mv", "gru"
+    for src in ("template_110kv", "template_345kv"):
+        d = tmp_path / "1.0.0-dev" / task / proto / grid / base / f"pretrain-{src}" / "val"
+        d.mkdir(parents=True, exist_ok=True)
+        (d / "result.json").write_text(
+            json.dumps(
+                {
+                    "task": task,
+                    "protocol": proto,
+                    "grid": grid,
+                    "baseline": base,
+                    "test_set": "val",
+                    "n_test": 10,
+                    "seeds": [0, 1],
+                    "aggregate": {"balanced_accuracy": {"mean": 0.9, "std": 0.01}},
+                }
+            )
+        )
+    # the source-less cell-root val doc keeps the legacy default (source=None)
+    _write_result(tmp_path, task, proto, grid, base, 0.9, test_set="val")
+
+    rows = scan_results(tmp_path)
+    assert {r.source for r in rows} == {"template_110kv", "template_345kv", None}, (
+        "per-source validation rows must keep their pre-training source"
+    )
+
+
+def test_explicit_pretrain_grid_field_wins_over_the_path(tmp_path):
+    """The runner's own field stays authoritative — the path is only a fallback."""
+    d = tmp_path / "1.0.0-dev" / "t" / "transfer_finetune" / "g" / "gru" / "pretrain-WRONG" / "test"
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "result.json").write_text(
+        json.dumps(
+            {
+                "task": "t",
+                "protocol": "transfer_finetune",
+                "grid": "g",
+                "baseline": "gru",
+                "test_set": "test",
+                "n_test": 10,
+                "seeds": [0],
+                "pretrain_grid": "template_345kv",
+                "aggregate": {"balanced_accuracy": {"mean": 0.9, "std": 0.0}},
+            }
+        )
+    )
+    (row,) = scan_results(tmp_path)
+    assert row.source == "template_345kv"
+
+
 def test_scan_and_rank(tmp_path):
     _write_result(tmp_path, "fault_detection_local", "in_grid", "double_line", "majority", 0.50)
     _write_result(tmp_path, "fault_detection_local", "in_grid", "double_line", "random_forest", 0.9)

@@ -14,8 +14,8 @@ Every file here is byte-checked against a fresh rebuild by the freshness gate
 
 ## `aggregated_results.csv` / `aggregated_results.json`
 
-One record per (task × protocol × grid × baseline × test_set × metric) — 34528
-records across 4164 cells for this version. Columns / keys:
+One record per (task × protocol × grid × baseline × test_set × metric) — 34548
+records across 4548 cells for this version. Columns / keys:
 
 - `version`
 - `task`
@@ -37,6 +37,12 @@ records across 4164 cells for this version. Columns / keys:
 empty (CSV) value marks a metric with no support on that eval set (e.g. an absent
 per-class F1), reported honestly rather than as a misleading 0. The CSV shows 6
 significant figures for readability; the JSON preserves the exact values.
+
+One convention split, stated because the column is shared: rows with `test_set=val`
+carry a **sample** std (`ddof=1`, written by `hpc/rescore_validation.py`), while
+`test`/`benchmark` rows carry a **population** std (`ddof=0`, written by the runner).
+`ci95` is t-based (`ddof=1`) in both. Validation rows are published so that baseline
+selection is auditable — the reported results are always the `test`/`benchmark` rows.
 
 ## `tables/`
 

@@ -2,10 +2,12 @@
 
 The same contract version is declared in pyproject.toml ([project].version, PEP 440:
 ``0.2.0.dev0``), src/evemtbench/version.py (``BENCHMARK_VERSION``, semver-ish: ``0.2.0-dev``),
-and CITATION.cff (``version:``). CHANGELOG.md must carry a section for the current version.
-docs/release.md step 4 relies on this test to force the three files to move together."""
+and CITATION.cff (``version:`` + ``date-released:`` once out of dev). CHANGELOG.md must carry a
+section for the current version. docs/release.md step 4 relies on this test to force the three
+files to move together."""
 
 import re
+from datetime import date
 from pathlib import Path
 
 try:
@@ -44,6 +46,22 @@ def test_citation_cff_matches():
         f"CITATION.cff version {m.group(1)!r} != BENCHMARK_VERSION {BENCHMARK_VERSION!r} — "
         "update CITATION.cff (docs/release.md step 4)"
     )
+
+
+def test_citation_cff_has_a_release_date_on_release_versions():
+    """docs/release.md step 4 moves CITATION.cff ``version`` AND ``date-released`` together, but
+    only the version half was enforced here — so 1.0.0 shipped with no release date at all, which
+    Zenodo and every other CFF consumer reads. Dev versions are exempt: they are not released."""
+    _, is_dev = _base(BENCHMARK_VERSION)
+    if is_dev:
+        return
+    cff = (REPO / "CITATION.cff").read_text()
+    m = re.search(r"^date-released:\s*\"?(\d{4}-\d{2}-\d{2})\"?\s*$", cff, re.M)
+    assert m, (
+        f"CITATION.cff has no 'date-released: YYYY-MM-DD' but BENCHMARK_VERSION "
+        f"{BENCHMARK_VERSION!r} is a release version (docs/release.md step 4)"
+    )
+    date.fromisoformat(m.group(1))  # raises on 2026-13-45 and friends
 
 
 def test_changelog_has_a_section_for_the_current_version():

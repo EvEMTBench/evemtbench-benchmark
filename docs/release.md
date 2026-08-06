@@ -36,6 +36,13 @@ is enforced by `tests/unit/test_version_consistency.py`, so drift fails CI long 
 
 8. **Annotated tag**: `git tag -a v<X.Y.Z> -m "EvEMTBench <X.Y.Z> — frozen benchmark contract"`
    on the freeze commit; push with `git push origin v<X.Y.Z>`.
+   **The public export is a separate history, so this tag does not reach it.** After pushing the
+   export (step 9), tag the corresponding sync commit in `dist/evemtbench-benchmark-public` as well
+   and push that tag — the GitHub Release, and therefore the Zenodo DOI, is minted from *that* tag:
+   ```bash
+   git -C dist/evemtbench-benchmark-public tag -a v<X.Y.Z> -m "EvEMTBench <X.Y.Z> — frozen benchmark contract"
+   git -C dist/evemtbench-benchmark-public push origin v<X.Y.Z>
+   ```
 9. **Public GitHub export**: run `bash hpc/make_public_release.sh` — it stages a clean
    `git archive` export of HEAD, prunes the private/operator-only paths (manuscript, internal
    docs, agent config, ops daemons), verifies the public tree is self-consistent, **refuses to
