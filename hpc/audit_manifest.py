@@ -15,7 +15,7 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-from evemtbench.version import SPLITS_VERSION
+from evemtbench.version import MULTI_GRID_SPLITS_VERSION, SPLITS_VERSION
 
 # Claim statuses. "auto" resolves against the coverage scan at build time: "measured" when every
 # cell selected by ``cells`` is done, else "in progress (N pending, M failed)". We never dress a
@@ -70,10 +70,11 @@ PILLARS: list[dict] = [
         text=(
             "Episode-disjoint, family-pure train/val/test/benchmark splits are committed to the "
             "repo and re-audited by named tests on every CI run — no training window shares an "
-            "episode with an evaluation window."
+            f"episode with an evaluation window (held_out v{SPLITS_VERSION}; multi_grid pretrain "
+            f"v{MULTI_GRID_SPLITS_VERSION}, topology-grouped)."
         ),
         gate_id="leakage",
-        source=f"src/evemtbench/splits/v{SPLITS_VERSION}",
+        source="src/evemtbench/splits",  # both committed trees: v1.0 held_out + v1.1 multi_grid
     ),
     dict(
         title="Analytic floor self-check",
@@ -427,7 +428,7 @@ GATES: list[Gate] = [
             ),
             (
                 "src/evemtbench/baselines/runner.py",
-                "def _results_env_hash() -> str | None:",
+                "def _results_env_hash(version: str) -> str | None:",
                 "The environment pin: sha256(env/results-v<version>.lock) — the captured conda "
                 "prefix incl. torch + CUDA — recorded into every new run_record.json. The older "
                 "lockfile_sha256 pins the CI dependency set, which contains no torch and so never "
@@ -438,15 +439,16 @@ GATES: list[Gate] = [
 ]
 
 # The two pipelines the gates guard, as plain diagrams (gates.html header). Real module names.
-DATA_PIPELINE = """\
+DATA_PIPELINE = f"""\
 PowerFactory EMT simulation            (producer; labels exact by construction)
    |  writes X_<topology>.raw + y_<topology>.parquet + *.raw.manifest.json (feature_hash)
    v
 data/windows.load_windows      -- _verify_manifest: status/topology/geometry  [contract_pin]
    |                              sha256(feature_names) == manifest.feature_hash
    v
-splits/loader.read_held_out_splits -> committed v0.2/held_out/<grid>/*.txt    [leakage]
+splits/loader.read_held_out_splits -> committed v{SPLITS_VERSION}/held_out/<grid>/*.txt   [leakage]
    |  episode-disjoint, family-pure                                          [splits_audit]
+   |  (multi_grid_pretrain: v{MULTI_GRID_SPLITS_VERSION}/multi_grid_pretrain/, topology-grouped)
    v
 baselines/runner  (fit on train, select on val; benchmark family predict-only)
    v
@@ -586,7 +588,10 @@ CLAIMS: list[Claim] = [
         "balanced accuracy",
     ),
     Claim(
-        claim="Cross-grid transfer from the 20 kV pretrain corpus (zero-shot vs fine-tune)",
+        claim=(
+            "Cross-grid transfer from the multi_grid pretrain corpora (zero-shot vs fine-tune) "
+            f"under the corrected topology-grouped source splits (v{MULTI_GRID_SPLITS_VERSION})"
+        ),
         value="{n_transfer_done} of {n_transfer_cells} transfer cells measured "
         "(+ {n_pretrain_done}/{n_pretrain_cells} pretrain cells)",
         detail=(
@@ -624,7 +629,7 @@ CLAIMS: list[Claim] = [
         hardware="any",
         verified_by=("freshness",),
         status="enforced",
-        paper_anchor="No official aggregate score is calculated",
+        paper_anchor="no aggregate score is defined",
         contribution=1,
     ),
     Claim(
@@ -680,7 +685,9 @@ CLAIMS: list[Claim] = [
         script="src/evemtbench/splits/loader.py",
         command="pytest tests/integration/test_leakage.py tests/integration/test_splits_audit.py"
         " -q",
-        artifact=f"src/evemtbench/splits/v{SPLITS_VERSION}/",
+        # both committed trees, " · "-separated (the ledger renders each as its own link)
+        artifact=f"src/evemtbench/splits/v{SPLITS_VERSION}/"
+        f" · src/evemtbench/splits/v{MULTI_GRID_SPLITS_VERSION}/",
         runtime="seconds",
         hardware="any (CI re-runs it)",
         verified_by=("leakage", "splits_audit"),
@@ -796,7 +803,7 @@ CLAIMS: list[Claim] = [
         hardware="the machine that ran the cell (self-recorded)",
         verified_by=("integrity", "tests/integration/test_checkpoints_telemetry.py"),
         status="measured",
-        paper_anchor="Every run produces a machine-readable provenance record",
+        paper_anchor="Each run records the benchmark version, code commit",
     ),
     Claim(
         claim="Paper result tables are machine-generated from result.json (a live gated view)",
@@ -968,7 +975,8 @@ CLAIMS: list[Claim] = [
         ),
         status="enforced",
         paper_anchor=(
-            "We release reference baselines, splits, evaluation software, and provenance records"
+            "We release the reference baselines, splits, evaluation software, and provenance "
+            "records"
         ),
         contribution=3,
     ),

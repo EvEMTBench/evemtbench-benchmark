@@ -7,7 +7,7 @@ import pandas as pd
 import pytest
 
 import evemtbench
-from evemtbench import BENCHMARK_VERSION, TaskDefinition, get_task, list_tasks, load_arrays
+from evemtbench import TaskDefinition, get_task, list_tasks, load_arrays, results_version
 
 
 def test_evaluate_export_survives_submodule_import():
@@ -97,7 +97,7 @@ def test_register_baseline_runs_through_runner(fixture_root, held_out_splits, tm
         )
         base = (
             out
-            / BENCHMARK_VERSION
+            / results_version("held_out")
             / "fault_detection_local"
             / "held_out"
             / "double_line"

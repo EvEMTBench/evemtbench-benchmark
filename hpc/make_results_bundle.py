@@ -7,17 +7,18 @@ reader/reviewer needs to inspect and verify the numbers WITHOUT the manuscript:
     results/<version>/
       aggregated_results.csv    flat: one row per (task, protocol, grid, baseline, test_set, metric)
       aggregated_results.json   same records, exact-typed (null for absent-class metrics)
-      tables/                   the LaTeX result tables (5 main + 10 supplement), copy-paste ready
-        tab_res_*.tex / supp_tab_*_*.tex / _preamble.tex
+      tables/                   the LaTeX result + evidence tables, copy-paste ready
+        tab_res_*.tex / tab_transfer_*.tex / supp_tab_*.tex / _preamble.tex
       README.md                 schema + provenance pointer
 
 Like ``make_results``/``make_audit``, the builders here are pure (no writes, no clock) and
 deterministic, so the freshness gate (``hpc/check_results_fresh.py``) can byte-compare the committed
-bundle against a fresh rebuild. The LaTeX comes from the SAME builders the private paper uses
-(``make_paper_tables`` / ``make_supplement_tables``) — one table-logic source, two write
-targets — so ``results/tables/*.tex`` is provably identical to the manuscript's fragments. The
+bundle against a fresh rebuild. The LaTeX is **copied** from the manuscript's committed fragments
+(``paper/manuscript/generated/*.tex``), each of which has exactly one owning generator under
+``hpc/paper_artifacts/`` — so ``results/tables/*.tex`` is byte-identical to the manuscript's
+fragments and this module is a packager, never a second renderer of a scientific artifact. The
 aggregated CSV/JSON is derived from the same ``leaderboard.scan_results`` rows the leaderboard/audit
-read, version-scoped to ``BENCHMARK_VERSION``.
+read, scoped to each protocol's CURRENT results version (``evemtbench.version.results_version``).
 
     PYTHONPATH=src python hpc/make_results_bundle.py            # outputs/ -> results/<version>/
 """
@@ -36,12 +37,10 @@ for _p in (_REPO / "src", _REPO / "hpc", _REPO / "hpc" / "paper_artifacts"):
     if str(_p) not in sys.path:
         sys.path.insert(0, str(_p))
 
-from paper_lib import build_transfer_tables  # noqa: E402
+from paper_lib import GEN_DIR  # noqa: E402
 
 from evemtbench.leaderboard import Row, scan_results  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
-from make_paper_tables import build_paper_tables  # noqa: E402
-from make_supplement_tables import build_supplement_tables  # noqa: E402
+from evemtbench.version import BENCHMARK_VERSION, results_version  # noqa: E402
 
 # Flat schema: one record per (task, protocol, grid, baseline, test_set, metric).
 COLUMNS = (
@@ -63,15 +62,19 @@ COLUMNS = (
 )
 
 
-def aggregated_records(rows: list[Row], *, version: str = BENCHMARK_VERSION) -> list[dict]:
+def aggregated_records(rows: list[Row], *, version: str | None = None) -> list[dict]:
     """Flatten scanned Rows to one record per (cell × test_set × metric), version-scoped.
+
+    ``version=None`` (default) keeps each protocol's CURRENT rows (``r.version ==
+    results_version(r.protocol)`` — held_out at its frozen version, pretrain/transfer at
+    ``BENCHMARK_VERSION``); an explicit ``version`` keeps that single version only.
 
     Exact values (no rounding): ``scan_results`` carries ``metrics[m] = {mean, std, ci95}`` and
     ``seeds``. Absent-class metrics keep ``None`` mean/std/ci95 (null in JSON / empty in CSV), so
     the file honestly states the class had no support rather than hiding it as a 0."""
     recs: list[dict] = []
     for r in rows:
-        if r.version != version:
+        if r.version != (results_version(r.protocol) if version is None else version):
             continue
         for metric, m in r.metrics.items():
             recs.append(
@@ -160,6 +163,10 @@ def _readme(version: str, n_records: int, n_cells: int) -> str:
         f"One record per (task × protocol × grid × baseline × test_set × metric) — {n_records}\n"
         f"records across {n_cells} cells for this version. Columns / keys:\n\n"
         f"{cols}\n"
+        f"Rows are each protocol's **current** results: `held_out` rows carry `version`\n"
+        f"{results_version('held_out')} (their artifacts are unchanged by the v{version} scoped\n"
+        "revision, so they were not re-run; see `docs/versioning.md`), while the\n"
+        f"pretrain/transfer rows carry {version}.\n\n"
         "`mean`/`std`/`ci95` are aggregated over the `n_seeds` random seeds; a null (JSON) /\n"
         "empty (CSV) value marks a metric with no support on that eval set (e.g. an absent\n"
         "per-class F1), reported honestly rather than as a misleading 0. The CSV shows 6\n"
@@ -170,9 +177,13 @@ def _readme(version: str, n_records: int, n_cells: int) -> str:
         "`ci95` is t-based (`ddof=1`) in both. Validation rows are published so that baseline\n"
         "selection is auditable — the reported results are always the `test`/`benchmark` rows.\n\n"
         "## `tables/`\n\n"
-        "The LaTeX result tables, copy-paste ready: `tab_res_<fn>.tex` (5 main, best learned\n"
-        "baseline per grid × observability view × held_out test set) and\n"
-        "`supp_tab_<fn>_<test_set>.tex` (10 full per-baseline supplement tables). Each cell is\n"
+        "The LaTeX result and evidence tables, copy-paste ready — a byte-identical copy of the\n"
+        "manuscript's generated fragments: `tab_res_<fn>.tex` (best learned baseline per grid ×\n"
+        "observability view × held_out test set), `tab_transfer_<fn>.tex` (cross-grid transfer),\n"
+        "`supp_tab_<fn>_<test_set>.tex` (full per-baseline breakdowns) and the supplementary\n"
+        "evidence tables (partition/leakage audit, valid-sample counts, EC support, ED negative\n"
+        "composition, current-scale diagnostic, transfer-vs-scratch reference, selection audit).\n"
+        "Each table names its owning generator and inputs in a header comment. Result cells are\n"
         "`mean $\\pm$ 95% CI`; `\\res` = no result yet. Compile standalone by prepending\n"
         "`\\input{_preamble.tex}` (it stubs `\\res`/`\\ac`/`\\acs`).\n\n"
         "## Full provenance\n\n"
@@ -183,10 +194,12 @@ def _readme(version: str, n_records: int, n_cells: int) -> str:
 
 
 def build_results_bundle(
-    outputs: str | Path = "outputs", *, version: str = BENCHMARK_VERSION
+    outputs: str | Path = "outputs", *, version: str | None = None
 ) -> dict[str, str]:
     """{rel-path-under-repo: content} for the whole ``results/<version>/`` bundle. Pure +
-    deterministic (no timestamps, sorted) so the freshness gate byte-compares it like the rest."""
+    deterministic (no timestamps, sorted) so the freshness gate byte-compares it like the rest.
+    The bundle path is always the current ``results/<BENCHMARK_VERSION>/`` tree; older
+    ``results/<v>/`` trees are frozen pre-revision bundles the gate never regenerates."""
     out = Path(outputs)
     rows = scan_results(out) if out.is_dir() else []
     records = aggregated_records(rows, version=version)
@@ -196,19 +209,19 @@ def build_results_bundle(
             for r in records
         }
     )
-    base = f"results/{version}"
+    base = f"results/{BENCHMARK_VERSION}"
     bundle = {
         f"{base}/aggregated_results.csv": _to_csv(records),
         f"{base}/aggregated_results.json": _to_json(records),
         f"{base}/tables/_preamble.tex": _PREAMBLE,
-        f"{base}/README.md": _readme(version, len(records), n_cells),
+        f"{base}/README.md": _readme(BENCHMARK_VERSION, len(records), n_cells),
     }
-    for fname, latex in {
-        **build_paper_tables(),
-        **build_supplement_tables(),
-        **build_transfer_tables(outputs),
-    }.items():
-        bundle[f"{base}/tables/{fname}"] = latex
+    for frag in sorted(GEN_DIR.glob("*.tex")):
+        # COPY, never re-render: each fragment has exactly one owning generator under
+        # hpc/paper_artifacts/ (see paper/manuscript/generated/README.md), and the freshness gate
+        # already byte-checks those against outputs/. Re-rendering here would make this a second
+        # producer of the same scientific artifact.
+        bundle[f"{base}/tables/{frag.name}"] = frag.read_text()
     return bundle
 
 

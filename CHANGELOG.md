@@ -4,6 +4,42 @@ Benchmark-contract versions (see [docs/versioning.md](docs/versioning.md)). The 
 in `evemtbench.version` is stamped into every result; a **major** bump means scores are not
 comparable across versions.
 
+## 1.1.0 — corrected (topology-grouped) multi_grid source-corpus splits (scoped revision)
+
+- **The defect.** A `multi_grid` episode is one *line* of one simulation (`sample_id =
+  sim_idx*10^4 + line_idx`), so the v1.0 episode-level 70/15/15 split scattered sibling lines of
+  one simulation — and every generated topology — across train/val/test. Measured on the v1.0
+  splits: ~99 % of val/test simulations also had sibling-line episodes in train, and all ~104
+  topologies per corpus appeared in all three partitions. The scored target-grid evaluations were
+  never contaminated (reference-grid splits are simulation-level), but source-domain model
+  selection (pretrain early-stopping/`best_val` and the zero-shot checkpoint choice) read a leaky
+  validation signal.
+- **The fix.** `splits/v1.1/multi_grid_pretrain/` regenerates the three source-corpus splits
+  **topology-grouped** (`graph_id`; group-aware iterative stratification by `event_type`,
+  `splits.generator.split_grouped_episodes`): no topology — and therefore no simulation and no
+  sibling line — crosses a partition boundary. A simulation-grouped (`result_id`) variant is
+  implemented and audited as the fallback; topology grouping is the shipped split because the
+  metadata identifies generated topologies reliably (0 inconsistencies across 431 072 episodes)
+  and every event class spans 87–104 of ~104 topologies per corpus, so class support survives
+  grouping. Each split dir carries a committed machine-readable `audit.json` (per-partition
+  topology/simulation/episode/fault counts, class support, pairwise overlap counts — all zero —
+  partition hashes, grouping + seed).
+- **Scope of invalidation (per-protocol versioning).** `multi_grid_pretrain`,
+  `transfer_zeroshot` and `transfer_finetune` results are re-run under the corrected splits into
+  `outputs/1.1.0/` — NOT comparable to their 1.0.0 counterparts (retained: `outputs/1.0.0/`,
+  frozen `results/1.0.0/` bundle). Every `held_out` artifact is byte-identical under v1.1.0, so
+  the published held_out results remain current, stay in `outputs/1.0.0/` and keep their 1.0.0
+  stamp (`evemtbench.version.results_version()` / `splits_version()` encode the mapping).
+- **New leakage gates.** `splits.leakage.assert_group_disjoint` + `verify_protocol_regenerates`
+  (grouped regeneration determinism), grouped split audits (`splits.audit.audit_multi_grid`),
+  committed-artifact drift gates and a behavioral preprocessing-fit leakage test
+  (`tests/integration/test_preprocessing_leakage.py`: channel stats / target scaling must be
+  train-only).
+
+**Why:** regenerating a committed split invalidates comparability for the protocols scored on it
+(versioning policy); grouping the source corpus is the fix the v1.0 release documented as the
+known split-granularity deviation.
+
 ## 1.0.0 — full dataset re-simulation + multi_grid template grids (major; supersedes 0.2)
 
 - **New dataset.** The entire EvEMTBench dataset was re-simulated and re-uploaded; every grid was

@@ -19,7 +19,7 @@ authors:
     given-names: Johann
 repository-code: "https://github.com/EvEMTBench/evemtbench-benchmark"
 license: MIT
-version: 1.0.0
+version: 1.1.0
 date-released: 2026-08-06
 # A per-release Zenodo DOI will be added here on the first tagged release so the benchmark
 # software is citable independently of the dataset and the paper.

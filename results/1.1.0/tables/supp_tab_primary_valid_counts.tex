@@ -1,0 +1,43 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_primary_valid_counts.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/{fault_detection,fault_classification,fault_location}_{local,line,global}/held_out/<grid>/<baseline>/{test,benchmark}/result.json  (n_test)
+%   outputs/1.0.0/{event_detection,event_classification}_global/held_out/<grid>/<baseline>/{test,benchmark}/result.json  (n_test)
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\caption{Evaluated sample counts for the five primary functions: the number of \emph{windows} (not episodes) admitted by each function's frozen valid-sample mask, per grid and evaluation family. This is the $n$ behind every mean and confidence interval in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, read from the committed result artefacts. The mask is a function of the window label frame only, so it is identical across the three observability views of a function and across baselines --- one count per (function, grid, family). Counts are far below episodes\,$\times\,23$ (the per-episode window count under the frozen contract) wherever the mask restricts scoring: \ac{fd} scores windows of fault episodes; \ac{fc} and \ac{fl} score fault-active windows (\ac{fl} additionally only line-fault episodes); \ac{ed} and \ac{ec} score every window with an in-vocabulary event type.}
+\label{tab:supp_primary_valid_counts}
+\begin{tabular}{ll rr}
+\toprule
+\textbf{Function} & \textbf{Grid} & \textbf{\texttt{adapt\_grid} test} & \textbf{\texttt{eval\_grid}} \\
+\midrule
+\multirow{4}{*}{\ac{fd}}           & CIGR\'E MV (20\,kV)      & 14,950 & 100,119 \\
+                                   & Double Line (110\,kV)    & 16,123 & 24,771 \\
+                                   & Prot.\ Ref.\ (110\,kV)   & 14,697 & 54,855 \\
+                                   & IEEE 39-Bus (345\,kV)    & 16,583 & 218,569 \\
+\midrule
+\multirow{4}{*}{\ac{fc}}           & CIGR\'E MV (20\,kV)      & 10,844 & 68,604 \\
+                                   & Double Line (110\,kV)    & 11,673 & 16,980 \\
+                                   & Prot.\ Ref.\ (110\,kV)   & 10,637 & 37,620 \\
+                                   & IEEE 39-Bus (345\,kV)    & 11,928 & 149,780 \\
+\midrule
+\multirow{4}{*}{\ac{fl}}           & CIGR\'E MV (20\,kV)      & 10,844 & 56,340 \\
+                                   & Double Line (110\,kV)    & 11,673 & 14,640 \\
+                                   & Prot.\ Ref.\ (110\,kV)   & 10,637 & 32,940 \\
+                                   & IEEE 39-Bus (345\,kV)    & 11,928 & 128,004 \\
+\midrule
+\multirow{4}{*}{\ac{ed}}           & CIGR\'E MV (20\,kV)      & 34,178 & 103,707 \\
+                                   & Double Line (110\,kV)    & 34,500 & 25,323 \\
+                                   & Prot.\ Ref.\ (110\,kV)   & 33,672 & 56,005 \\
+                                   & IEEE 39-Bus (345\,kV)    & 34,569 & 223,284 \\
+\midrule
+\multirow{4}{*}{\ac{ec}}           & CIGR\'E MV (20\,kV)      & 34,178 & 103,707 \\
+                                   & Double Line (110\,kV)    & 34,500 & 25,323 \\
+                                   & Prot.\ Ref.\ (110\,kV)   & 33,672 & 56,005 \\
+                                   & IEEE 39-Bus (345\,kV)    & 34,569 & 223,284 \\
+\bottomrule
+\end{tabular}
+\end{table}

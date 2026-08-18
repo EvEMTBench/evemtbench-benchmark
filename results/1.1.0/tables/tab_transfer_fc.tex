@@ -1,0 +1,37 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_tab_transfer_fc.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.1.0/fault_classification_{local,line}/transfer_{zeroshot,finetune}/<grid>/<baseline>/[pretrain-<source>/]benchmark/result.json
+%   outputs/1.1.0/fault_classification_{local,line}/multi_grid_pretrain/<source>/<baseline>/val/result.json  (zero-shot selection)
+%   outputs/1.1.0/fault_classification_{local,line}/transfer_finetune/<grid>/<baseline>/[pretrain-<source>/]val/result.json  (fine-tune selection)
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4.5pt}
+\caption{Fault-type classification (\ac{fc}, 9-class) --- cross-grid transfer reference baseline (best of MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported \texttt{eval\_grid} set: \emph{fine-tune} on the target grid's validation split, \emph{zero-shot} on the pre-training source's \texttt{multi\_grid} validation --- so the zero-shot choice is grid-independent), headline metric (balanced accuracy $\uparrow$), pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) then \emph{zero-shot} vs.\ \emph{fine-tuned} on each target grid, scored on the never-trained \texttt{eval\_grid} family per observability view. Cells are mean\,$\pm$\,95\% CI; \pending{}~= pending (no result yet); \oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent \emph{global} width).}
+\label{tab:transfer_fc}
+\begin{tabular}{ll ccc ccc}
+\toprule
+ & & \multicolumn{3}{c}{\textbf{Zero-shot}} & \multicolumn{3}{c}{\textbf{Fine-tune}} \\
+\cmidrule(lr){3-5}\cmidrule(lr){6-8}
+\textbf{Grid} & \textbf{Src} & \textbf{local} & \textbf{line} & \textbf{global} & \textbf{local} & \textbf{line} & \textbf{global} \\
+\midrule
+CIGR\'E MV (20\,kV)    & 20\,kV   & 0.441 $\pm$ 0.014 & 0.463 $\pm$ 0.003 & \oos & 0.667 $\pm$ 0.008 & 0.658 $\pm$ 0.005 & \oos \\
+                       & 110\,kV  & 0.441 $\pm$ 0.002 & 0.457 $\pm$ 0.007 & \oos & 0.665 $\pm$ 0.008 & 0.659 $\pm$ 0.019 & \oos \\
+                       & 345\,kV  & 0.424 $\pm$ 0.005 & 0.270 $\pm$ 0.008 & \oos & 0.664 $\pm$ 0.004 & 0.657 $\pm$ 0.018 & \oos \\
+\midrule
+Double Line (110\,kV)  & 20\,kV   & 0.483 $\pm$ 0.051 & 0.533 $\pm$ 0.012 & \oos & 0.855 $\pm$ 0.039 & 0.823 $\pm$ 0.009 & \oos \\
+                       & 110\,kV  & 0.553 $\pm$ 0.003 & 0.555 $\pm$ 0.011 & \oos & 0.867 $\pm$ 0.016 & 0.822 $\pm$ 0.011 & \oos \\
+                       & 345\,kV  & 0.514 $\pm$ 0.008 & 0.358 $\pm$ 0.010 & \oos & 0.889 $\pm$ 0.025 & 0.833 $\pm$ 0.009 & \oos \\
+\midrule
+Prot.\ Ref.\ (110\,kV) & 20\,kV   & 0.454 $\pm$ 0.047 & 0.523 $\pm$ 0.007 & \oos & 0.828 $\pm$ 0.018 & 0.823 $\pm$ 0.016 & \oos \\
+                       & 110\,kV  & 0.512 $\pm$ 0.005 & 0.560 $\pm$ 0.009 & \oos & 0.840 $\pm$ 0.006 & 0.818 $\pm$ 0.030 & \oos \\
+                       & 345\,kV  & 0.487 $\pm$ 0.010 & 0.342 $\pm$ 0.015 & \oos & 0.842 $\pm$ 0.006 & 0.829 $\pm$ 0.012 & \oos \\
+\midrule
+IEEE 39-Bus (345\,kV)  & 20\,kV   & 0.420 $\pm$ 0.024 & 0.463 $\pm$ 0.010 & \oos & 0.682 $\pm$ 0.013 & 0.695 $\pm$ 0.002 & \oos \\
+                       & 110\,kV  & 0.307 $\pm$ 0.013 & 0.623 $\pm$ 0.008 & \oos & 0.680 $\pm$ 0.005 & 0.697 $\pm$ 0.004 & \oos \\
+                       & 345\,kV  & 0.594 $\pm$ 0.010 & 0.622 $\pm$ 0.002 & \oos & 0.711 $\pm$ 0.042 & 0.697 $\pm$ 0.001 & \oos \\
+\bottomrule
+\end{tabular}
+\end{table*}

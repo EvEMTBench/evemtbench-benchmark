@@ -1,7 +1,8 @@
 """The public results bundle (hpc/make_results_bundle.py): the builder is pure + deterministic, the
 aggregated CSV/JSON is a single-source-of-truth flattening of the same result.json the paper tables
-read, it is strictly version-scoped, and its LaTeX tables are byte-identical to the paper builders'
-output. Torch-free; drives everything against a tmp outputs/ tree."""
+read, it is strictly version-scoped, and its LaTeX tables are a byte-identical copy of the
+manuscript's committed generated fragments. Torch-free; drives everything against a tmp outputs/
+tree."""
 
 import csv
 import io
@@ -10,18 +11,21 @@ import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc"):
+for p in (REPO / "src", REPO / "hpc", REPO / "hpc" / "paper_artifacts"):
     if str(p) not in sys.path:
         sys.path.insert(0, str(p))
 
 import make_results_bundle as MRB  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
+from evemtbench.version import BENCHMARK_VERSION, results_version  # noqa: E402
 
 VER = BENCHMARK_VERSION
+# held_out fixtures must live in the tree the per-protocol resolution reads (1.0.0 under the
+# v1.1.0 scoped revision); the bundle DIRECTORY stays keyed by the contract version.
+HO_VER = results_version("held_out")
 BASE = f"results/{VER}"
 
 
-def _write_cell(root: Path, task, grid, baseline, mean, *, version=VER, ci95=0.02):
+def _write_cell(root: Path, task, grid, baseline, mean, *, version=HO_VER, ci95=0.02):
     """Minimal valid done cell: one result.json per test set with a balanced_accuracy aggregate."""
     for ts in ("test", "benchmark"):
         d = root / "outputs" / version / task / "held_out" / grid / baseline / ts
@@ -46,7 +50,7 @@ def _write_cell(root: Path, task, grid, baseline, mean, *, version=VER, ci95=0.0
 
 
 def test_builder_deterministic_and_wellformed_without_outputs(tmp_path, monkeypatch):
-    monkeypatch.chdir(tmp_path)  # no outputs/ -> empty aggregate, tables all \res
+    monkeypatch.chdir(tmp_path)  # no outputs/ -> empty aggregate; tables are copied, not rendered
     a = MRB.build_results_bundle("outputs")
     b = MRB.build_results_bundle("outputs")
     assert a == b, "build_results_bundle is not deterministic"
@@ -57,12 +61,13 @@ def test_builder_deterministic_and_wellformed_without_outputs(tmp_path, monkeypa
     assert f"{BASE}/README.md" in a
     assert f"{BASE}/tables/tab_res_fd.tex" in a
     assert f"{BASE}/tables/supp_tab_fd_test.tex" in a
-    # empty: header-only CSV, empty JSON array, tables all placeholder markers (B2 five-state)
+    # empty: header-only CSV, empty JSON array. The tables are COPIES of the committed fragments
+    # (the bundle is a packager, not a renderer), so they do not depend on outputs/ being present.
     csv_txt = a[f"{BASE}/aggregated_results.csv"]
     assert csv_txt.splitlines()[0] == ",".join(MRB.COLUMNS)
     assert len(csv_txt.splitlines()) == 1, "no data rows expected without outputs"
     assert json.loads(a[f"{BASE}/aggregated_results.json"]) == []
-    assert r"\pending" in a[f"{BASE}/tables/tab_res_fd.tex"]
+    assert "AUTO-GENERATED" in a[f"{BASE}/tables/tab_res_fd.tex"]
 
 
 def test_aggregated_single_source_of_truth(tmp_path, monkeypatch):
@@ -79,7 +84,7 @@ def test_aggregated_single_source_of_truth(tmp_path, monkeypatch):
     )
     # JSON preserves the exact source value + provenance-free aggregate fields
     assert rec["mean"] == 0.951 and rec["ci95"] == 0.006 and rec["std"] == 0.01
-    assert rec["n_seeds"] == 5 and rec["n_test"] == 100 and rec["version"] == VER
+    assert rec["n_seeds"] == 5 and rec["n_test"] == 100 and rec["version"] == HO_VER
     # CSV row carries the same value (6g formatting) for the same key
     rows = list(csv.DictReader(io.StringIO(bundle[f"{BASE}/aggregated_results.csv"])))
     crow = next(
@@ -94,24 +99,35 @@ def test_aggregated_single_source_of_truth(tmp_path, monkeypatch):
 
 def test_strictly_version_scoped(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)
-    _write_cell(tmp_path, "fault_detection_local", "double_line", "mlp", 0.80, version=VER)
+    _write_cell(tmp_path, "fault_detection_local", "double_line", "mlp", 0.80, version=HO_VER)
     _write_cell(tmp_path, "fault_detection_local", "double_line", "mlp", 0.10, version="9.9.9")
     records = json.loads(MRB.build_results_bundle("outputs")[f"{BASE}/aggregated_results.json"])
     versions = {r["version"] for r in records}
-    assert versions == {VER}, f"foreign-version rows leaked into the bundle: {versions}"
+    assert versions == {HO_VER}, f"foreign-version rows leaked into the bundle: {versions}"
     assert all(r["mean"] != 0.10 for r in records), "the 9.9.9 value must not appear"
 
 
-def test_tables_match_the_paper_builders(tmp_path, monkeypatch):
-    """results/<v>/tables/*.tex must be byte-identical to the paper builders' output (one source of
-    table logic) — so the public bundle and the private manuscript can never disagree."""
+def test_tables_are_a_byte_copy_of_the_committed_fragments(tmp_path, monkeypatch):
+    """results/<v>/tables/*.tex must be a byte-identical COPY of the manuscript's committed
+    fragments — so the public bundle and the private manuscript can never disagree.
+
+    Under the artifact rule (one table = one generator = one file), each fragment is rendered by
+    exactly one hpc/paper_artifacts/build_<name>.py; the bundle is a packager, not a second
+    renderer, so this asserts a copy rather than re-running the builders. That the committed
+    fragments themselves match a fresh rebuild is the freshness gate's job
+    (hpc/check_results_fresh.py)."""
     monkeypatch.chdir(tmp_path)
-    from make_paper_tables import build_paper_tables
-    from make_supplement_tables import build_supplement_tables
+    from paper_lib import GEN_DIR
 
     bundle = MRB.build_results_bundle("outputs")
-    for fname, latex in {**build_paper_tables(), **build_supplement_tables()}.items():
-        assert bundle[f"{BASE}/tables/{fname}"] == latex, f"{fname} diverges from the paper builder"
+    frags = sorted(GEN_DIR.glob("*.tex"))
+    assert frags, "no committed fragments to bundle"
+    for frag in frags:
+        assert bundle[f"{BASE}/tables/{frag.name}"] == frag.read_text(), (
+            f"{frag.name} in the bundle is not a byte copy of the committed fragment"
+        )
+    shipped = {k.rsplit("/", 1)[1] for k in bundle if k.startswith(f"{BASE}/tables/")}
+    assert shipped == {f.name for f in frags} | {"_preamble.tex"}
 
 
 def test_csv_and_json_record_counts_agree(tmp_path, monkeypatch):

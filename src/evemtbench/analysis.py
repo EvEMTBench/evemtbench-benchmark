@@ -28,7 +28,7 @@ import pandas as pd
 from .data.windows import load_windows
 from .tasks.registry import get_task
 from .tasks.taxonomy import LabelKind
-from .version import BENCHMARK_VERSION
+from .version import results_version
 
 _FAMILY = {"test": "adapt_grid", "benchmark": "benchmark"}
 _TRUTH_COLS = [
@@ -42,7 +42,8 @@ _TRUTH_COLS = [
 
 
 def _cell_dir(out: Path, task: str, protocol: str, grid: str, baseline: str) -> Path:
-    return Path(out) / BENCHMARK_VERSION / task / protocol / grid / baseline
+    # per-protocol current-results tree (held_out stays at its frozen version)
+    return Path(out) / results_version(protocol) / task / protocol / grid / baseline
 
 
 def load_joined(

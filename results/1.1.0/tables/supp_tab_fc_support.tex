@@ -1,0 +1,27 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_fc_support.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/fault_classification_line/held_out/<grid>/<baseline>/test/result.json  (breakdowns.event_type.n)
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\caption{Per-class support (test-set window count) for the 9 FC classes per grid. A count of $0$ means the class is absent on that grid (the two HIF subtypes are \ac{mv}-only), so its per-class $\text{F}_1$ is undefined rather than zero.}
+\label{tab:supp_fc_support}
+\begin{tabular}{l rrrr}
+\toprule
+\textbf{Fault class} & \textbf{CIGR\'E MV (20\,kV)} & \textbf{Double Line (110\,kV)} & \textbf{Prot.\ Ref.\ (110\,kV)} & \textbf{IEEE 39-Bus (345\,kV)} \\
+\midrule
+1pg-SHC & 1,224 & 1,683 & 1,496 & 1,785 \\
+1pg-SHC-arc & 1,173 & 1,751 & 1,598 & 1,802 \\
+2p-SHC & 1,241 & 1,785 & 1,564 & 1,700 \\
+2pg-SHC & 1,156 & 1,717 & 1,530 & 1,751 \\
+3p-SHC & 1,309 & 1,649 & 1,649 & 1,853 \\
+1pg-inc & 1,150 & 1,529 & 1,309 & 1,468 \\
+1pg-inc-arc & 1,211 & 1,559 & 1,491 & 1,569 \\
+1pg-HIF & 1,207 & 0 & 0 & 0 \\
+1pg-HIF-arc & 1,173 & 0 & 0 & 0 \\
+\bottomrule
+\end{tabular}
+\end{table}

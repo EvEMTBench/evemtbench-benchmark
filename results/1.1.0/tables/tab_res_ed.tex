@@ -1,0 +1,24 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_tab_res_ed.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/event_detection_{local,line,global}/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4.1pt}
+\caption{Event detection (\ac{ed}) --- reference baseline (best of RF/MLP/GRU/CNN/ResNet, selected on the validation split; a beatable reference, full per-baseline breakdown in the Supplementary), headline metric (balanced accuracy $\uparrow$) per grid and observability view, for the two \texttt{held\_out} test sets (in-distribution vs.\ never-trained \texttt{eval\_grid} family). Cells are mean\,$\pm$\,95\% CI (Student's $t$); an interval exceeding the metric's $[0,1]$ range is shown truncated as $[\text{lo},\text{hi}]$. \pending{}~= pending (no result yet); \notapp{}~= not defined for this view. Full per-baseline tables in the Supplementary.}
+\label{tab:res_ed}
+\begin{tabular}{l ccc ccc}
+\toprule
+ & \multicolumn{3}{c}{\textbf{In-distribution (test)}} & \multicolumn{3}{c}{\textbf{Eval-Grid (never trained)}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Grid} & \textbf{local} & \textbf{line} & \textbf{global} & \textbf{local} & \textbf{line} & \textbf{global} \\
+\midrule
+CIGR\'E MV (20\,kV)        & \notapp & \notapp & 0.884 $\pm$ 0.019 & \notapp & \notapp & 0.989 $\pm$ 0.007 \\
+Double Line (110\,kV)      & \notapp & \notapp & 0.911 $\pm$ 0.012 & \notapp & \notapp & 0.990 $\pm$ 0.003 \\
+Prot.\ Ref.\ (110\,kV)     & \notapp & \notapp & 0.881 $\pm$ 0.045 & \notapp & \notapp & 0.994 $\pm$ 0.004 \\
+IEEE 39-Bus (345\,kV)      & \notapp & \notapp & 0.930 & \notapp & \notapp & 0.506 \\
+\bottomrule
+\end{tabular}
+\end{table*}

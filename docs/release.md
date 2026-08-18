@@ -27,7 +27,11 @@ is enforced by `tests/unit/test_version_consistency.py`, so drift fails CI long 
    `outputs/`, committed by the publisher each cycle — see `paper/AGENTS.md`). For a submission
    snapshot ensure the sweep is complete (or accounted for), then
    `PYTHONPATH=src python hpc/check_results_fresh.py --fix` so `generated/*.tex` match the frozen
-   corpus, and rebuild `figures/fig_transfer_overview.pdf` from the matplotlib env.
+   corpus, then rebuild **both** data figures from the matplotlib env (`$PAPERFIGS_PY`, via `srun`):
+   `hpc/paper_artifacts/build_fig_synthesis.py` and `build_fig_transfer_overview.py`. Each writes
+   `figures/<stem>.{pdf,svg,png}` (manuscript vector / editable vector / ≥300 dpi preview);
+   `pytest tests/integration/test_paper_figure_values.py` then asserts every plotted mean and CI
+   still equals its `generated/*.tex` cell.
 7. **Freeze by tag, not marker**: the annotated tag below IS the freeze — it pins the exact commit
    whose `generated/*.tex` are the reported numbers. Optionally pause the autocommit publisher so
    the tagged fragments don't keep moving.

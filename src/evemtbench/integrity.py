@@ -30,7 +30,8 @@ from .coverage import (
     iter_cells,
 )
 from .data.input_digests import load_table as _load_digest_table
-from .version import BENCHMARK_VERSION
+
+# per-protocol version resolution lives in cell_dir/cell_status (evemtbench.version.results_version)
 
 # Deep baselines persist best-val weights under these protocols (zero-shot only loads them).
 _CHECKPOINTED_PROTOCOLS = ("held_out", "multi_grid_pretrain", "transfer_finetune")
@@ -161,7 +162,7 @@ def check_cell(
 def check_outputs(
     out: str | Path = "outputs",
     *,
-    version: str = BENCHMARK_VERSION,
+    version: str | None = None,  # None -> per-protocol current-results tree
     protocols: tuple[str, ...] = SNAPSHOT_PROTOCOLS,
     expected_seeds: list[int] | None = [0, 1, 2, 3, 4],  # noqa: B006 — the production seed set
     deep: bool = False,
@@ -205,7 +206,7 @@ def check_outputs(
 def main(argv: list[str] | None = None) -> int:
     p = argparse.ArgumentParser(description="Artifact integrity over the outputs/ corpus.")
     p.add_argument("--out", default="outputs")
-    p.add_argument("--version", default=BENCHMARK_VERSION)
+    p.add_argument("--version", default=None, help="explicit tree (default: per-protocol)")
     p.add_argument("--protocols", nargs="*", default=list(SNAPSHOT_PROTOCOLS))
     p.add_argument(
         "--expect-seeds",

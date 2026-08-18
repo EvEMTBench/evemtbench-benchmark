@@ -125,12 +125,18 @@ def _paper_fragment_checks(repo: Path) -> list[tuple[str, Path, str]]:
         build_supplement_tables,
         build_transfer_tables,
     )
+    from supplement_lib import dataset_free_artifacts
 
     fresh = {
         **build_paper_tables(),
         **build_supplement_tables(),
         **build_transfer_tables(),
         **build_spec_tables(),
+        # SI evidence tables derived from committed repo artefacts only. The three DATASET_BACKED
+        # fragments (EC support, ED negative composition, current-scale) need the mounted dataset,
+        # so they are gated by `make check-supp-artifacts-dataset` on a machine that has it rather
+        # than by this commit-time hook.
+        **dataset_free_artifacts(),
     }
     return [
         (f"paper/generated/{name}", gen / name, content) for name, content in sorted(fresh.items())
@@ -180,6 +186,8 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
 
+    from evemtbench.version import BENCHMARK_VERSION
+
     audit_fresh, prov_fresh = _fresh_audit_views()
     results_fresh = _fresh_results_bundle()
     audit_dir = repo / "audit"
@@ -190,18 +198,20 @@ def main(argv: list[str] | None = None) -> int:
             if p.name not in audit_fresh and p.name not in _UNGATED
         )
         # The provenance index (audit/provenance/<version>/index.json) is keyed by its
-        # audit-relative path; a rebuild for the current version no longer produces a stale
-        # older-version index, so flag any provenance JSON a rebuild does not emit as stray.
+        # audit-relative path. Only the CURRENT version's tree is gated: any JSON there a rebuild
+        # does not emit is stray. audit/provenance/<older>/ indices are frozen history (they
+        # document a superseded revision's results) — never touched, never reported stale.
         stray += sorted(
             str(p.relative_to(audit_dir))
-            for p in audit_dir.glob("provenance/**/*.json")
+            for p in audit_dir.glob(f"provenance/{BENCHMARK_VERSION}/**/*.json")
             if str(p.relative_to(audit_dir)) not in prov_fresh
         )
     else:
         stray = []
-    # results/<version>/ strays: committed files a rebuild no longer emits (e.g. after a version
-    # bump the prior results/<oldversion>/ tree is retired). Keyed by repo-relative path.
-    results_root = repo / "results"
+    # results/<BENCHMARK_VERSION>/ strays: committed files a rebuild no longer emits. results/
+    # <older>/ trees are frozen pre-revision bundles kept for comparison; the gate owns only the
+    # current version's bundle. Keyed by repo-relative path.
+    results_root = repo / "results" / BENCHMARK_VERSION
     results_stray = (
         sorted(
             str(p.relative_to(repo))

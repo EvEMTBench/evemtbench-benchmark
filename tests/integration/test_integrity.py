@@ -7,7 +7,7 @@ import json
 
 import pytest
 
-from evemtbench import BENCHMARK_VERSION, integrity
+from evemtbench import integrity, results_version
 from evemtbench.baselines import runner
 
 
@@ -31,7 +31,12 @@ def fixture_cell(fixture_root, held_out_splits, tmp_path):
     out = tmp_path / "out"
     _run_fixture_cell(fixture_root, held_out_splits, out)
     cell_dir = (
-        out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "majority"
+        out
+        / results_version("held_out")
+        / "fault_detection_local"
+        / "held_out"
+        / "double_line"
+        / "majority"
     )
     return out, cell_dir
 

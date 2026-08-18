@@ -1,0 +1,35 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_baseline_cfg.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   src/evemtbench/baselines/{mlp,gru,cnn,resnet,random_forest,threshold}.py  (frozen constructor defaults, introspected)
+%   outputs/1.0.0/*/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json  (executed seed set)
+\begin{table}[t]
+\centering
+\small
+\caption{Reference-baseline configurations (benchmark \texttt{v1.1.0}). The four deep baselines share one training regime (top) and differ only in architecture; the classical baselines are fully specified by their listed rule. Every numeric hyperparameter is read from the shipped baseline classes when this table is generated, so it cannot drift from the code.}
+\label{tab:supp_baseline_cfg}
+\begin{tabular}{L{3.0cm} L{12.5cm}}
+\toprule
+\textbf{Component} & \textbf{Configuration} \\
+\midrule
+\multicolumn{2}{l}{\textit{Shared deep-baseline training regime (\ac{mlp}/\ac{gru}/\ac{cnn}/\ac{resnet})}} \\
+Optimiser & AdamW, learning rate $0.001$, weight decay $0.0001$ \\
+Batch / epochs & batch size 256; up to 60 epochs \\
+Learning-rate schedule & cosine annealing, $T_{\max}=60$ (stepped per epoch) \\
+Early stopping & on validation loss, patience 12, best-checkpoint restore \\
+Loss & cross-entropy with inverse-frequency class weights (classification); mean-squared error (MSE) on train-standardised targets, de-standardised at predict (regression, \ac{fl}) \\
+Input & per-channel standardisation fitted on train only \\
+Seeds & 5 per cell ($0$--$4$): model init, batch-shuffle order, dropout (not the split) \\
+\midrule
+\ac{mlp} & flattened window $\to 512$-$256$-$128$; each layer Linear\,+\,BatchNorm\,+\,ReLU\,+\,Dropout($0.3$) \\
+\ac{gru} & 1-layer GRU, hidden size 128, read at the final step; Dropout($0.3$)\,+\,Linear head \\
+\ac{cnn} & three dilated Conv1d blocks (Conv\,+\,BatchNorm\,+\,ReLU), width 64, kernels $7/5/3$ at dilations $1/2/4$, global average pooling, Dropout($0.3$) \\
+\ac{resnet} & three residual blocks (filters $64/128/128$), each three Conv1d with kernels $8/5/3$ and a $1{\times}1$ shortcut; global average pooling, Dropout($0.3$) \\
+\midrule
+\emph{majority} & most-frequent train class (classification) / train-mean target (regression) \\
+\emph{threshold} & phase-maximum \ac{rms}-current statistic; threshold maximises balanced accuracy over a 200-point train quantile grid; binary \ac{fd}, \emph{local} only \\
+\emph{random forest} & 200 trees, unbounded depth, balanced class weights (classifier); seven per-channel time-axis features: mean, std, min, max, peak-to-peak, \ac{rms}, peak $|\cdot|$ \\
+\bottomrule
+\end{tabular}
+\end{table}

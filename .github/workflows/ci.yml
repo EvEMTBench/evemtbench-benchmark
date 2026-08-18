@@ -62,7 +62,7 @@ jobs:
         # Already inside the pytest step above; re-run named so a leakage failure is legible in
         # the CI UI (seconds). Data-bound audits (splits.audit CLI, real-grid regeneration) stay
         # srun-only — no dataset is mounted here.
-        run: uv run pytest tests/integration/test_leakage.py tests/integration/test_splits_audit.py -q
+        run: uv run pytest tests/integration/test_leakage.py tests/integration/test_splits_audit.py tests/unit/test_grouped_splits.py -q
 
       - name: Publish rendered views (reviewers download without cloning)
         # The committed, freshness-gated views: the results-audit site, leaderboard, RESULTS

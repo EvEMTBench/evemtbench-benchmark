@@ -1,0 +1,121 @@
+{
+  "class_n_groups": {
+    "flt_1phg_hif": 98,
+    "flt_1phg_hif_w_arc": 97,
+    "flt_1phg_incipient": 92,
+    "flt_1phg_incipient_w_arc": 92,
+    "flt_1phg_shc": 92,
+    "flt_1phg_shc_w_arc": 87,
+    "flt_2ph_shc": 92,
+    "flt_2phg_shc": 94,
+    "flt_3ph_shc": 92,
+    "no_event": 104
+  },
+  "class_support": {
+    "test": {
+      "flt_1phg_hif": 34,
+      "flt_1phg_hif_w_arc": 37,
+      "flt_1phg_incipient": 26,
+      "flt_1phg_incipient_w_arc": 30,
+      "flt_1phg_shc": 47,
+      "flt_1phg_shc_w_arc": 23,
+      "flt_2ph_shc": 29,
+      "flt_2phg_shc": 37,
+      "flt_3ph_shc": 34,
+      "no_event": 18010
+    },
+    "train": {
+      "flt_1phg_hif": 148,
+      "flt_1phg_hif_w_arc": 177,
+      "flt_1phg_incipient": 158,
+      "flt_1phg_incipient_w_arc": 177,
+      "flt_1phg_shc": 148,
+      "flt_1phg_shc_w_arc": 159,
+      "flt_2ph_shc": 168,
+      "flt_2phg_shc": 147,
+      "flt_3ph_shc": 181,
+      "no_event": 80790
+    },
+    "val": {
+      "flt_1phg_hif": 28,
+      "flt_1phg_hif_w_arc": 40,
+      "flt_1phg_incipient": 30,
+      "flt_1phg_incipient_w_arc": 31,
+      "flt_1phg_shc": 30,
+      "flt_1phg_shc_w_arc": 32,
+      "flt_2ph_shc": 34,
+      "flt_2phg_shc": 37,
+      "flt_3ph_shc": 29,
+      "no_event": 18302
+    }
+  },
+  "class_totals": {
+    "flt_1phg_hif": 210,
+    "flt_1phg_hif_w_arc": 254,
+    "flt_1phg_incipient": 214,
+    "flt_1phg_incipient_w_arc": 238,
+    "flt_1phg_shc": 225,
+    "flt_1phg_shc_w_arc": 214,
+    "flt_2ph_shc": 231,
+    "flt_2phg_shc": 221,
+    "flt_3ph_shc": 244,
+    "no_event": 117102
+  },
+  "counts": {
+    "test": {
+      "episodes": 18307,
+      "fault_episodes": 297,
+      "simulations": 1405,
+      "topologies": 15
+    },
+    "train": {
+      "episodes": 82253,
+      "fault_episodes": 1463,
+      "simulations": 6934,
+      "topologies": 74
+    },
+    "val": {
+      "episodes": 18593,
+      "fault_episodes": 291,
+      "simulations": 1414,
+      "topologies": 15
+    }
+  },
+  "coverage_ok": true,
+  "family": "multi_grid",
+  "fractions_ok": true,
+  "grid": "template_20kv",
+  "group_column": "graph_id",
+  "grouping": "topology",
+  "issues": [],
+  "n_episodes": 119153,
+  "ok": true,
+  "overlaps": {
+    "episode": {
+      "train&test": 0,
+      "train&val": 0,
+      "val&test": 0
+    },
+    "simulation": {
+      "train&test": 0,
+      "train&val": 0,
+      "val&test": 0
+    },
+    "topology": {
+      "train&test": 0,
+      "train&val": 0,
+      "val&test": 0
+    }
+  },
+  "partition_hashes": {
+    "benchmark.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "meta.json": "e868ed7a1a1f0e422f6cbafa685c03ca59614c39f80f119f7d05474c9a934caa",
+    "test.txt": "42b05ada57eff5629d939c69bd36c33b48ec93eed1fe703c9752f9e213197aa3",
+    "train.txt": "737bc45e1df633b330525a8f914859c632c82ba8c662eae945eeb5dd5b59aa73",
+    "val.txt": "efc37b56de4aaa8f9ce35da54540b97381c882ad94207e82c72e79b0bff4251e"
+  },
+  "protocol": "multi_grid_pretrain",
+  "seed": 20313571,
+  "splits_version": "1.1",
+  "stratify_by": "event_type"
+}

@@ -23,7 +23,7 @@ from ..tasks.labels.fault_phase import PHASE_CLASSES
 from ..tasks.labels.switch_type import SWITCH_TYPE_CLASSES
 from ..tasks.task import Task
 from ..tasks.taxonomy import Function, LabelKind
-from ..version import BENCHMARK_VERSION
+from ..version import results_version
 from .metrics import (
     compute_binary_metrics,
     compute_multiclass_metrics,
@@ -135,7 +135,9 @@ def evaluate(
     breakdowns = stratified_metrics(test.metadata, y_true, y_pred, metric_fn)
 
     return EvalResult(
-        benchmark_version=BENCHMARK_VERSION,
+        # the protocol's current contract version (held_out results stay v1.0.0 under the
+        # v1.1.0 scoped revision — see evemtbench.version)
+        benchmark_version=results_version(task.protocol),
         task=td.task_id,
         protocol=task.protocol,
         grid=task.grid,

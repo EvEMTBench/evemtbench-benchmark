@@ -28,7 +28,7 @@ from .splits.loader import read_held_out_splits
 from .splits.protocols import PRETRAIN_TRANSFER_PROTOCOLS, TRANSFER_PROTOCOLS
 from .tasks.registry import get_task, list_tasks
 from .tasks.taxonomy import Function, LabelKind, Observability, TaskDefinition
-from .version import BENCHMARK_VERSION
+from .version import BENCHMARK_VERSION, results_version
 
 TEST_SETS = ("test", "benchmark")
 
@@ -135,7 +135,13 @@ def iter_cells(
     return cells
 
 
-def cell_dir(out: Path, cell: Cell, *, version: str = BENCHMARK_VERSION) -> Path:
+def cell_dir(out: Path, cell: Cell, *, version: str | None = None) -> Path:
+    """A cell's output directory. ``version=None`` (default) resolves per protocol
+    (:func:`evemtbench.version.results_version`): held_out results live in — and stay in — the
+    1.0.0 tree; the pretrain/transfer protocols re-scored under the corrected v1.1 source splits
+    live in the current tree. An explicit ``version`` always wins (historical inspection)."""
+    if version is None:
+        version = results_version(cell.protocol)
     d = Path(out) / version / cell.task / cell.protocol / cell.grid / cell.baseline
     # A transfer cell from a NON-default source gets a source-qualified subdir so it never collides
     # with the default (PRETRAIN_GRID) source, which keeps the legacy source-less path — so the
@@ -162,7 +168,7 @@ def _valid_result(path: Path) -> bool:
     return _load_result(path) is not None
 
 
-def cell_status(out: Path, cell: Cell, *, version: str = BENCHMARK_VERSION) -> str:
+def cell_status(out: Path, cell: Cell, *, version: str | None = None) -> str:
     """``done`` (all expected test sets valid), ``failed`` (partial), or ``pending`` (none)."""
     d = cell_dir(out, cell, version=version)
     expected = expected_test_sets(cell.grid, cell.protocol)
@@ -172,9 +178,7 @@ def cell_status(out: Path, cell: Cell, *, version: str = BENCHMARK_VERSION) -> s
     return "failed" if present else "pending"
 
 
-def scan(
-    out: Path, cells: list[Cell], *, version: str = BENCHMARK_VERSION
-) -> dict[str, list[Cell]]:
+def scan(out: Path, cells: list[Cell], *, version: str | None = None) -> dict[str, list[Cell]]:
     groups: dict[str, list[Cell]] = {"done": [], "pending": [], "failed": []}
     for c in cells:
         groups[cell_status(out, c, version=version)].append(c)
@@ -199,7 +203,7 @@ SNAPSHOT_PROTOCOLS = ("held_out", "multi_grid_pretrain", "transfer_zeroshot", "t
 def build_snapshot(
     out: Path,
     *,
-    version: str = BENCHMARK_VERSION,
+    version: str | None = None,
     protocols: tuple[str, ...] = SNAPSHOT_PROTOCOLS,
 ) -> dict:
     """The persistent coverage manifest: per-cell status + reproduce arg-line for every applicable
@@ -241,7 +245,12 @@ def build_snapshot(
         for k in ("total", "done", "pending", "failed")
     }
     return {
-        "benchmark_version": version,
+        "benchmark_version": BENCHMARK_VERSION if version is None else version,
+        # which outputs/<v>/ tree each protocol's CURRENT results live in (None = the per-protocol
+        # default: held_out stays at its published 1.0.0 tree, pretrain/transfer at the current one)
+        "results_versions": {
+            p: (results_version(p) if version is None else version) for p in protocols
+        },
         "protocols": list(protocols),
         "self_check": snapshot_self_check(out, cell_rows, counts, version=version),
         "counts": counts,
@@ -255,7 +264,7 @@ _RANGE_NONNEG = ("mae", "rmse", "median_abs_error")
 
 
 def snapshot_self_check(
-    out: Path, cell_rows: list[dict], counts: dict, *, version: str = BENCHMARK_VERSION
+    out: Path, cell_rows: list[dict], counts: dict, *, version: str | None = None
 ) -> dict:
     """The snapshot's embedded invariant set (UnderstandingVCS leaderboard-self-check idiom).
 
@@ -343,7 +352,7 @@ def snapshot_self_check(
     }
 
 
-def render_snapshot(out: str | Path = "outputs", *, version: str = BENCHMARK_VERSION) -> str:
+def render_snapshot(out: str | Path = "outputs", *, version: str | None = None) -> str:
     """The byte-canonical committed form — the single call site the freshness gate and every
     regen path share, so no two writers can disagree on formatting or parameters."""
     return json.dumps(build_snapshot(Path(out), version=version), indent=2, sort_keys=True) + "\n"
@@ -371,7 +380,7 @@ def check_floor(
     out: Path,
     cells: list[Cell],
     *,
-    version: str = BENCHMARK_VERSION,
+    version: str | None = None,
     tol: float = 0.02,
     test_set: str = "test",
 ) -> dict:
@@ -467,7 +476,11 @@ def check_floor(
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="Coverage manifest for the experiment matrix.")
     p.add_argument("--out", default="outputs", help="outputs root")
-    p.add_argument("--version", default=BENCHMARK_VERSION)
+    p.add_argument(
+        "--version",
+        default=None,
+        help="explicit outputs/<version> tree (default: per-protocol current-results resolution)",
+    )
     p.add_argument("--tasks", nargs="*", default=None, help="task ids (default: all registered)")
     p.add_argument("--grids", nargs="*", default=None, help="grid keys (default: all registered)")
     p.add_argument("--protocols", nargs="*", default=["held_out"])
@@ -547,7 +560,13 @@ def main(argv: list[str] | None = None) -> None:
         return
 
     total = len(cells)
-    print(f"version={args.version}  matrix={total} cells")
+    ver = (
+        args.version
+        or "per-protocol ("
+        + ", ".join(f"{p}={results_version(p)}" for p in sorted({c.protocol for c in cells}))
+        + ")"
+    )
+    print(f"version={ver}  matrix={total} cells")
     for k in ("done", "pending", "failed"):
         print(f"  {k:8s} {len(groups[k]):4d}")
     if groups["failed"]:

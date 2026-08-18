@@ -42,7 +42,7 @@ from ..evaluation.metrics import METRIC_DIRECTION
 from ..evaluation.predictions_io import predictions_frame
 from ..splits.protocols import TRANSFER_PROTOCOLS, default_input_normalize
 from ..tasks.task import load_task
-from ..version import BENCHMARK_VERSION, SPLITS_VERSION
+from ..version import results_version, splits_version
 from .interface import Baseline
 
 # ---- baseline registry (BYO plugin point, built on the Baseline Protocol) --------------------
@@ -187,10 +187,10 @@ def cell_identity(
         else ""
     )
     name = f"{task_id}/{protocol}/{grid}/{baseline_tag}{suffix}"
-    return name, f"{BENCHMARK_VERSION}/{name}"
+    return name, f"{results_version(protocol)}/{name}"
 
 
-def _results_env_hash() -> str | None:
+def _results_env_hash(version: str) -> str | None:
     """sha256 of ``env/results-v<version>.lock`` — the captured RESULTS environment.
 
     This is the pin a third party should compare against: it records the conda prefix that produced
@@ -198,7 +198,7 @@ def _results_env_hash() -> str | None:
     Cross-checked per cell by the ``versions`` block written alongside it (same record), so a
     mismatch between this file and the interpreter that ran is detectable after the fact.
     """
-    return _sha256_file(_repo_root() / "env" / f"results-v{BENCHMARK_VERSION}.lock")
+    return _sha256_file(_repo_root() / "env" / f"results-v{version}.lock")
 
 
 def _dist_version(name: str) -> str | None:
@@ -262,7 +262,7 @@ def _pretrained_bundle_path(args, seed: int, baseline_tag: str) -> Path:
         return base if base.suffix == ".pt" else base / f"seed{seed}.pt"
     return (
         Path(args.out)
-        / BENCHMARK_VERSION
+        / results_version("multi_grid_pretrain")
         / args.task
         / "multi_grid_pretrain"
         / args.pretrain_grid
@@ -382,7 +382,7 @@ def main(argv: list[str] | None = None) -> None:
     baseline_tag = args.baseline + ("+zero_seq" if args.zero_seq else "")
     base_dir = (
         Path(args.out)
-        / BENCHMARK_VERSION
+        / results_version(task.protocol)
         / task.definition.task_id
         / task.protocol
         / task.grid
@@ -412,11 +412,11 @@ def main(argv: list[str] | None = None) -> None:
         name=_cell_name,
         config={
             **vars(args),
-            "benchmark_version": BENCHMARK_VERSION,
-            "splits_version": SPLITS_VERSION,
+            "benchmark_version": results_version(task.protocol),
+            "splits_version": splits_version(task.protocol),
             "git_sha": _git_sha(),
             "lockfile_sha256": _lockfile_hash(),
-            "results_env_sha256": _results_env_hash(),
+            "results_env_sha256": _results_env_hash(results_version(task.protocol)),
             "normalize": normalize,
             "cluster": _cluster,
             "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
@@ -428,7 +428,7 @@ def main(argv: list[str] | None = None) -> None:
             task.protocol,
             task.grid,
             baseline_tag,
-            f"v{BENCHMARK_VERSION}",
+            f"v{results_version(task.protocol)}",
             _cluster,
             (_git_sha() or "")[:8],
             *(
@@ -551,7 +551,7 @@ def main(argv: list[str] | None = None) -> None:
         aggs[ts] = agg
         lr_ = last_result[ts]
         result_doc = build_result_doc(
-            benchmark_version=BENCHMARK_VERSION,
+            benchmark_version=results_version(task.protocol),
             task=task.definition.task_id,
             protocol=task.protocol,
             grid=task.grid,
@@ -609,11 +609,14 @@ def main(argv: list[str] | None = None) -> None:
         }
 
     run_record = {
-        "benchmark_version": BENCHMARK_VERSION,
-        "splits_version": SPLITS_VERSION,
+        "benchmark_version": results_version(task.protocol),
+        # the split-artifact version of the splits THIS run reads (multi_grid_pretrain -> the
+        # corrected v1.1 grouped splits; held_out/transfer read the frozen held_out v1.0 tree —
+        # per-file hashes incl. the pretrain lineage are in data.splits / attestation)
+        "splits_version": splits_version(task.protocol),
         "git_sha": _git_sha(),
         "lockfile_sha256": _lockfile_hash(),
-        "results_env_sha256": _results_env_hash(),
+        "results_env_sha256": _results_env_hash(results_version(task.protocol)),
         "seeds": args.seeds,
         "args": vars(args),
         "normalize": normalize,  # resolved input normalization (per_window for transfer/pretrain)

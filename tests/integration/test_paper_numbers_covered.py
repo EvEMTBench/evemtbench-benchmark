@@ -141,8 +141,12 @@ def test_every_paper_number_appears_on_the_dashboard():
         make_audit.build_baseline_page(b, rows, prov) for b in make_audit.ALL_BASELINES
     )
     bp_counts = Counter(_NUM.findall(baseline_pages))
-    supp_deficient = {n: (c, bp_counts[n]) for n, c in supp_counts.items() if bp_counts[n] < c}
-    assert not supp_deficient, (
-        f"supplement per-baseline numbers under-represented on the baseline drill-down pages: "
-        f"{supp_deficient}"
+    # Membership, not multiplicity: an SI table may legitimately restate a value the headline
+    # tables already carry (the protection table repeats the selected reference's balanced accuracy
+    # beside its MDR/FAR so a collapse cell is readable in one row). What must hold is that every
+    # value the supplement prints is traceable to a drill-down page, not that it is printed there
+    # exactly as often.
+    supp_missing = sorted(n for n in supp_counts if bp_counts[n] == 0)
+    assert not supp_missing, (
+        f"supplement numbers absent from the baseline drill-down pages: {supp_missing}"
     )

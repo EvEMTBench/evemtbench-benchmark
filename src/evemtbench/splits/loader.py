@@ -12,7 +12,7 @@ import json
 import os
 from pathlib import Path
 
-from ..version import SPLITS_VERSION
+from ..version import splits_version
 from .generator import PACKAGED_SPLITS_DIR
 from .protocols import HELD_OUT_SPLIT_NAMES
 
@@ -21,10 +21,15 @@ def split_dir(
     protocol: str,
     grid: str,
     *,
-    version: str = SPLITS_VERSION,
+    version: str | None = None,
     splits_root: str | os.PathLike | None = None,
 ) -> Path:
+    """Committed split directory for ``protocol``/``grid``. ``version=None`` (the default)
+    resolves per protocol (:func:`evemtbench.version.splits_version`): held_out and the transfer
+    protocols read the frozen v1.0 tree, ``multi_grid_pretrain`` the corrected v1.1 grouped tree.
+    An explicit ``version`` always wins (historical inspection, fixtures)."""
     root = Path(splits_root) if splits_root is not None else PACKAGED_SPLITS_DIR
+    version = splits_version(protocol) if version is None else version
     return root / f"v{version}" / protocol / grid
 
 
@@ -32,7 +37,7 @@ def read_meta(
     protocol: str,
     grid: str,
     *,
-    version: str = SPLITS_VERSION,
+    version: str | None = None,
     splits_root: str | os.PathLike | None = None,
 ) -> dict:
     path = split_dir(protocol, grid, version=version, splits_root=splits_root) / "meta.json"
@@ -44,7 +49,7 @@ def read_triple_split(
     grid: str,
     split: str,
     *,
-    version: str = SPLITS_VERSION,
+    version: str | None = None,
     splits_root: str | os.PathLike | None = None,
 ) -> list[tuple[str, str, int]]:
     """Read one split file of ``family:grid:sim_idx`` triples."""
@@ -64,7 +69,7 @@ def read_splits(
     protocol: str,
     grid: str,
     *,
-    version: str = SPLITS_VERSION,
+    version: str | None = None,
     splits_root: str | os.PathLike | None = None,
 ) -> dict[str, list[tuple[str, str, int]]]:
     """Read all 4 partitions (train/val/test/benchmark) of ``protocol``/``grid`` as
@@ -79,7 +84,7 @@ def read_splits(
 def read_held_out_splits(
     grid: str,
     *,
-    version: str = SPLITS_VERSION,
+    version: str | None = None,
     splits_root: str | os.PathLike | None = None,
 ) -> dict[str, list[tuple[str, str, int]]]:
     """Read all 4 held_out partitions (train/val/test/benchmark) as family:grid:sim_idx triples."""

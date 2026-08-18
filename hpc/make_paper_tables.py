@@ -1,16 +1,24 @@
-"""Regenerate the manuscript's five held_out result tables from outputs/<version>/.
+"""Import-only compatibility shim — **no longer writes any artifact**.
 
-Thin shim over the per-artifact builders in ``hpc/paper_artifacts/`` (one standalone script → one
-``paper/manuscript/generated/tab_res_<key>.tex``). The table logic lives in
-``hpc/paper_artifacts/paper_lib.py``; this module stays the historical entry point so
-``make_results_bundle.py``, ``check_results_fresh.py``, ``make_audit.py``, and the tests keep
-importing ``build_paper_tables`` + the shared config/selection names (``GRID_ROWS``, ``OBS``,
-``PAPER_FUNCTIONS``, ``TEST_SETS``, ``best_cell_choice``) from here unchanged.
+Historically this module regenerated the five held_out result fragments at once. Under the artifact
+rule the manuscript and Supplementary Information are now built with —
 
-    PYTHONPATH=src python hpc/make_paper_tables.py            # write the 5 fragments
+    one scientific table  ->  exactly one Python generator  ->  exactly one .tex artifact
 
-Wire numbers ONLY from a frozen benchmark version tag (see ``paper/AGENTS.md``); rehearsal runs
-stay ``\\res``.
+— each fragment is owned by exactly one standalone ``hpc/paper_artifacts/build_<name>.py``
+(see ``paper/manuscript/generated/README.md``). Build them individually, or all at once through the
+Makefile, which invokes the individual generators rather than a multi-output script::
+
+    make paper-artifacts         # regenerate every manuscript + SI fragment
+    make check-supp-artifacts    # verify the committed fragments are fresh (writes nothing)
+
+    PYTHONPATH=src python hpc/paper_artifacts/build_tab_res_fd.py [--check]
+
+The table LOGIC lives in ``hpc/paper_artifacts/paper_lib.py`` (shared, artifact-free); the pure
+aggregator ``build_paper_tables`` and the shared config/selection names (``GRID_ROWS``, ``OBS``,
+``PAPER_FUNCTIONS``, ``TEST_SETS``, ``best_cell_choice``) are re-exported here so the freshness
+gate, the audit dashboard and the tests keep importing them from this path unchanged. Aggregators
+return ``{filename: latex}``; they do not write.
 """
 
 from __future__ import annotations
@@ -33,12 +41,12 @@ from paper_lib import (  # noqa: E402,F401  (re-exported for downstream importer
 
 
 def main() -> None:
-    GEN_DIR.mkdir(parents=True, exist_ok=True)
-    tables = build_paper_tables()
-    for fname, content in tables.items():
-        (GEN_DIR / fname).write_text(content)
-    n_res = sum(c.count(r"\res") for c in tables.values())
-    print(f"wrote {len(tables)} paper tables to {GEN_DIR} ({n_res} empty cells -> \\res)")
+    sys.exit(
+        "hpc/make_paper_tables.py no longer writes artifacts (one artifact = one generator).\n"
+        "Use `make paper-artifacts`, or a single owner such as\n"
+        "  PYTHONPATH=src python hpc/paper_artifacts/build_tab_res_fd.py\n"
+        "See paper/manuscript/generated/README.md for the full artifact -> generator map."
+    )
 
 
 if __name__ == "__main__":

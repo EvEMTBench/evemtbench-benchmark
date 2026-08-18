@@ -17,8 +17,10 @@ from pathlib import Path
 
 import pytest
 
-from evemtbench import BENCHMARK_VERSION
+from evemtbench import results_version
 from evemtbench.baselines import runner
+
+HO_VER = results_version("held_out")
 
 GOLDEN = Path(__file__).resolve().parents[1] / "golden" / "fixture_metrics.json"
 
@@ -43,7 +45,7 @@ def _aggregates(baseline, task, fixture_root, held_out_splits, out) -> dict:
             "--out", str(out),
         ]
     )  # fmt: skip
-    base = out / BENCHMARK_VERSION / task / "held_out" / "double_line" / baseline
+    base = out / HO_VER / task / "held_out" / "double_line" / baseline
     return {
         ts: json.loads((base / ts / "result.json").read_text())["aggregate"]
         for ts in ("test", "benchmark")

@@ -15,13 +15,15 @@ import pytest
 
 from evemtbench.splits.generator import generate_held_out, write_held_out_artifact
 from evemtbench.tasks.task import load_task
-from evemtbench.version import BENCHMARK_VERSION, SPLITS_VERSION
+from evemtbench.version import BENCHMARK_VERSION, SPLITS_VERSION, splits_version
 
 
 @pytest.fixture(scope="module")
 def transfer_splits(fixture_root, tmp_path_factory) -> Path:
     """A splits root holding the multi_grid_pretrain split (template_20kv) + the held_out split of
-    the double_line target the transfer protocols evaluate on."""
+    the double_line target the transfer protocols evaluate on. Mirrors production: the pretrain
+    split is topology-grouped and lives under the multi_grid splits version (v1.1), the target's
+    held_out split under the frozen v1.0."""
     root = tmp_path_factory.mktemp("transfer_splits")
     pre = generate_held_out(
         "template_20kv",
@@ -30,8 +32,9 @@ def transfer_splits(fixture_root, tmp_path_factory) -> Path:
         benchmark_family=None,
         root=fixture_root,
         stratify_by="event_type",
+        grouping="topology",
     )
-    write_held_out_artifact(pre, root, version=SPLITS_VERSION)
+    write_held_out_artifact(pre, root, version=splits_version("multi_grid_pretrain"))
     tgt = generate_held_out("double_line", root=fixture_root, stratify_by="event_type")
     write_held_out_artifact(tgt, root, version=SPLITS_VERSION)
     return root

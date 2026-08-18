@@ -1,0 +1,26 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_tab_dataset_families.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs: (none — static specification)
+\begin{table*}[t]
+\caption{Dataset families as a generalisation ladder (family name; benchmark code
+handle in \texttt{typewriter}; \texttt{train} and \texttt{fine\_tune} are accepted as
+legacy read-aliases of \texttt{multi\_grid} and \texttt{adapt\_grid}). The dataset
+publication calls the evaluation-only family \emph{Benchmark}, which is also its on-disk
+handle; this article writes it \texttt{eval\_grid} to keep it distinct from the benchmark
+as a whole. Rows increase in
+what is held fixed between training and test. The Eval-Grid family is
+\emph{evaluation-only}: it is never used for training, validation, model selection,
+early stopping, normalisation, or threshold/hyperparameter tuning.}
+\label{tab:dataset_families}
+\centering
+\begin{tabular}{L{3.4cm} L{5.2cm} L{5.4cm}}
+\toprule
+\textbf{Family (handle)} & \textbf{Randomised / fixed} & \textbf{Generalisation role} \\
+\midrule
+Train (\texttt{multi\_grid}) & all three parameter classes; diverse random topologies & cross-topology training + evaluation \planned \\
+Fine-tune (\texttt{adapt\_grid}) & fixed topology; random events + operating states & in-grid training + in-distribution test (\texttt{held\_out}) \\
+Eval-Grid (\texttt{eval\_grid}) & fixed topology + operating point; discrete event-parameter sweep & never-trained systematic transfer evaluation \\
+\bottomrule
+\end{tabular}
+\end{table*}

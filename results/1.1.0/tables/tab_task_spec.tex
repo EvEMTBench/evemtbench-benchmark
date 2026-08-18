@@ -1,0 +1,22 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_tab_task_spec.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs: (none — static specification)
+\begin{table*}[t]
+\centering
+\caption{Benchmark task specification. Each function is scored under each
+observability view (Table~\ref{tab:observability}); a window is scored by exactly one
+rule per task. FC uses a frozen 9-class fault vocabulary.}
+\label{tab:task_spec}
+\begin{tabular}{L{2.2cm} L{2.0cm} L{4.6cm} L{4.4cm}}
+\toprule
+\textbf{Function} & \textbf{Label kind} & \textbf{Valid samples (windows scored)} & \textbf{Primary metrics} \\
+\midrule
+\ac{fd} & binary & all windows of fault episodes: pre-fault negatives + fault-active positives & balanced accuracy, macro $\text{F}_1$, missed-fault rate, false-alarm rate \\
+\ac{fc} & 9-class & fault-active windows whose type is in the 9-class vocabulary & balanced accuracy, macro / per-class $\text{F}_1$ \\
+\ac{fl} & regression & fault-active windows of \emph{line}-fault episodes (location defined; bus faults excluded) & \acs{mae}, \acs{rmse}, $R^2$ \\
+\ac{ed} & binary & every window: fault- or switching-active positives vs.\ quiescent negatives & balanced accuracy, missed-detection rate, false-trip rate; detection latency \\
+\ac{ec} & 23-class & every window over the full event-type vocabulary (non-active windows labelled \texttt{no\_event}; out-of-vocabulary types excluded) & balanced accuracy, macro / per-class $\text{F}_1$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

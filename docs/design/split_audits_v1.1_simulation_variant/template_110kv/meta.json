@@ -1,0 +1,57 @@
+{
+  "class_histograms": {
+    "test": {
+      "flt_1phg_incipient": 58,
+      "flt_1phg_incipient_w_arc": 54,
+      "flt_1phg_shc": 62,
+      "flt_1phg_shc_w_arc": 60,
+      "flt_2ph_shc": 49,
+      "flt_2phg_shc": 53,
+      "flt_3ph_shc": 60,
+      "no_event": 20382
+    },
+    "train": {
+      "flt_1phg_incipient": 274,
+      "flt_1phg_incipient_w_arc": 254,
+      "flt_1phg_shc": 288,
+      "flt_1phg_shc_w_arc": 281,
+      "flt_2ph_shc": 230,
+      "flt_2phg_shc": 249,
+      "flt_3ph_shc": 282,
+      "no_event": 95095
+    },
+    "val": {
+      "flt_1phg_incipient": 58,
+      "flt_1phg_incipient_w_arc": 54,
+      "flt_1phg_shc": 61,
+      "flt_1phg_shc_w_arc": 60,
+      "flt_2ph_shc": 49,
+      "flt_2phg_shc": 53,
+      "flt_3ph_shc": 60,
+      "no_event": 20386
+    }
+  },
+  "counts": {
+    "benchmark": 0,
+    "test": 20778,
+    "train": 96953,
+    "val": 20781
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "template_110kv",
+  "group_column": "result_id",
+  "group_counts": {
+    "test": 1480,
+    "train": 6919,
+    "val": 1480
+  },
+  "grouping": "simulation",
+  "protocol": "multi_grid_pretrain",
+  "seed": 20327739,
+  "splits_version": "1.1",
+  "stratify_by": "event_type"
+}

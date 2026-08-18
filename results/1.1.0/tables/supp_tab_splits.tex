@@ -1,0 +1,22 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_splits.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   src/evemtbench/splits/v1.0/held_out/<grid>/{train,val,test,benchmark}.txt
+\begin{table}[t]
+\centering
+\small
+\setlength{\tabcolsep}{6pt}
+\caption{Held-out split composition: number of \emph{episodes} per grid. Under the frozen window contract each episode yields $23$ windows ($50\,$ms length, $5\,$ms step, over the event-centred extraction interval), uniformly across every grid and family; the number of windows actually \emph{scored} by each function is smaller and is given in Table~\ref{tab:supp_primary_valid_counts}. Train/validation/test are the $70/15/15$ episode-level split of the \texttt{adapt\_grid} family; \texttt{eval\_grid} is the entire never-trained family.}
+\label{tab:supp_splits}
+\begin{tabular}{l rrrr}
+\toprule
+\textbf{Grid} & \textbf{train} & \textbf{val} & \textbf{test} & \textbf{\texttt{eval\_grid}} \\
+\midrule
+CIGR\'E MV (20\,kV) & 6,934 & 1,486 & 1,486 & 4,509 \\
+Double Line (110\,kV) & 6,999 & 1,500 & 1,500 & 1,101 \\
+Prot.\ Ref.\ (110\,kV) & 6,816 & 1,459 & 1,464 & 2,435 \\
+IEEE 39-Bus (345\,kV) & 6,997 & 1,500 & 1,503 & 9,708 \\
+\bottomrule
+\end{tabular}
+\end{table}

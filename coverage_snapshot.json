@@ -1,5 +1,5 @@
 {
-  "benchmark_version": "1.0.0",
+  "benchmark_version": "1.1.0",
   "cells": [
     {
       "arg_line": "--task event_classification_global --protocol held_out --grid cigre_mv --baseline cnn",
@@ -24284,6 +24284,12 @@
     "transfer_zeroshot",
     "transfer_finetune"
   ],
+  "results_versions": {
+    "held_out": "1.0.0",
+    "multi_grid_pretrain": "1.1.0",
+    "transfer_finetune": "1.1.0",
+    "transfer_zeroshot": "1.1.0"
+  },
   "self_check": {
     "checks": [
       {

@@ -119,8 +119,15 @@ def test_ledger_tracks_paper_anchors_and_contributions():
                 f"{c.claim!r}: paper_anchor no longer occurs verbatim in main.tex — the "
                 "manuscript changed; update the ledger row to match"
             )
-    # every Contributions \item must be backed by at least one claim row
+    # Every Contributions \item must be backed by at least one claim row.
+    #
+    # Dormant while the manuscript carries no explicit contributions list: the Scientific Reports
+    # rewrite folded those bullets into Introduction prose, so there is nothing to enumerate. The
+    # check is kept rather than deleted because the list has come and gone across revisions, and it
+    # must bind again the moment it returns — a silently-deleted check would not.
     raw = MAIN_TEX.read_text()
+    if r"\textbf{Contributions.}" not in raw:
+        return
     block = raw.split(r"\textbf{Contributions.}")[1].split(r"\end{itemize}")[0]
     n_items = len(re.findall(r"\\item", block))
     covered = {c.contribution for c in MAN.CLAIMS if c.contribution}

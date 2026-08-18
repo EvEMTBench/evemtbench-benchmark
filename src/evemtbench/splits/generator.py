@@ -89,6 +89,101 @@ def split_episodes(
     return {name: sorted(int(i) for i in v) for name, v in out.items()}
 
 
+def split_grouped_episodes(
+    episode_ids: list[int],
+    groups: dict[int, str],
+    fractions: tuple[float, float, float],
+    seed: int,
+    strata: dict[int, str] | None = None,
+) -> dict[str, list[int]]:
+    """Deterministically partition episodes into train/val/test with **whole groups** kept together.
+
+    ``groups`` maps every episode id to a group key (e.g. its simulation ``result_id`` or its
+    generated-topology ``graph_id``); no group ever straddles a partition boundary, so sibling
+    episodes of one simulation — or all simulations of one topology — always land in the same
+    partition. Fractions are targeted on **episode counts** (groups vary in size).
+
+    Assignment is a proportional greedy against ONE global per-partition episode budget
+    (largest relative remaining capacity wins), with stratification controlling the ORDER: each
+    group is labeled with the **rarest event class it contains** (by corpus-wide totals), strata
+    are processed rarest-first, groups within a stratum largest-first. Rare-class groups are
+    therefore placed while the budgets are still balanced, which spreads them ~proportionally
+    (for simulation grouping, where a fault simulation's stratum is its fault class, this is
+    near-exact per-class stratification — the one fault episode plus its no_event sibling lines
+    move as one unit); for topology grouping, where every event class spans most topologies, it
+    degrades gracefully into proportional size-balancing, and class proportions follow because
+    classes are near-uniform across topologies (the split audit verifies coverage, never assumes
+    it). Two rejected designs, for the record: per-class-demand assignment (with near-universal
+    classes it hands out almost every group during the rarest class's phase — observed 59/20/21
+    instead of 70/15/15 on the real corpora) and per-stratum budgets (degenerate on small corpora:
+    singleton strata all land in train).
+
+    Deterministic and byte-reproducible for a given seed: every tie falls back to a seeded
+    permutation of the sorted group keys, then to the fixed partition order.
+
+    **Coverage limit, stated precisely:** a class can appear in all three partitions only if it
+    occurs in >= 3 distinct groups; a class confined to a single group lands wholesale in one
+    partition. That is a property of the data (class-topology concentration), not of the assignment
+    — the split audit reports per-class group counts so such classes are visible, never silent.
+    """
+    ids = sorted(int(i) for i in episode_ids)
+    missing = [i for i in ids if i not in groups]
+    if missing:
+        raise ValueError(
+            f"{len(missing)} episode(s) have no group key (first: {missing[:5]}); "
+            "grouped splitting requires complete group metadata"
+        )
+    names = ("train", "val", "test")
+
+    # group -> episodes, group -> class histogram (single pseudo-class when unstratified)
+    by_group: dict[str, list[int]] = {}
+    for i in ids:
+        by_group.setdefault(str(groups[i]), []).append(i)
+    cls_of = (lambda i: str(strata.get(i, "__unlabeled__"))) if strata else (lambda i: "__all__")
+    group_hist: dict[str, Counter] = {
+        g: Counter(cls_of(i) for i in eps) for g, eps in by_group.items()
+    }
+    class_total: Counter = Counter()
+    for h in group_hist.values():
+        class_total.update(h)
+
+    # seeded permutation of the sorted group keys -> the deterministic tie-break order
+    keys = sorted(by_group)
+    rng = np.random.default_rng(seed)
+    order = {k: r for r, k in enumerate(np.array(keys)[rng.permutation(len(keys))])}
+
+    # stratum of a group = the rarest class it contains (corpus-wide totals; ties lexicographic)
+    def rarest(hist: Counter) -> str:
+        return min(hist, key=lambda c: (class_total[c], c))
+
+    strata_groups: dict[str, list[str]] = {}
+    for g, h in group_hist.items():
+        strata_groups.setdefault(rarest(h), []).append(g)
+
+    n_total = len(ids)
+    target = {p: f * n_total for p, f in zip(names, fractions, strict=True)}
+    filled = dict.fromkeys(names, 0)
+    assignment: dict[str, str] = {}
+    for label in sorted(strata_groups, key=lambda c: (class_total[c], c)):  # rarest stratum first
+        # largest group first tightens the endgame fit; ties resolve by the seeded permutation
+        for g in sorted(strata_groups[label], key=lambda k: (-len(by_group[k]), order[k])):
+            # partition with the largest relative remaining global capacity; ties -> fixed order
+            p = max(
+                names,
+                key=lambda q: (
+                    (target[q] - filled[q]) / target[q] if target[q] > 0 else 0.0,
+                    -names.index(q),
+                ),
+            )
+            assignment[g] = p
+            filled[p] += len(by_group[g])
+
+    out: dict[str, list[int]] = {p: [] for p in names}
+    for g, p in assignment.items():
+        out[p] += by_group[g]
+    return {p: sorted(v) for p, v in out.items()}
+
+
 def _grid_seed(grid_key: str) -> int:
     # Stable across processes/machines (builtin hash() is salted by PYTHONHASHSEED).
     digest = int(hashlib.sha256(grid_key.encode()).hexdigest()[:8], 16)
@@ -99,6 +194,14 @@ def _triple(family: str, grid: str, sim_idx: int) -> str:
     return f"{family}:{grid}:{sim_idx}"
 
 
+# Grouping level -> the episode-constant y-parquet column carrying the group key. The multi_grid
+# corpora encode one *line* of one simulation per episode (sample_id = result_id*10^4 + line_idx),
+# so an ungrouped episode split scatters sibling lines of a simulation — and whole generated
+# topologies — across partitions. "simulation" keeps each simulation (result_id) together;
+# "topology" keeps each generated topology (graph_id), and with it all its simulations and lines.
+GROUPING_COLUMNS = {"simulation": "result_id", "topology": "graph_id"}
+
+
 @dataclass
 class HeldOutArtifact:
     protocol: str
@@ -107,6 +210,9 @@ class HeldOutArtifact:
     splits: dict[str, list[str]]  # split name -> list of "family:grid:sim_idx" triples
     stratify_by: str | None = None  # strata key used (e.g. "event_type"), or None for uniform
     strata: dict[int, str] | None = None  # episode -> class (for meta.json histograms), optional
+    grouping: str | None = None  # "simulation" | "topology" | None (legacy episode-level)
+    group_column: str | None = None  # y-parquet column the group keys came from
+    groups: dict[int, str] | None = None  # episode -> group key (for meta.json group counts)
 
 
 def generate_held_out(
@@ -118,6 +224,7 @@ def generate_held_out(
     root: str | os.PathLike | None = None,
     seed: int | None = None,
     stratify_by: str | None = None,
+    grouping: str | None = None,
 ) -> HeldOutArtifact:
     """Build a 4-partition episode split for one grid under ``protocol``.
 
@@ -132,15 +239,32 @@ def generate_held_out(
     class — see :func:`split_episodes`); default None reproduces the uniform split byte-for-byte.
     The per-grid seed is namespaced by protocol so different protocols' splits of the same grid are
     independent.
+
+    ``grouping`` (``"simulation"`` / ``"topology"``) switches to the **group-aware** split
+    (:func:`split_grouped_episodes`): every episode of one group (its ``result_id`` simulation, or
+    its ``graph_id`` generated topology) stays in one partition — the leakage-free source-corpus
+    splits for ``multi_grid_pretrain``. The seed is then additionally namespaced by the grouping so
+    the simulation- and topology-grouped splits of one grid are independent draws. Default ``None``
+    reproduces the legacy episode-level split byte-for-byte.
     """
     g = get_grid(grid)
-    seed = _grid_seed(protocol + "_" + g.key) if seed is None else seed
+    seed_key = f"{protocol}_{grouping}_{g.key}" if grouping else f"{protocol}_{g.key}"
+    seed = _grid_seed(seed_key) if seed is None else seed
 
     ft_eps = read_episode_ids(g, train_family, root=root)
     strata = (
         read_episode_labels(g, train_family, column=stratify_by, root=root) if stratify_by else None
     )
-    parts = split_episodes(ft_eps, HELD_OUT_FRACTIONS, seed, strata=strata)
+    groups: dict[int, str] | None = None
+    group_column: str | None = None
+    if grouping is not None:
+        if grouping not in GROUPING_COLUMNS:
+            raise ValueError(f"grouping {grouping!r} not in {sorted(GROUPING_COLUMNS)}")
+        group_column = GROUPING_COLUMNS[grouping]
+        groups = read_episode_labels(g, train_family, column=group_column, root=root)
+        parts = split_grouped_episodes(ft_eps, groups, HELD_OUT_FRACTIONS, seed, strata=strata)
+    else:
+        parts = split_episodes(ft_eps, HELD_OUT_FRACTIONS, seed, strata=strata)
 
     # The benchmark family may be absent (a not-yet-windowed grid, or a pre-training family that has
     # no separate held-out family); in that case the split carries an empty benchmark partition.
@@ -159,7 +283,17 @@ def generate_held_out(
             [_triple(benchmark_family, g.key, i) for i in bm_eps] if benchmark_family else []
         ),
     }
-    return HeldOutArtifact(protocol, g.key, seed, splits, stratify_by=stratify_by, strata=strata)
+    return HeldOutArtifact(
+        protocol,
+        g.key,
+        seed,
+        splits,
+        stratify_by=stratify_by,
+        strata=strata,
+        grouping=grouping,
+        group_column=group_column,
+        groups=groups,
+    )
 
 
 def write_held_out_artifact(
@@ -180,6 +314,14 @@ def write_held_out_artifact(
         "counts": {n: len(artifact.splits[n]) for n in HELD_OUT_SPLIT_NAMES},
         "stratify_by": artifact.stratify_by,
     }
+    if artifact.grouping is not None:  # group-aware split: record how to regenerate + verify it
+        meta["grouping"] = artifact.grouping
+        meta["group_column"] = artifact.group_column
+        assert artifact.groups is not None
+        meta["group_counts"] = {
+            name: len({artifact.groups[int(tr.split(":")[2])] for tr in artifact.splits[name]})
+            for name in ("train", "val", "test")
+        }
     if artifact.strata is not None:  # per-split class histograms (self-documenting stratification)
         hist: dict[str, dict[str, int]] = {}
         for name in ("train", "val", "test"):
@@ -227,6 +369,19 @@ def main() -> None:
         help="episode-label column for a class-stratified train split (e.g. event_type); "
         "recorded in meta.json so leakage.verify_held_out_regenerates reproduces it",
     )
+    parser.add_argument(
+        "--grouping",
+        default=None,
+        choices=sorted(GROUPING_COLUMNS),
+        help="group-aware split level (multi_grid source corpora): 'simulation' keeps each "
+        "result_id together, 'topology' keeps each graph_id (and thus all its simulations and "
+        "sibling lines) together; recorded in meta.json for regeneration verification",
+    )
+    parser.add_argument(
+        "--splits-version",
+        default=SPLITS_VERSION,
+        help="version directory to write under the splits root (e.g. 1.1)",
+    )
     args = parser.parse_args()
 
     train_family, benchmark_family, default_grids = _GENERATED_PROTOCOLS[args.protocol]
@@ -238,12 +393,13 @@ def main() -> None:
             benchmark_family=benchmark_family,
             root=args.root,
             stratify_by=args.stratify_by,
+            grouping=args.grouping,
         )
-        out = write_held_out_artifact(art, Path(args.out))
+        out = write_held_out_artifact(art, Path(args.out), version=args.splits_version)
         counts = {n: len(art.splits[n]) for n in HELD_OUT_SPLIT_NAMES}
         print(
             f"[{args.protocol}/{grid_key}] seed={art.seed} stratify_by={art.stratify_by} "
-            f"counts={counts} -> {out}"
+            f"grouping={art.grouping} counts={counts} -> {out}"
         )
 
 

@@ -1,0 +1,39 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_tab_task_suite.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs: (none — static specification)
+\begin{table*}[t]
+\centering
+\small
+\caption{The full scored task suite (benchmark v1.0.0): twelve
+protection/event-analysis functions instantiated across the observability views,
+giving \emph{24 scored (function, view) tasks} in three difficulty tiers. The
+five \emph{primary} functions foregrounded in the main text are marked~$\dagger$; the
+remaining seven are scored diagnostics reported in the Supplementary and the online
+leaderboard. Views: L~= local, Li~= line, G~= global. Event-scope functions are
+grid-wide (global-only) by construction, because a benign or quiescent window has no
+faulted line on which to centre the local/line oracle. Classification tasks report
+balanced accuracy as the headline metric; \ac{fl} reports \acs{mae} in \% of line
+length.}
+\label{tab:task_suite}
+\begin{tabular}{L{4.4cm} c L{2.4cm} c L{4.0cm}}
+\toprule
+\textbf{Function} & \textbf{Tier} & \textbf{Label kind} & \textbf{Views} & \textbf{Interpretation} \\
+\midrule
+Fault detection (\ac{fd})\,$\dagger$      & 1 & binary      & L, Li, G & fault-active vs.\ pre-fault window \\
+Event detection (\ac{ed})\,$\dagger$      & 1 & binary      & G        & any active event vs.\ quiescent \\
+Switch detection                          & 1 & binary      & G        & benign switching vs.\ else \\
+Fault grounded                            & 1 & binary      & L, Li, G & ground element engaged? \\
+\midrule
+Event state                               & 2 & 3-class     & G        & normal / switching / fault \\
+Fault-type classification (\ac{fc})\,$\dagger$ & 2 & 9-class & L, Li, G & short-circuit / incipient / \ac{hif} subtype \\
+Faulted-phase identification              & 2 & 7-class     & L, Li, G & A\,/\,B\,/\,C\,/\,AB\,/\,AC\,/\,BC\,/\,ABC \\
+Fault category                            & 2 & 3-class     & L, Li, G & short-circuit / incipient / \ac{hif} \\
+Switch type                               & 2 & 8-class     & G        & which benign switching event \\
+Fault origin                              & 2 & binary      & G        & line vs.\ busbar fault \\
+\midrule
+Event classification (\ac{ec})\,$\dagger$ & 3 & 23-class    & G        & full event-type taxonomy \\
+Fault localisation (\ac{fl})\,$\dagger$   & 3 & regression  & L, Li, G & position along the faulted line \\
+\bottomrule
+\end{tabular}
+\end{table*}

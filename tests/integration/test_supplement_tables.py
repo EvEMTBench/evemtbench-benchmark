@@ -42,12 +42,12 @@ def test_build_is_deterministic_and_all_res_without_outputs(tmp_path, monkeypatc
 
 def test_real_result_populates_only_its_cell(tmp_path, monkeypatch):
     mst = _load_builder()
-    from evemtbench.version import BENCHMARK_VERSION
+    from evemtbench.version import results_version
 
     d = (
         tmp_path
         / "outputs"
-        / BENCHMARK_VERSION
+        / results_version("held_out")
         / "fault_detection_local"
         / "held_out"
         / "double_line"
@@ -90,9 +90,27 @@ def test_committed_supplement_fragments_present():
     if not gen.is_dir():
         pytest.skip("generated/ not present (public release clone)")
     frags = sorted(gen.glob("supp_tab_*.tex"))
-    # 10 standard per-baseline tables + 5 Package C SI tables (protection, fc_perclass, fc_support,
-    # splits, diagnostics) + 1 validation-selection audit table (val_selection)
-    assert len(frags) == 16, f"expected 16 committed supplement fragments, found {len(frags)}"
+    # 10 standard per-baseline tables + the SI evidence tables. Every one is owned by exactly one
+    # hpc/paper_artifacts/build_<name>.py, so the inventory is asserted by name, not by count.
+    expected = STD_PER_BASELINE | {
+        f"supp_tab_{k}.tex"
+        for k in (
+            "protection",
+            "fc_perclass",
+            "fc_support",
+            "splits",
+            "diagnostics",
+            "val_selection",
+            "partition_audit",
+            "transfer_scratch",
+            "primary_valid_counts",
+            "baseline_cfg",
+            "ec_support",
+            "ed_negative_support",
+            "current_shift",
+        )
+    }
+    assert {f.name for f in frags} == expected
     assert STD_PER_BASELINE <= {f.name for f in frags}
     for f in frags:
         txt = f.read_text()

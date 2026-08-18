@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "evemtbench"
-version = "1.0.0"
+version = "1.1.0"
 description = "EvEMTBench: a protocol-driven ML benchmark for power system protection on EMT waveform data"
 readme = "README.md"
 requires-python = ">=3.10"
@@ -47,7 +47,11 @@ graphs = ["networkx>=3.0"]
 # EVEMTBENCH_WANDB; imported lazily in baselines/_tracking.py so the core product stays tracker-free).
 tracking = ["wandb>=0.16"]
 dev = [
-    "pytest>=7.4", "pytest-cov>=4.1", "ruff>=0.4", "mypy>=1.8", "jsonschema>=4.18", "networkx>=3.0",
+    "pytest>=7.4", "pytest-cov>=4.1",
+    # ruff formats differently across minor releases, and `ruff format --check` is a CI gate:
+    # a dev env below the 0.16 series reformats files that both CIs then reject. The GitHub
+    # lock (CI of record) pins 0.16.1; the GitLab mirror installs this extra unpinned.
+    "ruff>=0.16.1", "mypy>=1.8", "jsonschema>=4.18", "networkx>=3.0",
     "tomli>=2.0; python_version < '3.11'",
 ]
 

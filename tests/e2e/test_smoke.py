@@ -8,7 +8,7 @@ import json
 
 import pytest
 
-from evemtbench import BENCHMARK_VERSION
+from evemtbench import results_version
 from evemtbench.baselines.majority import MajorityBaseline
 from evemtbench.evaluation.evaluate import evaluate
 from evemtbench.evaluation.predictions_io import load_predictions, save_predictions
@@ -39,7 +39,7 @@ def test_majority_evaluate_both_test_sets(fd_task):
     model.fit(fd_task)
     for ts in ("test", "benchmark"):
         result = evaluate(fd_task, model.predict(fd_task.view(ts)), test_set=ts)
-        assert result.benchmark_version == BENCHMARK_VERSION
+        assert result.benchmark_version == results_version(fd_task.protocol)
         assert result.test_set == ts
         for m in ("balanced_accuracy", "missed_fault_rate", "false_alarm_rate", "accuracy"):
             assert m in result.metrics

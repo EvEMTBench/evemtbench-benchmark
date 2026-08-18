@@ -27,7 +27,7 @@ from ..data.roots import GridSpec, get_grid
 from ..data.windows import WindowSet, load_windows
 from ..splits.loader import read_held_out_splits, read_splits, split_dir
 from ..splits.protocols import HELD_OUT_SPLIT_NAMES, get_protocol
-from ..version import SPLITS_VERSION
+from ..version import splits_version as _splits_version_for
 from . import line_view
 from .labels.event_detection import derive_event_present_series
 from .labels.event_present import derive_fault_active_series
@@ -816,7 +816,7 @@ _DEFAULT_PRETRAIN_GRID = "template_20kv"
 
 
 def _protocol_triples(
-    protocol: str, grid_key: str, *, version: str, splits_root
+    protocol: str, grid_key: str, *, version: str | None, splits_root
 ) -> dict[str, list[tuple[str, str, int]]]:
     """Assemble the (family, grid, sim_idx) triples per split for a protocol.
 
@@ -837,7 +837,7 @@ def _protocol_triples(
     raise ValueError(f"protocol {protocol!r} has no split builder in load_task")
 
 
-def _splits_provenance(protocol: str, grid_key: str, *, version: str, splits_root) -> dict:
+def _splits_provenance(protocol: str, grid_key: str, *, version: str | None, splits_root) -> dict:
     """sha256 of each committed split file this load reads — artifact-backed input provenance.
 
     The transfer protocols reuse the target grid's held_out split; multi_grid_pretrain reads its
@@ -847,6 +847,8 @@ def _splits_provenance(protocol: str, grid_key: str, *, version: str, splits_roo
         if protocol in ("held_out", "transfer_finetune", "transfer_zeroshot")
         else protocol
     )
+    if version is None:  # record the per-protocol resolution split_dir applies (see loader)
+        version = _splits_version_for(split_proto)
     d = split_dir(split_proto, grid_key, version=version, splits_root=splits_root)
     files = {
         f.name: hashlib.sha256(f.read_bytes()).hexdigest()
@@ -881,7 +883,7 @@ def load_task(
     protocol: str,
     *,
     grid: str | GridSpec | None = None,
-    version: str = SPLITS_VERSION,
+    version: str | None = None,
     root: str | os.PathLike | None = None,
     splits_root: str | os.PathLike | None = None,
     directory: str | os.PathLike | None = None,
@@ -901,6 +903,14 @@ def load_task(
     if grid is None and protocol == "multi_grid_pretrain":
         grid = _DEFAULT_PRETRAIN_GRID
     gspec = get_grid(grid if grid is not None else td.default_grid)
+
+    if version is None:  # per-protocol split-artifact version (mirrors _splits_provenance)
+        split_proto = (
+            "held_out"
+            if protocol in ("held_out", "transfer_finetune", "transfer_zeroshot")
+            else protocol
+        )
+        version = _splits_version_for(split_proto)
 
     triples = _protocol_triples(protocol, gspec.key, version=version, splits_root=splits_root)
 

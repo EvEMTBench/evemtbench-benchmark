@@ -1,0 +1,31 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_partition_audit.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   src/evemtbench/splits/v1.0/held_out/<grid>/{train,val,test,benchmark}.txt
+%   src/evemtbench/splits/v1.0/held_out/<grid>/meta.json
+%   src/evemtbench/splits/v1.1/multi_grid_pretrain/<source>/audit.json  (committed leakage audit; not recomputed)
+%   src/evemtbench/splits/v1.1/multi_grid_pretrain/<source>/meta.json
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.8pt}
+\caption{Partition and leakage audit of the committed splits used for every reported result. \emph{Top}: the four target grids' \texttt{held\_out} partitions of the \texttt{adapt\_grid} family, plus the never-trained \texttt{eval\_grid} family. \emph{Bottom}: the three \texttt{multi\_grid} pre-training source corpora, whose v1.1 splits are grouped by generated topology. Counts are \emph{episodes}. Overlap columns give the three pairwise intersection sizes train\,$\cap$\,val / train\,$\cap$\,test / val\,$\cap$\,test at each grouping level; every one is zero. For a reference grid one episode is one \ac{emt} simulation, so the simulation partition is the episode partition (\notapp{}), and all partitions share a single fixed topology (\notapp{}); the \texttt{eval\_grid} family is disjoint from the whole \texttt{adapt\_grid} family by construction (verified separately, see text). Source-corpus rows reproduce the committed \texttt{audit.json} written when the splits were generated; they are not a new resampling. Hashes are the leading $12$ hex digits of the SHA-256 of \texttt{train.txt}; the complete digests of every partition file are retained in each run's provenance record and in the source corpora's \texttt{audit.json}.}
+\label{tab:supp_partition_audit}
+\begin{tabular}{l l rrrr ccc r l}
+\toprule
+ & & \multicolumn{4}{c}{\textbf{Episodes}} & \multicolumn{3}{c}{\textbf{Overlaps} (tr$\cap$va / tr$\cap$te / va$\cap$te)} & & \\
+\cmidrule(lr){3-6}\cmidrule(lr){7-9}
+\textbf{Partition set} & \textbf{Grouping unit} & \textbf{train} & \textbf{val} & \textbf{test} & \textbf{\texttt{eval\_grid}} & \textbf{episode} & \textbf{simulation} & \textbf{topology} & \textbf{seed} & \textbf{hash (\texttt{train.txt})} \\
+\midrule
+CIGR\'E MV (20\,kV) & simulation episode & 6,934 & 1,486 & 1,486 & 4,509 & 0/0/0 & \notapp & \notapp & 20306606 & \texttt{aa36a13970b6} \\
+Double Line (110\,kV) & simulation episode & 6,999 & 1,500 & 1,500 & 1,101 & 0/0/0 & \notapp & \notapp & 20325215 & \texttt{eb6df4100cc4} \\
+Prot.\ Ref.\ (110\,kV) & simulation episode & 6,816 & 1,459 & 1,464 & 2,435 & 0/0/0 & \notapp & \notapp & 20281368 & \texttt{9214dc7f1a9e} \\
+IEEE 39-Bus (345\,kV) & simulation episode & 6,997 & 1,500 & 1,503 & 9,708 & 0/0/0 & \notapp & \notapp & 20284363 & \texttt{0875ff7b8e21} \\
+\midrule
+\texttt{multi\_grid} 20\,kV & topology & 82,253 & 18,593 & 18,307 & \notapp & 0/0/0 & 0/0/0 & 0/0/0 & 20313571 & \texttt{737bc45e1df6} \\
+\texttt{multi\_grid} 110\,kV & topology & 96,536 & 20,590 & 21,386 & \notapp & 0/0/0 & 0/0/0 & 0/0/0 & 20355208 & \texttt{52231f329fa4} \\
+\texttt{multi\_grid} 345\,kV & topology & 121,182 & 26,549 & 25,676 & \notapp & 0/0/0 & 0/0/0 & 0/0/0 & 20262559 & \texttt{0c7efc96795d} \\
+\bottomrule
+\end{tabular}
+\end{table*}

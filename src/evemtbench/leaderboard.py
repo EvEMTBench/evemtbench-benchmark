@@ -20,6 +20,7 @@ from pathlib import Path
 from .evaluation.metrics import METRIC_DIRECTION
 from .evaluation.significance import ci95_halfwidth
 from .tasks.registry import get_task, list_tasks
+from .version import BENCHMARK_VERSION, results_version
 
 # Registry size — the per-grid coverage denominator (was hard-coded to 9).
 _N_TASKS = len(list_tasks())
@@ -52,6 +53,13 @@ class Row:
     def mean(self, metric: str) -> float | None:
         m = self.metrics.get(metric)
         return None if m is None else m.get("mean")
+
+
+def _is_current(r: Row) -> bool:
+    """A row is CURRENT iff its version is its protocol's current results version — held_out rows
+    stay current at their frozen version; superseded pretrain/transfer rows in an older tree are
+    not (see ``evemtbench.version.results_version``)."""
+    return r.version == results_version(r.protocol)
 
 
 def _fmt_params(n: int | None) -> str:
@@ -331,11 +339,15 @@ def _source_label(src: str | None) -> str:
 def _transfer_section(rows: list[Row]) -> str:
     """Cross-grid transfer (OOD): per task, zero-shot vs fine-tune from the multi_grid pre-training,
     across the reference grids in **voltage order** (each annotated same-V / cross-V vs the 20 kV
-    source), on the held-out ``benchmark`` set, best baseline per cell. Empty if no transfer runs."""
+    source), on the held-out ``benchmark`` set, best baseline per cell. Empty if no transfer runs.
+    Current rows only — superseded transfer results from an older version tree must not
+    double-render next to their re-scored counterparts."""
     trows = [
         r
         for r in rows
-        if r.protocol in ("transfer_zeroshot", "transfer_finetune") and r.test_set == "benchmark"
+        if r.protocol in ("transfer_zeroshot", "transfer_finetune")
+        and r.test_set == "benchmark"
+        and _is_current(r)
     ]
     if not trows:
         return ""
@@ -464,12 +476,17 @@ SORT_JS = """
       document.querySelectorAll('.cmpset').forEach(s=>{s.style.display=s.dataset.cmpts===cts.value?'':'none';});
     });
     // Combined filters on the detail tables: version / topology / test-set / model / protocol.
+    // '__cur__' (version filter default) selects the rows flagged current (data-cur="1"):
+    // each protocol's current results version, not one single version.
     const FILTERS=[['fv','v'],['fgrid','grid'],['fts','ts'],['fbase','base'],['fproto','proto']];
     const val=id=>{const e=document.getElementById(id);return e?e.value:'__all__';};
     function applyFilters(){
       let shown=0;
       document.querySelectorAll('tr[data-v]').forEach(r=>{
-        const ok=FILTERS.every(([id,key])=>{const v=val(id);return v==='__all__'||r.dataset[key]===v;});
+        const ok=FILTERS.every(([id,key])=>{const v=val(id);
+          if(v==='__all__')return true;
+          if(v==='__cur__')return r.dataset.cur==='1';
+          return r.dataset[key]===v;});
         r.style.display=ok?'':'none'; if(ok)shown++;
       });
       document.querySelectorAll('section.task').forEach(s=>{
@@ -583,7 +600,8 @@ def render_html(
                 else "—"
             )
             body.append(
-                f'<tr data-v="{html.escape(r.version)}" data-grid="{html.escape(r.grid)}"'
+                f'<tr data-v="{html.escape(r.version)}" data-cur="{1 if _is_current(r) else 0}"'
+                f' data-grid="{html.escape(r.grid)}"'
                 f' data-ts="{html.escape(r.test_set)}" data-base="{html.escape(r.baseline)}"'
                 f' data-proto="{html.escape(r.protocol)}" data-source="{html.escape(r.source or "")}">'
                 f"<td class=base>{html.escape(r.baseline)}</td>"
@@ -611,20 +629,14 @@ def render_html(
             f"<thead>{head}</thead><tbody>{''.join(body)}</tbody></table></div></section>"
         )
 
-    # Filter bar: version (default latest) + grid / test_set / baseline / protocol (default all).
+    # Filter bar: version (default "current" = each protocol's current results version — held_out
+    # at its frozen version + pretrain/transfer at BENCHMARK_VERSION, selected via the rows'
+    # data-cur flag) + grid / test_set / baseline / protocol (default all).
     versions = sorted({r.version for r in rows}, reverse=True)
-    latest = versions[0] if versions else ""
+    cur_label = f"current (held_out {results_version('held_out')} + transfer {BENCHMARK_VERSION})"
     vopts = (
-        (
-            f'<option value="{html.escape(latest)}">latest ({html.escape(latest)})</option>'
-            if latest
-            else ""
-        )
-        + "".join(
-            f'<option value="{html.escape(v)}">{html.escape(v)}</option>'
-            for v in versions
-            if v != latest
-        )
+        f'<option value="__cur__">{html.escape(cur_label)}</option>'
+        + "".join(f'<option value="{html.escape(v)}">{html.escape(v)}</option>' for v in versions)
         + '<option value="__all__">all versions</option>'
     )
 
@@ -692,12 +704,15 @@ def render_html(
         f'<link rel=icon href="{favicon}">'
         f"<title>{html.escape(title)}</title><style>{css}</style></head><body>"
         f"<header>{nav}<h1>{html.escape(title)}</h1>"
-        f"<div class=v>benchmark version {html.escape(version or 'n/a')} · {len(rows)} runs total</div>"
+        f"<div class=v>benchmark v{html.escape(version or 'n/a')} (held_out results "
+        f"v{html.escape(results_version('held_out'))}) · {len(rows)} runs total</div>"
         f"{updated}{cta}</header>"
-        f"{_coverage_panel(rows)}"
+        # headline sections render CURRENT rows only (per-protocol version) — superseded
+        # older-tree results stay reachable through the detail tables' version filter
+        f"{_coverage_panel([r for r in rows if _is_current(r)])}"
         f"<div class=note>{html.escape(note)}</div>"
         f"{legend}"
-        f"{_comparison_section(rows)}"
+        f"{_comparison_section([r for r in rows if _is_current(r)])}"
         f"{_transfer_section(rows)}"
         f"{vfilter if rows else ''}"
         f"{''.join(sections) or '<p>No result.json files found.</p>'}"
@@ -734,8 +749,6 @@ def _bibtex_from_cff(path: Path | None = None) -> str:
 
 def main(argv: list[str] | None = None) -> None:
     from datetime import datetime, timezone
-
-    from .version import BENCHMARK_VERSION
 
     p = argparse.ArgumentParser(description="Render an internal HTML leaderboard from outputs/.")
     p.add_argument("--outputs", default="outputs", help="directory tree of result.json files")

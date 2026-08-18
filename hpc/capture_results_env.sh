@@ -46,7 +46,12 @@ mkdir -p "$(dirname "$OUT")"
 pkgs="$(PYTHONPATH= "$PY" -m pip list --format=freeze \
   | grep -E '^[A-Za-z0-9._-]+==' | grep -vE '^evemtbench==' | sort -f)"
 pyvv="$("$PY" -c 'import sys; print(sys.version.replace(chr(10), " "))')"
-prefix="$("$PY" -c 'import sys; print(sys.prefix)')"
+# The prefix is an ACCOUNT-SPECIFIC absolute path, and this file ships in the public export —
+# hpc/make_public_release.sh's leak scan rejects `/home/...`, so emitting it raw makes the export
+# unbuildable (it did, for v1.1.0; v1.0.0 had been redacted by hand after capture). Redact here so
+# the capture is publishable by construction: the env NAME is the part with provenance value, and
+# the path is neither reconstructable nor useful to a third party.
+prefix="conda env \"$("$PY" -c 'import sys, os; print(os.path.basename(sys.prefix))')\" on the cluster (absolute path omitted — account-specific)"
 plat="$("$PY" -c 'import platform; print(platform.platform())')"
 torchv="$("$PY" -c 'import torch; print(torch.__version__)' 2>/dev/null || echo '<not installed>')"
 

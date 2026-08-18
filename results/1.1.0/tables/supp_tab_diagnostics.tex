@@ -1,0 +1,53 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_diagnostics.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/{fault_grounded,fault_phase,fault_category}_line/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
+%   outputs/1.0.0/{fault_origin,event_state,switch_detection,switch_type}_global/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\caption{Extended (diagnostic) functions: per-baseline balanced accuracy ($\uparrow$) on the in-distribution test set, each function at its natural observability view. Reported per baseline (no single `best') for the full picture; \pending{}~= pending. The never-trained, per-class, and protection-grade breakdowns are in the leaderboard.}
+\label{tab:supp_diagnostics}
+\begin{tabular}{L{3.4cm} l c c c c c c }
+\toprule
+\textbf{Function} & \textbf{Grid} & \textbf{majority} & \textbf{\ac{rf}} & \textbf{\ac{mlp}} & \textbf{\ac{gru}} & \textbf{\ac{cnn}} & \textbf{\ac{resnet}} \\
+\midrule
+Fault grounded (binary, line) & CIGR\'E MV (20\,kV) & 0.500 & 0.945 $\pm$ 0.001 & 0.947 $\pm$ 0.001 & 0.946 $\pm$ 0.010 & 0.960 $\pm$ 0.008 & 0.963 $\pm$ 0.007 \\
+ & Double Line (110\,kV) & 0.500 & 0.940 $\pm$ 0.001 & 0.970 & 0.970 $\pm$ 0.001 & 0.970 & 0.971 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.500 & 0.938 $\pm$ 0.001 & 0.968 $\pm$ 0.001 & 0.969 $\pm$ 0.001 & 0.969 $\pm$ 0.001 & 0.969 $\pm$ 0.002 \\
+ & IEEE 39-Bus (345\,kV) & 0.500 & 0.952 $\pm$ 0.001 & 0.970 & 0.969 $\pm$ 0.001 & 0.970 & 0.970 \\
+\midrule
+Faulted phase (7-class, line) & CIGR\'E MV (20\,kV) & 0.143 & 0.797 $\pm$ 0.002 & 0.805 $\pm$ 0.002 & 0.811 $\pm$ 0.031 & 0.850 $\pm$ 0.003 & 0.858 $\pm$ 0.036 \\
+ & Double Line (110\,kV) & 0.143 & 0.828 $\pm$ 0.003 & 0.849 $\pm$ 0.002 & 0.865 $\pm$ 0.034 & 0.878 $\pm$ 0.002 & 0.894 $\pm$ 0.026 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.143 & 0.839 $\pm$ 0.002 & 0.856 $\pm$ 0.004 & 0.876 $\pm$ 0.010 & 0.886 $\pm$ 0.003 & 0.895 $\pm$ 0.020 \\
+ & IEEE 39-Bus (345\,kV) & 0.143 & 0.926 $\pm$ 0.001 & 0.854 $\pm$ 0.002 & 0.874 $\pm$ 0.011 & 0.893 $\pm$ 0.001 & 0.916 $\pm$ 0.003 \\
+\midrule
+Fault category (3-class, line) & CIGR\'E MV (20\,kV) & 0.333 & 0.595 $\pm$ 0.007 & 0.649 $\pm$ 0.003 & 0.656 $\pm$ 0.015 & 0.670 $\pm$ 0.003 & 0.658 $\pm$ 0.027 \\
+ & Double Line (110\,kV) & 0.500 & 0.827 $\pm$ 0.007 & 0.964 & 0.967 $\pm$ 0.001 & 0.964 $\pm$ 0.003 & 0.965 $\pm$ 0.004 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.500 & 0.824 $\pm$ 0.005 & 0.955 & 0.963 $\pm$ 0.002 & 0.961 $\pm$ 0.003 & 0.960 $\pm$ 0.003 \\
+ & IEEE 39-Bus (345\,kV) & 0.500 & 0.951 $\pm$ 0.001 & 0.963 $\pm$ 0.003 & 0.964 $\pm$ 0.001 & 0.964 $\pm$ 0.003 & 0.962 $\pm$ 0.003 \\
+\midrule
+Fault origin (binary, global) & CIGR\'E MV (20\,kV) & 0.500 & 0.581 $\pm$ 0.009 & 0.774 $\pm$ 0.020 & 0.802 $\pm$ 0.027 & 0.811 $\pm$ 0.020 & 0.778 $\pm$ 0.018 \\
+ & Double Line (110\,kV) & 0.500 & 0.842 $\pm$ 0.002 & 0.865 $\pm$ 0.003 & 0.863 $\pm$ 0.007 & 0.867 $\pm$ 0.010 & 0.881 $\pm$ 0.012 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.500 & 0.759 $\pm$ 0.006 & 0.854 $\pm$ 0.007 & 0.875 $\pm$ 0.016 & 0.886 $\pm$ 0.010 & 0.866 $\pm$ 0.026 \\
+ & IEEE 39-Bus (345\,kV) & 0.500 & 0.548 $\pm$ 0.005 & 0.869 $\pm$ 0.003 & 0.858 $\pm$ 0.007 & 0.860 $\pm$ 0.006 & 0.859 $\pm$ 0.010 \\
+\midrule
+Event state (3-class, global) & CIGR\'E MV (20\,kV) & 0.333 & 0.724 $\pm$ 0.001 & 0.659 $\pm$ 0.001 & 0.740 $\pm$ 0.030 & 0.733 $\pm$ 0.027 & 0.696 $\pm$ 0.111 \\
+ & Double Line (110\,kV) & 0.333 & 0.723 $\pm$ 0.001 & 0.702 $\pm$ 0.001 & 0.743 $\pm$ 0.023 & 0.695 $\pm$ 0.004 & 0.777 $\pm$ 0.011 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.333 & 0.705 $\pm$ 0.001 & 0.706 $\pm$ 0.001 & 0.689 $\pm$ 0.060 & 0.662 $\pm$ 0.021 & 0.839 $\pm$ 0.013 \\
+ & IEEE 39-Bus (345\,kV) & 0.333 & 0.911 $\pm$ 0.001 & 0.787 $\pm$ 0.001 & 0.637 $\pm$ 0.037 & 0.707 $\pm$ 0.016 & 0.729 $\pm$ 0.034 \\
+\midrule
+Switch detection (binary, global) & CIGR\'E MV (20\,kV) & 0.500 & 0.754 $\pm$ 0.002 & 0.688 $\pm$ 0.002 & 0.718 $\pm$ 0.127 & 0.781 $\pm$ 0.012 & 0.865 $\pm$ 0.011 \\
+ & Double Line (110\,kV) & 0.500 & 0.721 $\pm$ 0.001 & 0.701 & 0.769 $\pm$ 0.029 & 0.729 $\pm$ 0.025 & 0.780 $\pm$ 0.004 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.500 & 0.682 $\pm$ 0.002 & 0.711 $\pm$ 0.001 & 0.725 $\pm$ 0.057 & 0.694 $\pm$ 0.021 & 0.786 $\pm$ 0.006 \\
+ & IEEE 39-Bus (345\,kV) & 0.500 & 0.922 & 0.754 $\pm$ 0.015 & 0.720 $\pm$ 0.041 & 0.783 $\pm$ 0.011 & 0.888 $\pm$ 0.013 \\
+\midrule
+Switch type (8-class, global) & CIGR\'E MV (20\,kV) & 0.143 & 0.605 $\pm$ 0.005 & 0.592 $\pm$ 0.002 & 0.739 $\pm$ 0.012 & 0.726 $\pm$ 0.005 & 0.628 $\pm$ 0.064 \\
+ & Double Line (110\,kV) & 0.250 & 0.729 $\pm$ 0.002 & 0.705 $\pm$ 0.009 & 0.696 $\pm$ 0.014 & 0.710 $\pm$ 0.006 & 0.791 $\pm$ 0.050 \\
+ & Prot.\ Ref.\ (110\,kV) & 0.200 & 0.658 $\pm$ 0.005 & 0.694 $\pm$ 0.002 & 0.747 $\pm$ 0.006 & 0.729 $\pm$ 0.003 & 0.835 $\pm$ 0.056 \\
+ & IEEE 39-Bus (345\,kV) & 0.200 & 0.872 $\pm$ 0.002 & 0.719 $\pm$ 0.005 & 0.669 $\pm$ 0.016 & 0.682 $\pm$ 0.011 & 0.689 $\pm$ 0.022 \\
+\bottomrule
+\end{tabular}
+\end{table*}

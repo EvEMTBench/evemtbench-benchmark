@@ -18,13 +18,22 @@ from evemtbench.data.roots import GRIDS
 from evemtbench.evaluation.significance import ci95_halfwidth
 from evemtbench.tasks.registry import get_task, tasks_by_tier
 from evemtbench.tasks.taxonomy import Function
-from evemtbench.version import BENCHMARK_VERSION
+from evemtbench.version import BENCHMARK_VERSION, results_version
 
 # Short "vMAJOR.MINOR" tag for the title, derived from the contract version so it never goes stale.
 SHORT_VERSION = "v" + ".".join(BENCHMARK_VERSION.split(".")[:2])
 
+# RESULTS.md renders the held_out matrix; its current results live in the per-protocol tree
+# (1.0.0 — the v1.1.0 revision changed only the multi_grid source splits, see version.py).
+HELD_OUT_VERSION = results_version("held_out")
+
 NARRATIVE = """\
 # EvEMTBench {short} — results ({ver})
+
+The `held_out` results below were produced under contract v{ho_ver} and remain current under
+v{ver}: the v1.1 revision regenerated only the `multi_grid` source-corpus splits (pre-training /
+transfer protocols — see the leaderboard and `results/{ver}/`), leaving every `held_out` artifact
+byte-identical.
 
 Protocol `held_out`: train/val/test on the `adapt_grid` family; **benchmark** = the held-out
 `benchmark` family (never trained on). 5 seeds — cells show **mean ± 95% CI half-width** (Student
@@ -105,7 +114,7 @@ def warn_once(msg: str) -> None:
 def load_rows(grid: str) -> dict:
     """(task_id, baseline) -> {test_set: doc} for one grid, from outputs/<version>/..."""
     rows: dict = collections.defaultdict(dict)
-    for f in glob.glob(f"outputs/{BENCHMARK_VERSION}/*/held_out/{grid}/*/*/result.json"):
+    for f in glob.glob(f"outputs/{HELD_OUT_VERSION}/*/held_out/{grid}/*/*/result.json"):
         try:
             d = json.load(open(f))
             rows[(d["task"], d["baseline"])][d["test_set"]] = d
@@ -232,7 +241,10 @@ def build_results() -> str:
 
     Single source of truth for RESULTS.md; side-effect-free so the freshness gate
     (hpc/check_results_fresh.py) can compare it byte-for-byte against the committed file."""
-    out = [NARRATIVE.format(short=SHORT_VERSION, ver=BENCHMARK_VERSION), "\n## Results by grid\n"]
+    out = [
+        NARRATIVE.format(short=SHORT_VERSION, ver=BENCHMARK_VERSION, ho_ver=HELD_OUT_VERSION),
+        "\n## Results by grid\n",
+    ]
     for grid in GRIDS:
         rows = load_rows(grid)
         if sum(len(v) for v in rows.values()):

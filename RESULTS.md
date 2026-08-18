@@ -1,4 +1,9 @@
-# EvEMTBench v1.0 — results (1.0.0)
+# EvEMTBench v1.1 — results (1.1.0)
+
+The `held_out` results below were produced under contract v1.0.0 and remain current under
+v1.1.0: the v1.1 revision regenerated only the `multi_grid` source-corpus splits (pre-training /
+transfer protocols — see the leaderboard and `results/1.1.0/`), leaving every `held_out` artifact
+byte-identical.
 
 Protocol `held_out`: train/val/test on the `adapt_grid` family; **benchmark** = the held-out
 `benchmark` family (never trained on). 5 seeds — cells show **mean ± 95% CI half-width** (Student

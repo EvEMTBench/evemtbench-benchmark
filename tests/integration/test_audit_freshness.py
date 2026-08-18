@@ -16,21 +16,22 @@ for p in (REPO / "src", REPO / "hpc"):
 
 import make_audit  # noqa: E402
 from evemtbench.coverage import expected_test_sets, iter_cells  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
+from evemtbench.version import results_version  # noqa: E402
 
 _VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
 
 
 def _write_cell(root: Path, task: str, protocol: str, grid: str, baseline: str) -> None:
     """A minimal-but-valid done cell: one result.json per expected test set + a run record."""
-    cell = root / "outputs" / BENCHMARK_VERSION / task / protocol / grid / baseline
+    # per-protocol current-results tree (held_out resolves to 1.0.0 under the scoped revision)
+    cell = root / "outputs" / results_version(protocol) / task / protocol / grid / baseline
     for ts in expected_test_sets(grid, protocol):
         d = cell / ts
         d.mkdir(parents=True, exist_ok=True)
         (d / "result.json").write_text(
             json.dumps(
                 {
-                    "benchmark_version": BENCHMARK_VERSION,
+                    "benchmark_version": results_version(protocol),
                     "task": task,
                     "protocol": protocol,
                     "grid": grid,

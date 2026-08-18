@@ -49,6 +49,9 @@ PRUNE=(
   hpc/build_paper.py
   hpc/rescore_val.sbatch
   hpc/rescore_transfer_val.sbatch
+  # One-time 1.0.0 -> 1.1.0 hardlink migration of OUR private project cache; hardcodes the
+  # operator's cache root and means nothing without it.
+  hpc/seed_cache_1.1.0.sh
 )
 if [ "${1:-}" = "--print-prune" ]; then
   printf '%s\n' "${PRUNE[@]}"
@@ -116,8 +119,10 @@ done
 REQUIRED=(
   LICENSE LICENSES/DATA-LICENSE.md CITATION.cff README.md CONTRIBUTING.md CHANGELOG.md
   pyproject.toml requirements.lock requirements-ci-py3.10.lock requirements-ci-py3.12.lock
-  env/results-v1.0.0.lock env/results-scoring.constraints
-  src/evemtbench/version.py src/evemtbench/splits/v1.0
+  # both results-env locks ship: the frozen held_out capture (1.0.0) + the current version's
+  env/results-v1.0.0.lock "env/results-v$VERSION.lock" env/results-scoring.constraints
+  # both split trees ship: v1.0 (held_out) + v1.1 (corrected multi_grid_pretrain)
+  src/evemtbench/version.py src/evemtbench/splits/v1.0 src/evemtbench/splits/v1.1
   RESULTS.md leaderboard.html coverage_snapshot.json
   "results/$VERSION" audit/index.html "audit/provenance/$VERSION/index.json"
   .github/workflows/ci.yml .github/workflows/nightly.yml

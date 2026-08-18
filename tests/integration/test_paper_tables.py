@@ -34,13 +34,13 @@ def test_build_is_deterministic_and_all_res_without_outputs(tmp_path, monkeypatc
 
 def test_real_result_populates_its_cell(tmp_path, monkeypatch):
     mpt = _load_builder()
-    from evemtbench.version import BENCHMARK_VERSION
+    from evemtbench.version import results_version
 
     # a done fault_detection_local cell on double_line/test for a learned baseline (mlp)
     d = (
         tmp_path
         / "outputs"
-        / BENCHMARK_VERSION
+        / results_version("held_out")
         / "fault_detection_local"
         / "held_out"
         / "double_line"

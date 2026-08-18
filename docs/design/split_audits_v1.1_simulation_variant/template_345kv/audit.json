@@ -1,0 +1,111 @@
+{
+  "class_n_groups": {
+    "flt_1phg_incipient": 411,
+    "flt_1phg_incipient_w_arc": 379,
+    "flt_1phg_shc": 413,
+    "flt_1phg_shc_w_arc": 391,
+    "flt_2ph_shc": 431,
+    "flt_2phg_shc": 426,
+    "flt_3ph_shc": 432,
+    "no_event": 9895
+  },
+  "class_support": {
+    "test": {
+      "flt_1phg_incipient": 62,
+      "flt_1phg_incipient_w_arc": 57,
+      "flt_1phg_shc": 62,
+      "flt_1phg_shc_w_arc": 58,
+      "flt_2ph_shc": 64,
+      "flt_2phg_shc": 63,
+      "flt_3ph_shc": 65,
+      "no_event": 25585
+    },
+    "train": {
+      "flt_1phg_incipient": 288,
+      "flt_1phg_incipient_w_arc": 266,
+      "flt_1phg_shc": 289,
+      "flt_1phg_shc_w_arc": 274,
+      "flt_2ph_shc": 302,
+      "flt_2phg_shc": 300,
+      "flt_3ph_shc": 302,
+      "no_event": 119359
+    },
+    "val": {
+      "flt_1phg_incipient": 61,
+      "flt_1phg_incipient_w_arc": 56,
+      "flt_1phg_shc": 62,
+      "flt_1phg_shc_w_arc": 59,
+      "flt_2ph_shc": 65,
+      "flt_2phg_shc": 63,
+      "flt_3ph_shc": 65,
+      "no_event": 25580
+    }
+  },
+  "class_totals": {
+    "flt_1phg_incipient": 411,
+    "flt_1phg_incipient_w_arc": 379,
+    "flt_1phg_shc": 413,
+    "flt_1phg_shc_w_arc": 391,
+    "flt_2ph_shc": 431,
+    "flt_2phg_shc": 426,
+    "flt_3ph_shc": 432,
+    "no_event": 170524
+  },
+  "counts": {
+    "test": {
+      "episodes": 26016,
+      "fault_episodes": 431,
+      "simulations": 1483,
+      "topologies": 103
+    },
+    "train": {
+      "episodes": 121380,
+      "fault_episodes": 2021,
+      "simulations": 6930,
+      "topologies": 104
+    },
+    "val": {
+      "episodes": 26011,
+      "fault_episodes": 431,
+      "simulations": 1482,
+      "topologies": 104
+    }
+  },
+  "coverage_ok": true,
+  "family": "multi_grid",
+  "fractions_ok": true,
+  "grid": "template_345kv",
+  "group_column": "result_id",
+  "grouping": "simulation",
+  "issues": [],
+  "n_episodes": 173407,
+  "ok": true,
+  "overlaps": {
+    "episode": {
+      "train&test": 0,
+      "train&val": 0,
+      "val&test": 0
+    },
+    "simulation": {
+      "train&test": 0,
+      "train&val": 0,
+      "val&test": 0
+    },
+    "topology": {
+      "train&test": 103,
+      "train&val": 104,
+      "val&test": 103
+    }
+  },
+  "partition_hashes": {
+    "benchmark.txt": "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855",
+    "meta.json": "63a21aa80c6e6dbe0cf7fdc14e8f198997470e488710a74d96eee294418eb2b5",
+    "test.txt": "27f5aadc263ebcfe27db520e734e6a9960110bf357023f380f983b823f98d2c5",
+    "train.txt": "b58ffd9ae756d8bb895adc58eec9523d9671248910fa954586038de43cbb3637",
+    "val.txt": "886c080322664c47e77da5d175b1fd8c9debaaadefc870d6ea69357e8a01af40"
+  },
+  "protocol": "multi_grid_pretrain",
+  "seed": 20336004,
+  "splits_version": "1.1",
+  "stratify_by": "event_type"
+}

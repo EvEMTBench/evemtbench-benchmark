@@ -12,8 +12,26 @@ Versioning policy (see ``docs/versioning.md``):
 * **patch** — bug fixes that do not change any score.
 """
 
-BENCHMARK_VERSION = "1.0.0"
+BENCHMARK_VERSION = "1.1.0"
 """Current benchmark contract version.
+
+v1.1.0 (current): **scoped contract revision — corrected multi_grid source-corpus splits.** The
+v1.0 ``multi_grid_pretrain`` splits were episode-level, and a multi_grid episode is one *line* of
+one simulation (``sample_id = sim_idx*10^4 + line_idx``), so sibling lines of a simulation — and
+every generated topology — straddled train/val/test. That never contaminated the scored target-grid
+evaluations (reference-grid splits are simulation-level), but it weakened source-domain model
+selection for the transfer protocols. v1.1 regenerates those three splits **topology-grouped**
+(``splits/v1.1/multi_grid_pretrain/``; no ``graph_id``/``result_id`` crosses a partition), so:
+
+* ``multi_grid_pretrain`` / ``transfer_zeroshot`` / ``transfer_finetune`` results are re-scored
+  under the corrected splits and land in ``outputs/1.1.0/`` — NOT comparable to their 1.0.0
+  counterparts (which are retained: ``outputs/1.0.0/`` + the frozen ``results/1.0.0/`` bundle).
+* Every ``held_out`` artifact (splits, tasks, labels, metrics, window contract) is byte-identical
+  to v1.0.0, so the published held_out results remain the current ones and are NOT re-run; they
+  stay in ``outputs/1.0.0/`` and keep their ``benchmark_version: 1.0.0`` stamp.
+
+:func:`results_version` / :func:`splits_version` encode that per-protocol scoping; see
+``docs/versioning.md`` ("scoped revision") and ``CHANGELOG.md``.
 
 v1.0.0 (current): first frozen release, cut on the fully re-simulated EvEMTBench dataset. Every grid
 is re-windowed to the psp_helper window-contract 1.0.0 across the ``held_out`` (adapt_grid +
@@ -53,4 +71,35 @@ carries ``overlap_ratio`` and thus always took the correct branch.
 # major.minor of the committed split artifacts and is referenced by load_task().
 # Bumped 0.2 -> 1.0 for the v1.0.0 release: splits regenerated on the re-simulated dataset
 # (same methodology: stratify_by=event_type, fractions 0.7/0.15/0.15).
+# v1.1.0 note: the held_out splits are UNCHANGED (still read from splits/v1.0/); only the
+# multi_grid_pretrain splits moved to splits/v1.1/ (topology-grouped). SPLITS_VERSION therefore
+# stays the held_out artifact version; use splits_version(protocol) wherever the protocol is known.
 SPLITS_VERSION = "1.0"
+
+# The corrected multi_grid source-corpus splits (grouped; splits/v1.1/multi_grid_pretrain/).
+MULTI_GRID_SPLITS_VERSION = "1.1"
+
+
+def splits_version(protocol: str) -> str:
+    """Committed-splits directory version for ``protocol``. ``multi_grid_pretrain`` reads the
+    corrected v1.1 grouped splits; every other protocol (held_out, and the transfer protocols,
+    which reuse the *target grid's* held_out split at load time) reads the frozen v1.0 tree."""
+    return MULTI_GRID_SPLITS_VERSION if protocol == "multi_grid_pretrain" else SPLITS_VERSION
+
+
+# The held_out results produced (and published) under the 1.0.0 contract remain the current
+# results: every artifact that protocol reads is byte-identical under 1.1.0, so re-running would
+# only churn published numbers. The pretrain/transfer protocols are re-scored at 1.1.0.
+HELD_OUT_RESULTS_VERSION = "1.0.0"
+
+
+def results_version(protocol: str) -> str:
+    """The ``outputs/<version>/`` tree holding a protocol's CURRENT results (see the v1.1.0
+    docstring above: held_out stays at 1.0.0; pretrain/transfer re-scored at 1.1.0)."""
+    return HELD_OUT_RESULTS_VERSION if protocol == "held_out" else BENCHMARK_VERSION
+
+
+# Every outputs/results version that carries current results — reporting/audit layers iterate
+# these; the freshness gate owns ONLY the BENCHMARK_VERSION derived trees (older versions'
+# results/<v>/ bundles and audit/provenance/<v>/ indices are frozen history, kept for comparison).
+CURRENT_RESULTS_VERSIONS = tuple(dict.fromkeys((HELD_OUT_RESULTS_VERSION, BENCHMARK_VERSION)))

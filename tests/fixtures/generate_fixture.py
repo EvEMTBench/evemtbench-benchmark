@@ -309,7 +309,11 @@ def _write_multigrid_family(specs) -> None:
                     "y_switch_present": int(present and fam == "switching"),
                     "y_fault_line": mg_line,
                     "y_fault_location": loc,
-                    "graph_id": f"g{int(sim_idx) % 3}",
+                    # simulation/topology identity as in the real corpus: one episode is one line
+                    # of one simulation (result_id), each simulation belongs to exactly one
+                    # generated topology (graph_id) — the group keys the grouped splits use
+                    "result_id": int(sim_idx) // 2,
+                    "graph_id": f"g{(int(sim_idx) // 2) % 5}",
                     "line_id": f"L{bus_a}_{bus_b}",
                     "bus_a": bus_a,
                     "bus_b": bus_b,

@@ -71,17 +71,28 @@ import os, sys
 from evemtbench.tasks.task import load_task
 proto, grid, *tasks = sys.argv[1:]
 cdir = os.environ["EVEMTBENCH_PROJECTION_CACHE"]
-built = set()
+built, skipped = set(), 0
 for t in tasks:
     task = load_task(t, proto, grid=grid)
+    # Defensive only: every split currently resolves for both documented protocols (the
+    # multi_grid_pretrain builds report "0 view(s) absent"). A protocol that later omits one should
+    # skip that view rather than abort a multi-hour build, and the count below makes it visible
+    # instead of silent. NB the real constraint is TASKS: multi_grid_pretrain supports the 12
+    # local/line tasks only, so passing the held_out default (which includes *_global) fails at
+    # load_task — pass the protocol's own task set (python -m evemtbench.coverage lists them).
     for vn in ("train", "val", "test", "benchmark"):
-        v = task.view(vn)
+        try:
+            v = task.view(vn)
+        except (KeyError, ValueError, FileNotFoundError) as e:
+            skipped += 1
+            print(f"skip {t}/{vn}: {type(e).__name__}: {e}", flush=True)
+            continue
         fn = v.cache_filename()
         if fn and fn not in built:
             v.materialize_cache(cdir)
             built.add(fn)
             print("built", fn, flush=True)
-print(f"total {len(built)} cache file(s)", flush=True)
+print(f"total {len(built)} cache file(s) ({skipped} view(s) absent for {proto})", flush=True)
 PY
 
 # 3) Publish caches to the persistent root on /cluster (one sequential, bandwidth-limited write).

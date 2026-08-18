@@ -19,10 +19,17 @@ The layers a user touches — ``evemtbench.data``, ``evemtbench.tasks``, ``evemt
 CI enforces that nothing outside ``baselines`` imports it.
 """
 
-from .version import BENCHMARK_VERSION, SPLITS_VERSION
+from .version import (
+    BENCHMARK_VERSION,
+    MULTI_GRID_SPLITS_VERSION,
+    SPLITS_VERSION,
+    results_version,
+    splits_version,
+)
 
 __all__ = [
     "BENCHMARK_VERSION",
+    "MULTI_GRID_SPLITS_VERSION",
     "SPLITS_VERSION",
     "TaskDefinition",
     "evaluate",
@@ -30,6 +37,8 @@ __all__ = [
     "list_tasks",
     "load_arrays",
     "load_task",
+    "results_version",
+    "splits_version",
 ]
 
 

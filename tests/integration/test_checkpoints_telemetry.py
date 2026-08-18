@@ -9,7 +9,9 @@ pytest.importorskip("torch")
 
 import torch  # noqa: E402
 
-from evemtbench import BENCHMARK_VERSION  # noqa: E402
+from evemtbench import results_version  # noqa: E402
+
+HO_VER = results_version("held_out")
 from evemtbench.baselines import runner  # noqa: E402
 from evemtbench.baselines.resnet import ResNetBaseline, _ResNet  # noqa: E402
 from evemtbench.tasks.task import load_task  # noqa: E402
@@ -45,7 +47,7 @@ def _run(baseline, task, fixture_root, held_out_splits, out, epochs="1"):
 def test_deep_baseline_writes_checkpoint_and_telemetry(fixture_root, held_out_splits, tmp_path):
     out = tmp_path / "out"
     _run("resnet", "fault_detection_local", fixture_root, held_out_splits, out)
-    base = out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "resnet"
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "resnet"
 
     # best-val checkpoint saved for the seed, and reloadable as a real torch state_dict
     ckpt = base / "checkpoints" / "seed0.pt"
@@ -69,9 +71,7 @@ def test_deep_baseline_writes_checkpoint_and_telemetry(fixture_root, held_out_sp
 def test_classical_baseline_has_no_checkpoint_or_params(fixture_root, held_out_splits, tmp_path):
     out = tmp_path / "out"
     _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
-    base = (
-        out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "majority"
-    )
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
     rr = json.loads((base / "run_record.json").read_text())
     assert rr["n_params"] is None  # non-parametric — reported as "—", not 0
     assert rr["checkpoints"] == {}

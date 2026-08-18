@@ -1,0 +1,47 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_ec_support.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   src/evemtbench/splits/v1.0/held_out/<grid>/{test,benchmark}.txt
+%   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/y_*.parquet  (released dataset)
+%   src/evemtbench/tasks/labels/event_type.py  (frozen 23-class vocabulary+deriver)
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.2pt}
+\caption{Per-class support of the frozen 23-class \ac{ec} vocabulary: number of \emph{windows} carrying each class in the in-distribution test split and the never-trained \texttt{eval\_grid} family of each grid. Class indices are the frozen label ids. A count of $0$ is genuine zero support --- the class does not occur in that evaluation set --- and its per-class $\text{F}_1$ is reported as \undefm{} (undefined), never as zero; the grid-restricted classes (the \ac{mv}-only \ac{hif} and cable/motor events, and the \ac{ehv}-only generator trip) are the systematic zeros. Column totals are the evaluated \ac{ec} sample count $n$ and match Table~\ref{tab:supp_primary_valid_counts}. Derived from the committed partitions and the released window labels with the benchmark's frozen deriver.}
+\label{tab:supp_ec_support}
+\begin{tabular}{r l rr rr rr rr }
+\toprule
+ & & \multicolumn{2}{c}{\textbf{CIGR\'E MV (20\,kV)}} & \multicolumn{2}{c}{\textbf{Double Line (110\,kV)}} & \multicolumn{2}{c}{\textbf{Prot.\ Ref.\ (110\,kV)}} & \multicolumn{2}{c}{\textbf{IEEE 39-Bus (345\,kV)}} \\
+\cmidrule(lr){2-3}\cmidrule(lr){4-5}\cmidrule(lr){6-7}\cmidrule(lr){8-9}
+\textbf{idx} & \textbf{\ac{ec} class} & \textbf{test} & \textbf{eval} & \textbf{test} & \textbf{eval} & \textbf{test} & \textbf{eval} & \textbf{test} & \textbf{eval} \\
+\midrule
+0 & \texttt{flt\_1phg\_shc} & 1,224 & 12,816 & 1,683 & 3,312 & 1,496 & 7,344 & 1,785 & 29,232 \\
+1 & \texttt{flt\_1phg\_shc\_w\_arc} & 1,173 & 12,816 & 1,751 & 3,312 & 1,598 & 7,344 & 1,802 & 29,232 \\
+2 & \texttt{flt\_2ph\_shc} & 1,241 & 12,816 & 1,785 & 3,312 & 1,564 & 7,344 & 1,700 & 29,072 \\
+3 & \texttt{flt\_2phg\_shc} & 1,156 & 12,816 & 1,717 & 3,312 & 1,530 & 7,344 & 1,751 & 29,232 \\
+4 & \texttt{flt\_3ph\_shc} & 1,309 & 12,816 & 1,649 & 3,312 & 1,649 & 7,344 & 1,853 & 29,232 \\
+5 & \texttt{flt\_1phg\_incipient} & 1,150 & 870 & 1,529 & 210 & 1,309 & 450 & 1,468 & 1,890 \\
+6 & \texttt{flt\_1phg\_incipient\_w\_arc} & 1,211 & 870 & 1,559 & 210 & 1,491 & 450 & 1,569 & 1,890 \\
+7 & \texttt{flt\_1phg\_hif} & 1,207 & 1,392 & 0 & 0 & 0 & 0 & 0 & 0 \\
+8 & \texttt{flt\_1phg\_hif\_w\_arc} & 1,173 & 1,392 & 0 & 0 & 0 & 0 & 0 & 0 \\
+9 & \texttt{switch\_load\_on} & 759 & 140 & 1,012 & 30 & 1,001 & 60 & 1,122 & 280 \\
+10 & \texttt{switch\_load\_off} & 737 & 140 & 1,133 & 30 & 1,056 & 60 & 1,056 & 280 \\
+11 & \texttt{switch\_cap\_on} & 770 & 140 & 1,144 & 30 & 1,001 & 60 & 1,078 & 280 \\
+12 & \texttt{switch\_cap\_off} & 704 & 140 & 1,133 & 30 & 1,034 & 60 & 1,045 & 280 \\
+13 & \texttt{switch\_ohl\_on} & 781 & 140 & 1,133 & 30 & 1,001 & 60 & 1,089 & 280 \\
+14 & \texttt{switch\_ohl\_off} & 847 & 140 & 1,100 & 30 & 979 & 60 & 1,067 & 280 \\
+15 & \texttt{switch\_inrush\_lv} & 759 & 140 & 1,045 & 30 & 1,023 & 60 & 1,045 & 280 \\
+16 & \texttt{switch\_inrush\_hv} & 770 & 140 & 1,089 & 30 & 990 & 60 & 0 & 0 \\
+17 & \texttt{switch\_ibr\_trip} & 814 & 20 & 0 & 0 & 990 & 20 & 0 & 0 \\
+18 & \texttt{switch\_cable\_on} & 814 & 140 & 0 & 0 & 0 & 0 & 0 & 0 \\
+19 & \texttt{switch\_cable\_off} & 693 & 140 & 0 & 0 & 0 & 0 & 0 & 0 \\
+20 & \texttt{switch\_motor\_start} & 748 & 140 & 0 & 0 & 0 & 0 & 0 & 0 \\
+21 & \texttt{switch\_gen\_trip} & 0 & 0 & 0 & 0 & 0 & 0 & 1,100 & 90 \\
+22 & \texttt{no\_event} & 14,138 & 33,543 & 14,038 & 8,103 & 13,960 & 17,885 & 14,039 & 71,454 \\
+\midrule
+\multicolumn{2}{l}{\textbf{total (evaluated EC windows)}} & 34,178 & 103,707 & 34,500 & 25,323 & 33,672 & 56,005 & 34,569 & 223,284 \\
+\bottomrule
+\end{tabular}
+\end{table*}

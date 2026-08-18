@@ -1,0 +1,57 @@
+{
+  "class_histograms": {
+    "test": {
+      "flt_1phg_incipient": 56,
+      "flt_1phg_incipient_w_arc": 52,
+      "flt_1phg_shc": 62,
+      "flt_1phg_shc_w_arc": 81,
+      "flt_2ph_shc": 44,
+      "flt_2phg_shc": 54,
+      "flt_3ph_shc": 61,
+      "no_event": 20976
+    },
+    "train": {
+      "flt_1phg_incipient": 271,
+      "flt_1phg_incipient_w_arc": 255,
+      "flt_1phg_shc": 277,
+      "flt_1phg_shc_w_arc": 269,
+      "flt_2ph_shc": 230,
+      "flt_2phg_shc": 240,
+      "flt_3ph_shc": 282,
+      "no_event": 94712
+    },
+    "val": {
+      "flt_1phg_incipient": 63,
+      "flt_1phg_incipient_w_arc": 55,
+      "flt_1phg_shc": 72,
+      "flt_1phg_shc_w_arc": 51,
+      "flt_2ph_shc": 54,
+      "flt_2phg_shc": 61,
+      "flt_3ph_shc": 59,
+      "no_event": 20175
+    }
+  },
+  "counts": {
+    "benchmark": 0,
+    "test": 21386,
+    "train": 96536,
+    "val": 20590
+  },
+  "fractions": [
+    0.7,
+    0.15,
+    0.15
+  ],
+  "grid": "template_110kv",
+  "group_column": "graph_id",
+  "group_counts": {
+    "test": 16,
+    "train": 74,
+    "val": 15
+  },
+  "grouping": "topology",
+  "protocol": "multi_grid_pretrain",
+  "seed": 20355208,
+  "splits_version": "1.1",
+  "stratify_by": "event_type"
+}

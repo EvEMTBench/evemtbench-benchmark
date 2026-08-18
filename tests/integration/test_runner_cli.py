@@ -4,9 +4,11 @@ import json
 
 import pytest
 
-from evemtbench import BENCHMARK_VERSION
+from evemtbench import results_version
 from evemtbench.baselines import runner
 from evemtbench.evaluation import cli
+
+HO_VER = results_version("held_out")
 
 
 def _run(baseline, task, fixture_root, held_out_splits, out, seeds=("0",)):
@@ -36,7 +38,7 @@ def _run(baseline, task, fixture_root, held_out_splits, out, seeds=("0",)):
 def test_runner_writes_both_test_sets(baseline, fixture_root, held_out_splits, tmp_path):
     out = tmp_path / "out"
     _run(baseline, "fault_detection_local", fixture_root, held_out_splits, out)
-    base = out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / baseline
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / baseline
     for ts in ("test", "benchmark"):
         result = json.loads((base / ts / "result.json").read_text())
         assert result["baseline"] == baseline
@@ -50,9 +52,7 @@ def test_multi_seed_ci_and_run_record_attestation(fixture_root, held_out_splits,
     out = tmp_path / "out"
     seeds = ("0", "1", "2")
     _run("majority", "fault_detection_local", fixture_root, held_out_splits, out, seeds=seeds)
-    base = (
-        out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "majority"
-    )
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
     agg = json.loads((base / "test" / "result.json").read_text())["aggregate"]["balanced_accuracy"]
     # majority is deterministic across seeds -> a zero-width but *defined* CI (not null)
     assert agg["n_defined"] == 3 and agg["ci95"] == pytest.approx(0.0)
@@ -88,9 +88,7 @@ def test_run_record_validates_against_schema(fixture_root, held_out_splits, tmp_
 
     out = tmp_path / "out"
     _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
-    base = (
-        out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "majority"
-    )
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
     record = json.loads((base / "run_record.json").read_text())
     schema_path = Path(runner.__file__).resolve().parent / "run_record.schema.json"
     jsonschema.validate(record, json.loads(schema_path.read_text()))
@@ -102,7 +100,7 @@ def test_single_seed_ci_is_null(fixture_root, held_out_splits, tmp_path):
     result = json.loads(
         (
             out
-            / BENCHMARK_VERSION
+            / HO_VER
             / "fault_detection_local"
             / "held_out"
             / "double_line"
@@ -120,7 +118,7 @@ def test_runner_regression_task(fixture_root, held_out_splits, tmp_path):
     _run("random_forest", "fault_location_local", fixture_root, held_out_splits, out)
     base = (
         out
-        / BENCHMARK_VERSION
+        / HO_VER
         / "fault_location_local"
         / "held_out"
         / "double_line"
@@ -136,7 +134,7 @@ def test_evaluate_cli_audits_predictions(fixture_root, held_out_splits, tmp_path
     _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
     preds = (
         out
-        / BENCHMARK_VERSION
+        / HO_VER
         / "fault_detection_local"
         / "held_out"
         / "double_line"
@@ -165,7 +163,7 @@ def test_evaluate_cli_audits_predictions(fixture_root, held_out_splits, tmp_path
     )
     audited = json.loads(audit.read_text())
     assert audited["task"] == "fault_detection_local"
-    assert audited["benchmark_version"] == BENCHMARK_VERSION
+    assert audited["benchmark_version"] == HO_VER
     assert "balanced_accuracy" in audited["metrics"]
 
 
@@ -187,7 +185,5 @@ def test_broken_harness_aborts_the_cell(fixture_root, held_out_splits, tmp_path,
     out = tmp_path / "out"
     with pytest.raises(RuntimeError, match="harness positive control FAILED"):
         _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
-    base = (
-        out / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "majority"
-    )
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
     assert not (base / "test" / "result.json").exists()

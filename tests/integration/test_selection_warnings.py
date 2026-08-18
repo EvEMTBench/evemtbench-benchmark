@@ -9,7 +9,7 @@ from pathlib import Path
 
 import pytest
 
-from evemtbench.version import BENCHMARK_VERSION
+from evemtbench.version import results_version
 
 REPO = Path(__file__).resolve().parents[2]
 
@@ -51,7 +51,7 @@ def _held_out_path(tmp_path: Path, task: str, grid: str, baseline: str, test_set
     return (
         tmp_path
         / "outputs"
-        / BENCHMARK_VERSION
+        / results_version("held_out")
         / task
         / "held_out"
         / grid
@@ -70,7 +70,7 @@ def _transfer_row(task: str, grid: str, baseline: str, mean: float, source: str)
         grid=grid,
         baseline=baseline,
         test_set="benchmark",
-        version=BENCHMARK_VERSION,
+        version=results_version("held_out"),
         n_test=100,
         seeds=5,
         metrics={"balanced_accuracy": {"mean": mean, "std": 0.01, "ci95": 0.01}},

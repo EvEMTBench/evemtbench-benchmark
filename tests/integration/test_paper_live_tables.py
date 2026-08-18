@@ -13,7 +13,7 @@ for p in (REPO / "src", REPO / "hpc", REPO / "hpc" / "paper_artifacts"):
         sys.path.insert(0, str(p))
 
 import check_results_fresh as gate  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
+from evemtbench.version import results_version  # noqa: E402
 
 POPULATED_FRAGMENT = "% AUTO-GENERATED\n\\begin{tabular}{l}\n0.883 $\\pm$ 0.030\n\\end{tabular}\n"
 
@@ -44,7 +44,7 @@ def test_paper_fragments_are_a_live_gated_view(tmp_path, monkeypatch):
     d = (
         tmp_path
         / "outputs"
-        / BENCHMARK_VERSION
+        / results_version("held_out")
         / "fault_classification_local"
         / "held_out"
         / "cigre_mv"
@@ -55,7 +55,7 @@ def test_paper_fragments_are_a_live_gated_view(tmp_path, monkeypatch):
     (d / "result.json").write_text(
         json.dumps(
             {
-                "benchmark_version": BENCHMARK_VERSION,
+                "benchmark_version": results_version("held_out"),
                 "task": "fault_classification_local",
                 "protocol": "held_out",
                 "grid": "cigre_mv",

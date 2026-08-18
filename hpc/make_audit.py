@@ -67,7 +67,13 @@ from evemtbench.leaderboard import (  # noqa: E402
 )
 from evemtbench.splits.loader import read_held_out_splits  # noqa: E402
 from evemtbench.tasks.registry import get_task, list_tasks  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION, SPLITS_VERSION  # noqa: E402
+from evemtbench.version import (  # noqa: E402
+    BENCHMARK_VERSION,
+    CURRENT_RESULTS_VERSIONS,
+    MULTI_GRID_SPLITS_VERSION,
+    SPLITS_VERSION,
+    results_version,
+)
 
 PROTOCOLS = ("held_out", "multi_grid_pretrain", "transfer_zeroshot", "transfer_finetune")
 
@@ -165,71 +171,82 @@ class RunRecordStats:
 
 
 def collect_coverage(
-    outputs: str | Path = "outputs", *, version: str = BENCHMARK_VERSION
+    outputs: str | Path = "outputs", *, version: str | None = None
 ) -> CoverageView:
     out = Path(outputs)
     by_protocol = {p: scan(out, iter_cells(protocols=(p,)), version=version) for p in PROTOCOLS}
     floor = check_floor(out, iter_cells(protocols=("held_out",)), version=version)
-    return CoverageView(version=version, by_protocol=by_protocol, floor=floor)
+    return CoverageView(version=version or BENCHMARK_VERSION, by_protocol=by_protocol, floor=floor)
 
 
 def collect_run_records(
-    outputs: str | Path = "outputs", *, version: str = BENCHMARK_VERSION
+    outputs: str | Path = "outputs", *, version: str | None = None
 ) -> RunRecordStats:
     st = RunRecordStats()
     git_shas, lock_shas, pythons, torchs, hosts = set(), set(), set(), set(), set()
-    root = Path(outputs) / version
-    # Reuse the verifier's parser + package list; duplicating them here is how the audit and the
-    # check would drift apart.
-    _renv = _REPO / "env" / f"results-v{version}.lock"
-    _pins = VRE.parse_lock(_renv) if _renv.is_file() else {}
-    for p in sorted(root.rglob("run_record.json")) if root.is_dir() else []:
-        try:
-            rec = json.loads(p.read_text())
-        except (OSError, json.JSONDecodeError):
-            continue
-        st.n_records += 1
-        att = rec.get("attestation") or {}
-        if att.get("held_out_untouched"):
-            st.n_attested += 1
-        if rec.get("git_sha"):
-            git_shas.add(rec["git_sha"])
-        if rec.get("lockfile_sha256"):
-            lock_shas.add(rec["lockfile_sha256"])
-        if rec.get("python"):
-            pythons.add(rec["python"])
-        if rec.get("torch"):
-            torchs.add(str(rec["torch"]))
-        if _pins:
-            got = rec.get("versions") or {}
-            ok = all(got.get(pkg) == _pins.get(pkg) for pkg in VRE._SCORING_PKGS)
-            rt = rec.get("torch")
-            if rt is not None and _pins.get("torch") is not None and rt != _pins["torch"]:
-                ok = False
-            if ok:
-                st.env_agree += 1
-            else:
-                st.env_disagree += 1
-        host = (rec.get("host") or {}).get("hostname")
-        if host:
-            # same shortening rule as _neutral_paths — FQDNs stay out of committed pages
-            hosts.add(_HOST_SUFFIX.sub("", host))
-        # Per-cell provenance keyed by the cell path (<task>/<protocol>/<grid>/<baseline_tag>).
-        try:
-            cell_key = str(p.parent.relative_to(root))
-            st.by_cell[cell_key] = {
-                "git_sha": rec.get("git_sha"),
-                "wandb": rec.get("wandb"),
-                "args": rec.get("args"),
-                "normalize": rec.get("normalize"),
-                "attestation": rec.get("attestation"),
-                "host": rec.get("host"),
-                "data": rec.get("data"),
-                "checkpoints": rec.get("checkpoints"),
-                "compute": rec.get("compute"),
-            }
-        except (ValueError, OSError):
-            pass
+    # ``version=None`` (default) iterates every CURRENT results tree and keeps a record only if
+    # its protocol is current IN that tree (results_version(protocol) == tree version) — the
+    # superseded pretrain/transfer results still on disk under the older tree must not feed the
+    # audit. An explicit ``version`` reads that single tree unfiltered (historical inspection).
+    for tree in (version,) if version is not None else CURRENT_RESULTS_VERSIONS:
+        root = Path(outputs) / tree
+        # Reuse the verifier's parser + package list; duplicating them here is how the audit and
+        # the check would drift apart. The env lock is per results tree (env/results-v<tree>.lock).
+        _renv = _REPO / "env" / f"results-v{tree}.lock"
+        _pins = VRE.parse_lock(_renv) if _renv.is_file() else {}
+        for p in sorted(root.rglob("run_record.json")) if root.is_dir() else []:
+            # Cell key relative to ITS tree root (<task>/<protocol>/<grid>/<baseline_tag>[...]):
+            # the current trees' cells are disjoint by protocol, so keys never collide.
+            try:
+                cell_key = str(p.parent.relative_to(root))
+            except ValueError:
+                cell_key = None
+            if version is None:
+                parts = (cell_key or "").split("/")
+                if len(parts) < 2 or results_version(parts[1]) != tree:
+                    continue
+            try:
+                rec = json.loads(p.read_text())
+            except (OSError, json.JSONDecodeError):
+                continue
+            st.n_records += 1
+            att = rec.get("attestation") or {}
+            if att.get("held_out_untouched"):
+                st.n_attested += 1
+            if rec.get("git_sha"):
+                git_shas.add(rec["git_sha"])
+            if rec.get("lockfile_sha256"):
+                lock_shas.add(rec["lockfile_sha256"])
+            if rec.get("python"):
+                pythons.add(rec["python"])
+            if rec.get("torch"):
+                torchs.add(str(rec["torch"]))
+            if _pins:
+                got = rec.get("versions") or {}
+                ok = all(got.get(pkg) == _pins.get(pkg) for pkg in VRE._SCORING_PKGS)
+                rt = rec.get("torch")
+                if rt is not None and _pins.get("torch") is not None and rt != _pins["torch"]:
+                    ok = False
+                if ok:
+                    st.env_agree += 1
+                else:
+                    st.env_disagree += 1
+            host = (rec.get("host") or {}).get("hostname")
+            if host:
+                # same shortening rule as _neutral_paths — FQDNs stay out of committed pages
+                hosts.add(_HOST_SUFFIX.sub("", host))
+            if cell_key is not None:
+                st.by_cell[cell_key] = {
+                    "git_sha": rec.get("git_sha"),
+                    "wandb": rec.get("wandb"),
+                    "args": rec.get("args"),
+                    "normalize": rec.get("normalize"),
+                    "attestation": rec.get("attestation"),
+                    "host": rec.get("host"),
+                    "data": rec.get("data"),
+                    "checkpoints": rec.get("checkpoints"),
+                    "compute": rec.get("compute"),
+                }
     st.git_shas = sorted(git_shas)
     st.lockfile_shas = sorted(lock_shas)
     st.pythons = sorted(pythons)
@@ -275,15 +292,17 @@ def _reproduce_cmd(task: str, protocol: str, grid: str, cfg: dict) -> str:
     return "PYTHONPATH=src python -m evemtbench.baselines.runner " + " ".join(parts)
 
 
-def _metrics_by_cell(rows: list[Row], version: str) -> dict[str, dict]:
+def _metrics_by_cell(rows: list[Row], version: str | None) -> dict[str, dict]:
     """cell key -> {test_set: {metric: {mean, std, ci95}}, "_n": {test_set: seeds}} from Rows.
 
-    Filtered to ``version``: cell keys carry no version segment, so without this a leftover
-    result.json from another benchmark version (``scan_results`` reads every version present) could
-    cross-attach its metrics to a same-keyed cell — the provenance index must be single-version."""
+    Filtered to ``version`` (``None`` = each row's per-protocol CURRENT version,
+    ``results_version(r.protocol)``): cell keys carry no version segment, so without this a
+    leftover result.json from a superseded version (``scan_results`` reads every version present)
+    could cross-attach its metrics to a same-keyed cell — the provenance index must carry only
+    current numbers."""
     out: dict[str, dict] = {}
     for r in rows:
-        if r.version != version:
+        if r.version != (results_version(r.protocol) if version is None else version):
             continue
         ck = f"{r.task}/{r.protocol}/{r.grid}/{r.baseline}"
         if r.protocol in TRANSFER_PROTOCOLS and r.source and r.source != PRETRAIN_GRID:
@@ -344,7 +363,7 @@ def _neutral_paths(value):
 
 
 def provenance_cells(
-    rows: list[Row], records: RunRecordStats, *, version: str = BENCHMARK_VERSION
+    rows: list[Row], records: RunRecordStats, *, version: str | None = None
 ) -> dict[str, dict]:
     """The per-cell provenance map (Python dict, keyed by "<task>/<protocol>/<grid>/<tag>").
 
@@ -367,7 +386,9 @@ def provenance_cells(
             continue
         cfg = dict(rec.get("args") or {})
         baseline_arg = cfg.get("baseline") or baseline_tag.split("+")[0]
-        base = f"outputs/{version}/{ck}"
+        # version=None => the cell's artifacts live in its protocol's CURRENT tree (held_out
+        # cells point into the frozen older tree, pretrain/transfer into the current one).
+        base = f"outputs/{results_version(protocol) if version is None else version}/{ck}"
         cell_metrics = {k: v for k, v in mbc.get(ck, {}).items() if k != "_n"}
         n_by_ts = mbc.get(ck, {}).get("_n", {})
         ckpts = rec.get("checkpoints") or {}
@@ -425,17 +446,22 @@ def build_provenance_index(
     rows: list[Row],
     records: RunRecordStats,
     *,
-    version: str = BENCHMARK_VERSION,
+    version: str | None = None,
     cells: dict[str, dict] | None = None,
 ) -> dict[str, str]:
     """{"provenance/<version>/index.json": <deterministic json>} — the committed provenance store.
+
+    ``version=None`` (default) emits the ONE current index at ``provenance/<BENCHMARK_VERSION>/``,
+    covering every CURRENT cell — including held_out cells whose artifact paths point into the
+    frozen older ``outputs/`` tree. Older ``provenance/<v>/`` indices are frozen history.
 
     Pass ``cells`` (a ``provenance_cells`` result) to share the one expensive per-cell join with
     ``build_audit_pages`` — ``fresh_views`` does; standalone callers may omit it."""
     if cells is None:
         cells = provenance_cells(rows, records, version=version)
-    doc = {"version": version, "n_cells": len(cells), "cells": cells}
-    return {f"provenance/{version}/index.json": json.dumps(doc, indent=2, sort_keys=True) + "\n"}
+    v = BENCHMARK_VERSION if version is None else version
+    doc = {"version": v, "n_cells": len(cells), "cells": cells}
+    return {f"provenance/{v}/index.json": json.dumps(doc, indent=2, sort_keys=True) + "\n"}
 
 
 # ---------------------------------------------------------------------------------------------
@@ -751,12 +777,14 @@ def _metric_glossary(metrics: tuple[str, ...] | list[str]) -> str:
     )
 
 
-def _trace_strip(prov_cell: dict | None, *, version: str = BENCHMARK_VERSION) -> str:
+def _trace_strip(prov_cell: dict | None, *, version: str | None = None) -> str:
     """The five per-number traceability links (+ W&B), resolved for the repo-only site:
     (1) output file, (2) aggregation/eval code, (3) training log, (4) training code, (5) config.
     ``prov_cell`` is one entry of ``provenance_cells``; ``None`` when no run_record exists yet
-    (pending cell / empty outputs) — the code links still resolve, the artifact links say pending."""
-    idx = f"audit/provenance/{version}/index.json"
+    (pending cell / empty outputs) — the code links still resolve, the artifact links say pending.
+    ``version=None`` links the ONE current index (BENCHMARK_VERSION); per-cell artifact paths
+    inside it are already per-protocol (see ``provenance_cells``)."""
+    idx = f"audit/provenance/{BENCHMARK_VERSION if version is None else version}/index.json"
     if not prov_cell:
         return (
             "<span class=dim>trace:</span> "
@@ -813,7 +841,9 @@ def _page(active: str, title: str, body: str, *, generated_at: str | None) -> st
         f'<link rel=icon href="{FAVICON}">'
         f"<title>{_esc(title)}</title><style>{AUDIT_CSS}</style></head><body>"
         f"<header>{_nav(active)}<h1>{_esc(title)}</h1>"
-        f"<div class=v>benchmark version {_esc(BENCHMARK_VERSION)} · splits v{_esc(SPLITS_VERSION)}</div>"
+        f"<div class=v>benchmark version {_esc(BENCHMARK_VERSION)} · held_out results "
+        f"v{_esc(results_version('held_out'))} · splits v{_esc(SPLITS_VERSION)}/held_out, "
+        f"v{_esc(MULTI_GRID_SPLITS_VERSION)}/multi_grid</div>"
         f"{updated}</header>{body}{footer}<script>{SORT_JS}</script></body></html>"
     )
 
@@ -856,10 +886,12 @@ def _results_table(rows: list[Row], *, caption: str, prov: dict | None = None) -
     test/benchmark values (mean ± ci95, n), params, fit time, and — when a provenance map is
     supplied — a per-row trace strip to the five artifacts + W&B. ``rows`` is pre-filtered by the
     caller."""
-    # Single-version at the rendering point too (not only via build_audit_pages): a shown number
-    # must be a current-version number so its trace strip resolves against the same version's
+    # Current-version at the rendering point too (not only via build_audit_pages): a shown number
+    # must be a current number for its protocol so its trace strip resolves against the current
     # provenance index. See build_audit_pages for the rationale.
-    held = [r for r in rows if r.protocol == "held_out" and r.version == BENCHMARK_VERSION]
+    held = [
+        r for r in rows if r.protocol == "held_out" and r.version == results_version("held_out")
+    ]
     keys = sorted(
         {(r.task, r.grid, r.baseline) for r in held},
         key=lambda k: (
@@ -1148,8 +1180,21 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
     )
     lock = _REPO / "requirements.lock"
     lock_sha = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.exists() else "—"
-    renv = _REPO / "env" / f"results-v{BENCHMARK_VERSION}.lock"
+    # The held_out results keep their original lock; the pretrain/transfer re-scores get their
+    # own env/results-v<BENCHMARK_VERSION>.lock — list it only once it is captured (is_file()).
+    held_v = results_version("held_out")
+    renv = _REPO / "env" / f"results-v{held_v}.lock"
     renv_sha = hashlib.sha256(renv.read_bytes()).hexdigest() if renv.exists() else "—"
+    cur_lock_li = ""
+    cur_renv = _REPO / "env" / f"results-v{BENCHMARK_VERSION}.lock"
+    if BENCHMARK_VERSION != held_v and cur_renv.is_file():
+        cur_sha = hashlib.sha256(cur_renv.read_bytes()).hexdigest()
+        cur_lock_li = (
+            f"<li><b>results environment (v{_esc(BENCHMARK_VERSION)} re-scores)</b> "
+            f"{_src(f'env/results-v{BENCHMARK_VERSION}.lock')} — sha256 <code>{_esc(cur_sha)}"
+            "</code>. The environment for the pretrain/transfer re-scores under the corrected "
+            "multi_grid splits; the held_out results keep the lock above.</li>"
+        )
     fmt_list = lambda xs: _esc(", ".join(xs)) if xs else "— (none recorded yet)"  # noqa: E731
     recs = "".join(
         f"<tr><td><b>{_esc(k)}</b></td><td>{v}</td></tr>"
@@ -1183,11 +1228,12 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
         f"<h2>Determinism &amp; seeds</h2><p>{_esc(MAN.ENVIRONMENT['seed_policy'])}</p>"
         f"<p>{_esc(MAN.ENVIRONMENT['staging'])}</p>"
         "<h2>Pins</h2><ul>"
-        f"<li><b>results environment</b> {_src(f'env/results-v{BENCHMARK_VERSION}.lock')} — sha256 "
+        f"<li><b>results environment</b> {_src(f'env/results-v{held_v}.lock')} — sha256 "
         f"<code>{_esc(renv_sha)}</code>. The conda prefix that actually produced these numbers "
         "(torch + CUDA stack included), captured by <code>hpc/capture_results_env.sh</code>. Every "
         "run record independently captured its own package versions at run time; agreement between "
         "the two is verified by <code>hpc/verify_results_env.py</code> — see the row below.</li>"
+        f"{cur_lock_li}"
         f"<li>CI test-gate locks {_src('requirements-ci-py3.10.lock')} / "
         f"{_src('requirements-ci-py3.12.lock')} — hash-pinned, installed by CI with "
         "<code>--require-hashes</code>. Torch-free: they pin the <em>test gate</em>, not the "
@@ -1198,7 +1244,10 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
         "torch) nor current CI.</li>"
         f"<li>window contract v{_esc(values['contract_version'])} — pinned sha256 "
         f"<code>{_esc(values['contract_sha'])}</code> ({_src('src/evemtbench/contract/contract.json')})</li>"
-        f"<li>committed splits v{_esc(SPLITS_VERSION)} — {_src(f'src/evemtbench/splits/v{SPLITS_VERSION}')}</li></ul>"
+        f"<li>committed splits v{_esc(SPLITS_VERSION)} (held_out) — "
+        f"{_src(f'src/evemtbench/splits/v{SPLITS_VERSION}')} · "
+        f"v{_esc(MULTI_GRID_SPLITS_VERSION)} (multi_grid_pretrain, topology-grouped) — "
+        f"{_src(f'src/evemtbench/splits/v{MULTI_GRID_SPLITS_VERSION}')}</li></ul>"
         "<h2>What the run records say</h2><p>Aggregated at build time from every "
         "<code>run_record.json</code> under outputs/ — the audit reads the records, it does not "
         f"assert them.</p><div class=tablewrap><table>{recs}</table></div>"
@@ -1470,13 +1519,12 @@ def build_baseline_page(baseline: str, rows: list[Row], prov: dict | None = None
     )
 
 
-def collect_headline_seeds(
-    outputs: str | Path = "outputs", *, version: str = BENCHMARK_VERSION
-) -> dict:
+def collect_headline_seeds(outputs: str | Path = "outputs", *, version: str | None = None) -> dict:
     """task -> grid -> baseline -> per-seed headline values (held_out / test set), read straight
-    from the committed result.json files (the leaderboard Row drops per_seed)."""
+    from the committed result.json files (the leaderboard Row drops per_seed). Headline cells are
+    held_out, so ``version=None`` (default) resolves to that protocol's CURRENT results tree."""
     data: dict = {}
-    root = Path(outputs) / version
+    root = Path(outputs) / (results_version("held_out") if version is None else version)
     if not root.is_dir():
         return data
     for p in sorted(root.glob("*/held_out/*/*/test/result.json")):
@@ -1748,7 +1796,8 @@ def build_paper_numbers(
             f"{head_cells}</tr></thead><tbody>{''.join(body_rows)}</tbody></table></div>"
         )
     empty_note = (
-        "<div class=note>No paper numbers are wired yet — the v1.0.0 sweep has not run, so every "
+        f"<div class=note>No paper numbers are wired yet — the v{_esc(BENCHMARK_VERSION)} sweep "
+        "has not run, so every "
         "generated table cell is <code>\\res</code> and every cell below is “—”. The mapping is "
         "already fixed: once the sweep populates <code>outputs/</code>, each cell becomes a traced "
         "number here and in the manuscript simultaneously (same selection, same "
@@ -1797,18 +1846,16 @@ def build_audit_pages(
 
     Pass ``prov_cells`` (a ``provenance_cells`` result) to share the one expensive per-cell join
     with ``build_provenance_index`` — ``fresh_views`` does; standalone callers may omit it."""
-    # The audit is the provenance record of THIS benchmark version. scan_results returns rows for
+    # The audit is the provenance record of the CURRENT results. scan_results returns rows for
     # EVERY version present under outputs/ (superseded prior-version data may still be on disk), so
-    # scope to BENCHMARK_VERSION here — otherwise a stale number would be published on the audit
-    # site with no matching (version-scoped) provenance/trace, contradicting the traceability
-    # guarantee. Mirrors make_results / the coverage scan / the provenance index / paper_numbers.
-    rows = [r for r in rows if r.version == BENCHMARK_VERSION]
+    # keep only each protocol's current rows (results_version(protocol) — held_out stays at its
+    # frozen version, pretrain/transfer at BENCHMARK_VERSION) — otherwise a superseded number would
+    # be published on the audit site with no matching provenance/trace, contradicting the
+    # traceability guarantee. Mirrors make_results / the coverage scan / the provenance index /
+    # paper_numbers.
+    rows = [r for r in rows if r.version == results_version(r.protocol)]
     values = compute_values(rows, cov, records)
-    prov = (
-        prov_cells
-        if prov_cells is not None
-        else provenance_cells(rows, records, version=BENCHMARK_VERSION)
-    )
+    prov = prov_cells if prov_cells is not None else provenance_cells(rows, records)
     headline_seeds = headline_seeds or {}
     pages: dict[str, str] = {}
 
@@ -1871,7 +1918,7 @@ def fresh_provenance(outputs: str | Path = "outputs") -> dict[str, str]:
     out = Path(outputs)
     rows = scan_results(out) if out.is_dir() else []
     records = collect_run_records(out)
-    return build_provenance_index(rows, records, version=BENCHMARK_VERSION)
+    return build_provenance_index(rows, records)
 
 
 def fresh_views(
@@ -1887,11 +1934,11 @@ def fresh_views(
     cov = collect_coverage(out)
     records = collect_run_records(out)
     seeds = collect_headline_seeds(out)
-    cells = provenance_cells(rows, records, version=BENCHMARK_VERSION)
+    cells = provenance_cells(rows, records)
     pages = build_audit_pages(
         rows, cov, records, headline_seeds=seeds, generated_at=generated_at, prov_cells=cells
     )
-    prov = build_provenance_index(rows, records, version=BENCHMARK_VERSION, cells=cells)
+    prov = build_provenance_index(rows, records, cells=cells)
     return pages, prov
 
 

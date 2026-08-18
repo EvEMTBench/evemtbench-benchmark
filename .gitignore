@@ -55,6 +55,9 @@ build/
 dist/
 .venv*/
 venv/
+# hpc/verify_suite.sh builds its pinned-ruff venv here (default is under local/,
+# this catches an overridden RUFFVENV pointing elsewhere in the tree)
+ruff-ci-venv/
 .env
 
 # Tooling caches
@@ -93,3 +96,7 @@ local/
 .local/
 # untracked machine profile (data root, interpreter, W&B entity) — see hpc/clusters/alex.env
 hpc/clusters/local.env
+
+# Derived LaTeX build source: hpc/build_paper.py compiles a shimmed COPY of main.tex so the
+# committed file stays a byte-faithful Overleaf mirror. Never committed; removed after a build.
+/paper/manuscript/_offline_build.*

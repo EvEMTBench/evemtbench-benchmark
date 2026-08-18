@@ -1,0 +1,34 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_transfer_scratch.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/{fault_detection,fault_classification,fault_location}_{local,line}/held_out/<grid>/<baseline>/{val,benchmark}/result.json
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\caption{From-scratch target-grid reference for the cross-grid transfer tables (Tables~\ref{tab:transfer_fd}--\ref{tab:transfer_fl}). Each cell is the \texttt{held\_out} baseline trained on the \emph{target} grid's \texttt{adapt\_grid} training partition with random initialisation, its architecture selected on the \emph{target} grid's validation split, and evaluated on that grid's never-trained \texttt{eval\_grid} family --- the same evaluation set the transfer tables report. The reference is independent of the pre-training source, so it is tabulated once here rather than repeated in every source row. \textbf{ref.} names the selected architecture; the \texttt{eval\_grid} family is prediction-only and takes no part in any selection. Cells are mean\,$\pm$\,95\% CI over five seeds; \pending{}~= pending.}
+\label{tab:supp_transfer_scratch}
+\begin{tabular}{ll ll ll}
+\toprule
+ & & \multicolumn{2}{c}{\textbf{local}} & \multicolumn{2}{c}{\textbf{line}} \\
+\cmidrule(lr){3-4}\cmidrule(lr){5-6}
+\textbf{Function} & \textbf{Target grid} & \textbf{ref.} & \textbf{from scratch} & \textbf{ref.} & \textbf{from scratch} \\
+\midrule
+\multirow{4}{*}{\ac{fd}\,(bal.\ acc.\ $\uparrow$)} & CIGR\'E MV (20\,kV)      & \acs{rf} & 0.983 $\pm$ 0.001 & \acs{rf} & 0.980 $\pm$ 0.003 \\
+                                             & Double Line (110\,kV)    & \acs{rf} & 0.499 & \acs{resnet} & 0.991 $\pm$ 0.008 \\
+                                             & Prot.\ Ref.\ (110\,kV)   & \acs{resnet} & 0.995 $\pm$ 0.004 & \acs{resnet} & 0.990 $\pm$ 0.003 \\
+                                             & IEEE 39-Bus (345\,kV)    & \acs{rf} & 0.886 & \acs{rf} & 0.868 $\pm$ 0.004 \\
+\midrule
+\multirow{4}{*}{\ac{fc}\,(bal.\ acc.\ $\uparrow$)} & CIGR\'E MV (20\,kV)      & \acs{resnet} & 0.701 $\pm$ 0.011 & \acs{resnet} & 0.700 $\pm$ 0.010 \\
+                                             & Double Line (110\,kV)    & \acs{resnet} & 0.896 $\pm$ 0.045 & \acs{resnet} & 0.873 $\pm$ 0.023 \\
+                                             & Prot.\ Ref.\ (110\,kV)   & \acs{resnet} & 0.848 $\pm$ 0.007 & \acs{resnet} & 0.834 $\pm$ 0.015 \\
+                                             & IEEE 39-Bus (345\,kV)    & \acs{gru} & 0.703 $\pm$ 0.003 & \acs{resnet} & 0.716 $\pm$ 0.003 \\
+\midrule
+\multirow{4}{*}{\ac{fl}\,(\acs{mae}\,\% $\downarrow$)} & CIGR\'E MV (20\,kV)      & \acs{gru} & 30.485 $\pm$ 0.049 & \acs{cnn} & 24.522 $\pm$ 4.373 \\
+                                             & Double Line (110\,kV)    & \acs{gru} & 11.695 $\pm$ 0.530 & \acs{mlp} & 5.179 $\pm$ 0.243 \\
+                                             & Prot.\ Ref.\ (110\,kV)   & \acs{gru} & 10.855 $\pm$ 0.572 & \acs{mlp} & 6.545 $\pm$ 0.540 \\
+                                             & IEEE 39-Bus (345\,kV)    & \acs{mlp} & 21.403 $\pm$ 0.013 & \acs{mlp} & 9.396 $\pm$ 0.257 \\
+\bottomrule
+\end{tabular}
+\end{table*}

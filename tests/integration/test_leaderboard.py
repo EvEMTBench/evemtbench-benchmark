@@ -7,10 +7,13 @@ from pathlib import Path
 import pytest
 
 from evemtbench.leaderboard import render_html, scan_results
+from evemtbench.version import results_version
 
 
 def _write_result(base: Path, task, protocol, grid, baseline, bal_acc, *, test_set="test"):
-    d = base / "1.0.0-dev" / task / protocol / grid / baseline / test_set
+    # written into the protocol's CURRENT results tree so the headline sections (coverage
+    # panel / topology comparison / transfer), which are current-scoped, render these rows
+    d = base / results_version(protocol) / task / protocol / grid / baseline / test_set
     d.mkdir(parents=True, exist_ok=True)
     (d / "result.json").write_text(
         json.dumps(
@@ -20,6 +23,7 @@ def _write_result(base: Path, task, protocol, grid, baseline, bal_acc, *, test_s
                 "grid": grid,
                 "baseline": baseline,
                 "test_set": test_set,
+                "benchmark_version": results_version(protocol),
                 "n_test": 100,
                 "seeds": [0, 1],
                 "aggregate": {

@@ -12,14 +12,17 @@ for p in (REPO / "src", REPO / "hpc"):
         sys.path.insert(0, str(p))
 
 import check_results_fresh as gate  # noqa: E402  (needs hpc/ on the path)
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
+from evemtbench.version import results_version  # noqa: E402
+
+# the seeded cell is held_out -> it must live in that protocol's current tree (1.0.0)
+HO_VER = results_version("held_out")
 
 
 def _seed_repo(root: Path) -> None:
     d = (
         root
         / "outputs"
-        / BENCHMARK_VERSION
+        / HO_VER
         / "fault_classification_local"
         / "held_out"
         / "cigre_mv"
@@ -30,7 +33,7 @@ def _seed_repo(root: Path) -> None:
     (d / "result.json").write_text(
         json.dumps(
             {
-                "benchmark_version": BENCHMARK_VERSION,
+                "benchmark_version": HO_VER,
                 "task": "fault_classification_local",
                 "protocol": "held_out",
                 "grid": "cigre_mv",

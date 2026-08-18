@@ -34,6 +34,38 @@ from make_results import BASELINES, ci_val, load_rows, mean_val, warn_once  # no
 GEN_DIR = _REPO / "paper" / "manuscript" / "generated"
 FIG_DIR = _REPO / "paper" / "manuscript" / "figures"
 
+
+# --------------------------------------------------------------------------------------------------
+# Artifact provenance header (golden rule: one artifact = one generator = one file).
+# Every generated fragment opens with this block, so a reader of the .tex knows which script owns it
+# and which committed inputs it was rendered from without consulting the build system.
+# --------------------------------------------------------------------------------------------------
+def provenance_header(generator: str, inputs: list[str] | tuple[str, ...]) -> str:
+    """The mandatory ``% AUTO-GENERATED`` provenance block for one generated artifact.
+
+    ``generator`` is the repo-relative path of the single owning script; ``inputs`` the committed
+    artifacts it reads. The benchmark line names the contract version the SI reports
+    (:data:`evemtbench.version.BENCHMARK_VERSION`), not the per-protocol ``outputs/<v>/`` tree —
+    that scoping is visible in the input paths themselves."""
+    from evemtbench.version import BENCHMARK_VERSION
+
+    lines = [
+        "% AUTO-GENERATED. DO NOT EDIT.",
+        f"% Generator: {generator}",
+        f"% Benchmark: EvEMTBench v{BENCHMARK_VERSION}",
+        "% Inputs:" + ("" if inputs else " (none — static specification)"),
+    ]
+    lines += [f"%   {i}" for i in inputs]
+    return "\n".join(lines) + "\n"
+
+
+#: The committed held_out result tree (``outputs/1.0.0/`` under v1.1.0's scoped revision).
+def _held_out_glob(task_glob: str, sets: str = "{val,test,benchmark}") -> str:
+    from evemtbench.version import results_version
+
+    return f"outputs/{results_version('held_out')}/{task_glob}/held_out/<grid>/<baseline>/{sets}/result.json"
+
+
 # --------------------------------------------------------------------------------------------------
 # Shared configuration (identical to the pre-refactor make_paper_tables / make_supplement_tables).
 # --------------------------------------------------------------------------------------------------
@@ -75,8 +107,15 @@ _BASELINE_LABEL = {
 }
 # Scale-down-ONLY width backstop for the wide SI tables: shrinks a tabular that would overrun
 # \textwidth, leaves a narrow one untouched (adjustbox is absent from the offline tectonic bundle,
-# hence the raw \ifdim). Every user must close the extra group with `\end{tabular}}`.
-_SHRINK_TO_FIT = "\\resizebox{\\ifdim\\width>\\textwidth \\textwidth\\else \\width\\fi}{!}{%\n"
+# hence the raw \ifdim). Every user must close the extra group with `\end{tabular}`.
+#: RETIRED (2026-08-17): formerly a scale-to-fit box around every wide tabular. It had no floor,
+#: so a table needing 1.8x \textwidth was scaled to 0.55x and its \scriptsize type landed on the
+#: page at 3.76 pt -- below the ~5 pt legibility floor, with a different effective size in every
+#: table (against the journal's same-typeface-same-size rule) and rules scaled under the 1 pt
+#: stroke floor. Now empty: a table that overruns \textwidth raises an Overfull \hbox at build
+#: time and is fixed by layout (landscape, transpose, split) or replaced by a figure, never by
+#: shrinking the type. Kept as a named constant so the emit sites stay one-line and greppable.
+_SHRINK_TO_FIT = ""
 
 # DISPLAY labels for the two held_out test sets. The manuscript calls the never-trained family
 # `eval_grid` to keep it distinct from "the benchmark" (the evaluation framework as a whole); the
@@ -98,6 +137,24 @@ def _is_bounded01(metric: str) -> bool:
     return metric in _BOUNDED_01 or metric.startswith("f1_")
 
 
+def ci_bounds(mean: float, ci: float | None, metric: str) -> tuple[float, float] | None:
+    """The 95\\% interval to DISPLAY for a cell as ``(lo, hi)``, or ``None`` when there is none.
+
+    A symmetric Student-t interval on a [0,1]-bounded metric can run past the bound at n=5 (F10),
+    so such an interval is clipped to the metric's support --- which is why the tables print it as
+    ``mean [lo, hi]`` rather than ``mean $\\pm$ ci``. MAE/RMSE (% line length) and R^2 are not
+    bounded to [0,1] and are never clipped.
+
+    Shared with the figure builders (``build_fig_transfer_overview``) so that a drawn error bar is
+    definitionally the same interval the corresponding table cell prints, and the two cannot drift.
+    """
+    if ci is None:
+        return None
+    if _is_bounded01(metric):
+        return max(0.0, mean - ci), min(1.0, mean + ci)
+    return mean - ci, mean + ci
+
+
 def _fmt_mean_ci(mean: float, ci: float | None, metric: str, compact: bool = False) -> str:
     """``mean $\\pm$ ci``; for a [0,1]-bounded metric whose symmetric interval overflows the
     bound, show the truncated interval ``mean [lo, hi]`` instead (F10). ``compact`` (used by the
@@ -108,7 +165,7 @@ def _fmt_mean_ci(mean: float, ci: float | None, metric: str, compact: bool = Fal
         return f"{mean:.3f}"
     bounded = _is_bounded01(metric)
     if bounded and (mean + ci > 1.0 or mean - ci < 0.0):
-        lo, hi = max(0.0, mean - ci), min(1.0, mean + ci)
+        lo, hi = ci_bounds(mean, ci, metric)
         if compact:  # narrower 2 d.p. bracket for the dense per-baseline supplement tables
             return f"{mean:.3f}$\\,{{\\scriptscriptstyle[{lo:.2f},{hi:.2f}]}}$"
         return f"{mean:.3f}$\\,{{\\scriptscriptstyle[{lo:.3f},\\,{hi:.3f}]}}$"
@@ -203,6 +260,176 @@ def best_cell_choice(rows: dict, task_id: str, test_set: str, metric: str) -> di
     }
 
 
+# --- what the two main-text figures cover -------------------------------------------------------
+# Shared by build_fig_synthesis / build_fig_transfer_overview and by the figure-value test, so a
+# change to a figure's coverage cannot silently escape verification.
+#: Fig. 2 upper panel: ``(row label, task stem, observability view)``, balanced accuracy.
+SYNTHESIS_BACC_ROWS: list[tuple[str, str, str]] = [
+    ("FD · local", "fault_detection", "local"),
+    ("FD · line", "fault_detection", "line"),
+    ("FD · global", "fault_detection", "global"),
+    ("FC · local", "fault_classification", "local"),
+    ("FC · line", "fault_classification", "line"),
+    ("FC · global", "fault_classification", "global"),
+    ("ED · global", "event_detection", "global"),
+    ("EC · global", "event_classification", "global"),
+]
+#: Fig. 2 lower panel: fault localization, its own metric (MAE % of line length) and scale.
+SYNTHESIS_FL_ROWS: list[tuple[str, str, str]] = [
+    ("FL · local", "fault_location", "local"),
+    ("FL · line", "fault_location", "line"),
+    ("FL · global", "fault_location", "global"),
+]
+#: Fig. 3 covers the differential two-terminal view only — transfer applies to the fixed-width
+#: local/line views, and `line` is the one the manuscript reports.
+TRANSFER_FIG_VIEW = "line"
+#: Fig. 3 columns: only the fault-triad functions carry transferable weights (ED/EC are global-only
+#: and held-out-only, so they have no transfer cell).
+TRANSFER_FIG_FUNCTIONS = ("fd", "fc", "fl")
+
+
+def held_out_rows() -> dict:
+    """``{grid: load_rows(grid)}`` for the four reference grids --- one glob of ``outputs/`` per grid.
+
+    Hoisted out so a caller that builds several matrices (the synthesis figure needs one for
+    balanced accuracy and one for MAE) scans the tree once instead of once per matrix."""
+    return {g: load_rows(g) for g, _ in GRID_ROWS}
+
+
+def synthesis_matrix(
+    row_specs, metric: str, per_grid: dict | None = None, test_sets=TEST_SETS
+) -> list[list[dict | None]]:
+    """The held-out synthesis matrix behind Fig. 2, as plain data (no matplotlib).
+
+    ``row_specs`` is an iterable of ``(label, task stem, observability view)``. The result is one
+    list per row; within a row the columns run ``test_set`` block by ``test_set`` block, each in
+    :data:`GRID_ROWS` order --- so ``len(row) == len(test_sets) * len(GRID_ROWS)``. A cell is
+    :func:`best_cell_choice`'s dict (plus ``grid``/``test_set``/``task_id`` for traceability), or
+    ``None`` where no result exists.
+
+    Lives here rather than in the builder so the figure's numbers are the same object the tables
+    are built from, and so a test can assert figure-vs-table agreement without importing matplotlib.
+    """
+    grids = [g for g, _ in GRID_ROWS]
+    if per_grid is None:
+        per_grid = held_out_rows()
+    matrix: list[list[dict | None]] = []
+    for _label, stem, view in row_specs:
+        task_id = f"{stem}_{view}"
+        row: list[dict | None] = []
+        for test_set in test_sets:
+            for grid in grids:
+                choice = best_cell_choice(per_grid[grid], task_id, test_set, metric)
+                if choice is not None:
+                    choice = {**choice, "grid": grid, "test_set": test_set, "task_id": task_id}
+                row.append(choice)
+        matrix.append(row)
+    return matrix
+
+
+# --------------------------------------------------------------------------------------------------
+# Cross-grid transfer tables — mirror the held_out layout but cols = obs x {zero-shot, fine-tune}
+# on the never-trained benchmark family. Data source: the same scan the leaderboard's transfer
+# section uses (leaderboard.scan_results), version-scoped, best learned baseline per cell.
+# --------------------------------------------------------------------------------------------------
+_TRANSFER_PROTOS = [("transfer_zeroshot", "Zero-shot"), ("transfer_finetune", "Fine-tune")]
+
+
+def transfer_series(
+    idx: dict,
+    task_id: str,
+    source: str,
+    metric: str,
+    val_idx: dict | None = None,
+    grids=None,
+) -> dict[str, list[dict | None]]:
+    """The cross-grid transfer cells behind one Fig. 3 panel, as plain data (no matplotlib).
+
+    ``{protocol: [cell | None per target grid]}`` in :data:`GRID_ROWS` order, for a single
+    ``(task_id, source)``. Each cell carries ``mean``, the raw ``ci`` half-width, and the
+    ``(lo, hi)`` the table displays via :func:`ci_bounds` --- so the figure's error bars and the
+    table's printed interval are the same numbers by construction. Selection is
+    :func:`best_transfer_row`, i.e. identical to ``tab_transfer_*.tex``.
+    """
+    grids = [g for g, _ in GRID_ROWS] if grids is None else list(grids)
+    out: dict[str, list[dict | None]] = {}
+    for protocol, _label in _TRANSFER_PROTOS:
+        cells: list[dict | None] = []
+        for grid in grids:
+            row = best_transfer_row(idx, task_id, grid, protocol, metric, source, val_idx)
+            if row is None:
+                cells.append(None)
+                continue
+            mean = row.mean(metric)
+            ci = (row.metrics.get(metric) or {}).get("ci95")
+            lo, hi = ci_bounds(mean, ci, metric) or (mean, mean)
+            cells.append(
+                {
+                    "grid": grid,
+                    "protocol": protocol,
+                    "source": source,
+                    "task_id": task_id,
+                    "baseline": row.baseline,
+                    "mean": mean,
+                    "ci": ci,
+                    "lo": lo,
+                    "hi": hi,
+                }
+            )
+        out[protocol] = cells
+    return out
+
+
+def per_baseline_matrix(
+    stem: str,
+    metric: str,
+    per_grid: dict | None = None,
+    views=OBS,
+    test_sets=TEST_SETS,
+) -> dict[tuple[str, str, str, str], dict | None]:
+    """Every per-baseline held_out cell of one function, as plain data (no matplotlib).
+
+    Keyed ``(grid, view, baseline, test_set)`` over :data:`GRID_ROWS` x ``views`` x
+    :data:`BASELINES` x ``test_sets``; the value is ``{mean, ci, lo, hi, n_seeds}`` or ``None``.
+    ``None`` covers both states the S2 tables render as markers: a (view, baseline) combination the
+    function does not define (``\\notapp``), and a defined cell with no result yet (``\\pending``).
+
+    This is the seam behind the S2 per-baseline figures. It deliberately reuses
+    :func:`load_rows` / :func:`mean_val` / :func:`ci_val` --- the same objects
+    the retired S2 tables were rendered from --- so a figure and the published CSV cannot disagree, and so the
+    parity test can assert that without importing matplotlib.
+    """
+    if per_grid is None:
+        per_grid = held_out_rows()
+    out: dict[tuple[str, str, str, str], dict | None] = {}
+    for grid, _ in GRID_ROWS:
+        for view in views:
+            for baseline in BASELINES:
+                unsupported = _held_unsupported(stem, view, baseline)
+                for test_set in test_sets:
+                    key = (grid, view, baseline, test_set)
+                    if unsupported:
+                        out[key] = None
+                        continue
+                    doc = per_grid[grid].get((f"{stem}_{view}", baseline), {}).get(test_set)
+                    mean = mean_val(doc, metric)
+                    if mean is None:
+                        out[key] = None
+                        continue
+                    ci = ci_val(doc, metric)
+                    # None for a deterministic baseline (one seed) or a half-width that rounds
+                    # away -- the figures then draw a bare marker, as the tables print a bare mean.
+                    bounds = ci_bounds(mean, ci, metric)
+                    out[key] = {
+                        "mean": mean,
+                        "ci": ci,
+                        "lo": None if bounds is None else bounds[0],
+                        "hi": None if bounds is None else bounds[1],
+                        "n_seeds": (doc.get("aggregate", {}).get(metric) or {}).get("n_seeds"),
+                    }
+    return out
+
+
 def _best_cell(rows: dict, stem: str, view: str, test_set: str, metric: str) -> str:
     """Best learned baseline for (stem, view, test_set): a clipped ``mean $\\pm$ ci`` value, or
     a five-state marker --- ``\\notapp`` (view not defined for this function) / ``\\pending``
@@ -256,8 +483,11 @@ def result_table(key: str) -> str:
         else ""
     )
     return (
-        "% AUTO-GENERATED by hpc/make_paper_tables.py from outputs/ — do not edit by hand.\n"
-        "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
+        provenance_header(
+            f"hpc/paper_artifacts/build_tab_res_{key}.py",
+            [_held_out_glob(f"{stem}_{{local,line,global}}")],
+        )
+        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.1pt}\n"
         f"\\caption{{{name} --- reference baseline (best of RF/MLP/GRU/CNN/ResNet, "
         "selected on the validation split; a beatable reference, full per-baseline breakdown "
         "in the Supplementary), headline metric "
@@ -273,62 +503,13 @@ def result_table(key: str) -> str:
         "\\textbf{Grid} & \\textbf{local} & \\textbf{line} & \\textbf{global} & "
         "\\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
     )
 
 
 # --------------------------------------------------------------------------------------------------
 # Supplement tables — verbatim layout of the pre-refactor make_supplement_tables._table.
 # --------------------------------------------------------------------------------------------------
-def supp_table(key: str, test_set: str) -> str:
-    _, name, stem, metric, metric_label = _PF_BY_KEY[key]
-    per_grid = {g: load_rows(g) for g, _ in GRID_ROWS}
-    grid_heads = " & ".join(
-        f"\\multicolumn{{3}}{{c}}{{\\textbf{{{label}}}}}" for _, label in GRID_ROWS
-    )
-    cmids = "".join(f"\\cmidrule(lr){{{2 + 3 * i}-{4 + 3 * i}}}" for i in range(len(GRID_ROWS)))
-    obs_heads = " & ".join(["\\textbf{loc} & \\textbf{lin} & \\textbf{glo}"] * len(GRID_ROWS))
-    body_lines = []
-    for baseline in BASELINES:
-        cells = [
-            _supp_cell(per_grid[grid], stem, obs, baseline, test_set, metric)
-            for grid, _ in GRID_ROWS
-            for obs in OBS
-        ]
-        body_lines.append(f"{_BASELINE_LABEL[baseline]:<28} & " + " & ".join(cells) + r" \\")
-    body = "\n".join(body_lines)
-    ci_note = (
-        "the 95\\% CI half-width is shown as a compact subscript ($\\pm h$); an interval that would "
-        "exceed $[0,1]$ is instead shown truncated as $[\\text{lo},\\text{hi}]$"
-        if _is_bounded01(metric)
-        else "the 95\\% CI half-width is shown as a compact subscript ($\\pm h$) at 2 d.p"
-    )
-    return (
-        "% AUTO-GENERATED by hpc/make_supplement_tables.py from outputs/ — do not edit by hand.\n"
-        "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{2.6pt}\n"
-        f"\\caption{{{name} --- full per-baseline results on the {_TS_LABEL[test_set]} "
-        f"(\\texttt{{held\\_out}} protocol), headline metric ({metric_label}). Cells are "
-        f"mean\\,$\\pm$\\,95\\% CI over seeds (Student's $t$); {ci_note}. \\pending{{}}~= pending; "
-        "\\notapp{}~= not defined for this (function, view) or baseline.}\n"
-        f"\\label{{tab:supp_{key}_{test_set}}}\n"
-        # scale down to the text width only if the natural table is wider (graphicx; no-op otherwise)
-        + _SHRINK_TO_FIT
-        + f"\\begin{{tabular}}{{l {'ccc ' * len(GRID_ROWS)}}}\n\\toprule\n"
-        f" & {grid_heads} \\\\\n{cmids}\n"
-        f"\\textbf{{Baseline}} & {obs_heads} \\\\\n\\midrule\n"
-        f"{body}\n"
-        "\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
-    )
-
-
-# --------------------------------------------------------------------------------------------------
-# Cross-grid transfer tables (NEW) — mirror the held_out layout but cols = obs × {zero-shot,
-# fine-tune} on the never-trained benchmark family. Data source: the same scan the leaderboard's
-# transfer section uses (leaderboard.scan_results), version-scoped, best learned baseline per cell.
-# --------------------------------------------------------------------------------------------------
-_TRANSFER_PROTOS = [("transfer_zeroshot", "Zero-shot"), ("transfer_finetune", "Fine-tune")]
-
-
 def _source_short(source: str) -> str:
     r"""LaTeX short label for a transfer pre-training SOURCE grid: ``template_20kv`` -> ``20\,kV``."""
     kv = source.replace("template_", "").replace("kv", "")
@@ -508,9 +689,18 @@ def transfer_table(
         if gi < len(GRID_ROWS) - 1:
             body_lines.append(r"\midrule")
     body = "\n".join(body_lines)
-    header = (
-        f"% AUTO-GENERATED by hpc/paper_artifacts/build_tab_transfer_{key}.py from outputs/ "
-        "— do not edit by hand.\n"
+    from evemtbench.version import BENCHMARK_VERSION
+
+    header = provenance_header(
+        f"hpc/paper_artifacts/build_tab_transfer_{key}.py",
+        [
+            f"outputs/{BENCHMARK_VERSION}/{stem}_{{local,line}}/transfer_{{zeroshot,finetune}}/"
+            "<grid>/<baseline>/[pretrain-<source>/]benchmark/result.json",
+            f"outputs/{BENCHMARK_VERSION}/{stem}_{{local,line}}/multi_grid_pretrain/<source>/"
+            "<baseline>/val/result.json  (zero-shot selection)",
+            f"outputs/{BENCHMARK_VERSION}/{stem}_{{local,line}}/transfer_finetune/<grid>/"
+            "<baseline>/[pretrain-<source>/]val/result.json  (fine-tune selection)",
+        ],
     )
     return (
         header + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
@@ -535,7 +725,7 @@ def transfer_table(
         "\\textbf{Grid} & \\textbf{Src} & \\textbf{local} & \\textbf{line} & \\textbf{global} & "
         "\\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
     )
 
 
@@ -543,7 +733,10 @@ def transfer_table(
 # Static specification tables (authored content lifted verbatim out of main.tex). These are NOT
 # data-derived, so they are exempt from the pre-freeze \res policy (see check_results_fresh.py).
 # --------------------------------------------------------------------------------------------------
-_SPEC_HEADER = "% AUTO-GENERATED by hpc/paper_artifacts/build_tab_{name}.py — static spec table.\n"
+def _spec_header(name: str) -> str:
+    """Provenance block for a static specification table (authored content, no data inputs)."""
+    return provenance_header(f"hpc/paper_artifacts/build_tab_{name}.py", [])
+
 
 SPEC_TABLES: dict[str, str] = {
     "task_spec": r"""\begin{table*}[t]
@@ -602,8 +795,8 @@ Fault localisation (\ac{fl})\,$\dagger$   & 3 & regression  & L, Li, G & positio
 \end{table*}
 """,
     "topology_overview": r"""\begin{table}[t]
-\caption{Reference grids used to instantiate the benchmark
-\cite{kordowich_evemtbench_2026}. The \emph{global} view width (number of channels)
+\caption{Reference grids used to instantiate the benchmark, as released with the
+EvEMTBench dataset. The \emph{global} view width (number of channels)
 is grid-dependent, which motivates topology-agnostic models for the planned
 cross-topology protocol.}
 \label{tab:topology_overview}
@@ -686,7 +879,7 @@ threshold & conventional (overcurrent) & local current & binary \ac{fd}, \emph{l
 
 def spec_table(name: str) -> str:
     """The static specification table ``name`` with a generated-by header (LaTeX comment)."""
-    return _SPEC_HEADER.format(name=name) + SPEC_TABLES[name]
+    return _spec_header(name) + SPEC_TABLES[name]
 
 
 # --------------------------------------------------------------------------------------------------
@@ -727,38 +920,24 @@ def _sel_metric_cell(rows: dict, task_id: str, test_set: str, metric: str) -> st
     return _fmt_mean_ci(m, ci_val(doc, metric), metric)
 
 
-def protection_rate_table() -> str:
-    """SI table: dependability (missed-fault/-event rate) and security (false-alarm/-trip rate) for
-    the binary functions FD and ED, validation-selected reference, per (function, view, grid) on the
-    in-distribution and never-trained sets."""
-    per_grid = {g: load_rows(g) for g, _ in GRID_ROWS}
-    body = []
-    specs = [("FD", "fault_detection", OBS), ("ED", "event_detection", ("global",))]
-    for flabel, stem, views in specs:
-        mk, fk = _BINARY_RATE_KEYS[stem]
-        for v in views:
-            for g, glabel in GRID_ROWS:
-                r = per_grid[g]
-                tid = f"{stem}_{v}"
-                cells = [_sel_metric_cell(r, tid, ts, key) for ts in TEST_SETS for key in (mk, fk)]
-                body.append(f"{flabel}\\,·\\,{v} & {glabel} & " + " & ".join(cells) + r" \\")
-    return (
-        "% AUTO-GENERATED by hpc/paper_artifacts/build_supp_tab_protection.py — do not edit.\n"
-        "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{4pt}\n"
-        "\\caption{Protection-grade error rates for the binary functions (FD, ED), "
-        "validation-selected reference baseline: dependability = missed-fault/-event rate "
-        "($\\downarrow$), security = false-alarm/-trip rate ($\\downarrow$). Cells are "
-        "mean\\,$\\pm$\\,95\\% CI over seeds; \\pending{}~= pending.}\n"
-        "\\label{tab:supp_protection}\n"
-        "\\begin{tabular}{l l cc cc}\n\\toprule\n"
-        " & & \\multicolumn{2}{c}{\\textbf{In-distribution (test)}} & "
-        "\\multicolumn{2}{c}{\\textbf{Never-trained (\\texttt{eval\\_grid})}} \\\\\n"
-        "\\cmidrule(lr){3-4}\\cmidrule(lr){5-6}\n"
-        "\\textbf{Function·view} & \\textbf{Grid} & \\textbf{missed} & \\textbf{false-alarm} & "
-        "\\textbf{missed} & \\textbf{false-alarm} \\\\\n\\midrule\n"
-        + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
-    )
+#: Short LaTeX label for a selected baseline, used where the table names the reference identity.
+_BASELINE_ACS = {
+    "random_forest": r"\acs{rf}",
+    "mlp": r"\acs{mlp}",
+    "gru": r"\acs{gru}",
+    "cnn": r"\acs{cnn}",
+    "resnet": r"\acs{resnet}",
+    "majority": "maj.",
+    "threshold": "thr.",
+}
+
+
+def _sel_baseline_cell(rows: dict, task_id: str, test_set: str) -> str:
+    """Identity of the validation-selected reference reported for (task_id, test_set)."""
+    choice = best_cell_choice(rows, task_id, test_set, "balanced_accuracy")
+    if choice is None:
+        return r"\pending"
+    return _BASELINE_ACS.get(choice["baseline"], choice["baseline"])
 
 
 def fc_per_class_f1_table() -> str:
@@ -776,8 +955,11 @@ def fc_per_class_f1_table() -> str:
         ]
         body.append(f"{clabel} & " + " & ".join(cells) + r" \\")
     return (
-        "% AUTO-GENERATED by hpc/paper_artifacts/build_supp_tab_fc_perclass.py — do not edit.\n"
-        "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_fc_perclass.py",
+            [_held_out_glob("fault_classification_line", "{val,test}")],
+        )
+        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
         "\\caption{Per-class $\\text{F}_1$ for fault-type classification (FC, 9-class, "
         "\\emph{line} view, in-distribution test), validation-selected reference baseline. "
         "\\undefm{}~= $\\text{F}_1$ undefined (no supported \\emph{and} no predicted samples); "
@@ -787,7 +969,7 @@ def fc_per_class_f1_table() -> str:
         "\\label{tab:supp_fc_perclass}\n" + _SHRINK_TO_FIT + "\\begin{tabular}{l cccc}\n\\toprule\n"
         f"\\textbf{{Fault class}} & {heads} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}}\n\\end{table}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -799,7 +981,17 @@ def fc_per_class_f1_table() -> str:
 # repo-derived (committed split files); per-class support is read from the result.json breakdowns.
 # --------------------------------------------------------------------------------------------------
 def _episode_counts(grid: str) -> dict:
-    base = _REPO / "src" / "evemtbench" / "splits" / "v1.0" / "held_out" / grid
+    from evemtbench.version import splits_version
+
+    base = (
+        _REPO
+        / "src"
+        / "evemtbench"
+        / "splits"
+        / f"v{splits_version('held_out')}"
+        / "held_out"
+        / grid
+    )
     out = {}
     for split in ("train", "val", "test", "benchmark"):
         f = base / f"{split}.txt"
@@ -821,12 +1013,18 @@ def dataset_split_table() -> str:
         ]
         body.append(f"{glabel} & " + " & ".join(cells) + r" \\")
     return (
-        "% AUTO-GENERATED by hpc/paper_artifacts/build_supp_tab_splits.py — do not edit.\n"
-        "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{6pt}\n"
-        "\\caption{Held-out split composition: number of \\emph{episodes} per grid (each episode "
-        "yields $91$ windows at $50\\,\\text{ms}$ / $5\\,\\text{ms}$). Train/validation/test "
-        "are the $70/15/15$ episode-level split of the Fine-tune (adapt-grid) family; "
-        "\\texttt{eval\\_grid} is the entire never-trained family.}\n"
+        provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_splits.py",
+            ["src/evemtbench/splits/v1.0/held_out/<grid>/{train,val,test,benchmark}.txt"],
+        )
+        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{6pt}\n"
+        "\\caption{Held-out split composition: number of \\emph{episodes} per grid. Under the frozen "
+        "window contract each episode yields $23$ windows ($50\\,$ms length, $5\\,$ms step, over "
+        "the event-centred extraction interval), uniformly across every grid and family; the "
+        "number of windows actually \\emph{scored} by each function is smaller and is given in "
+        "Table~\\ref{tab:supp_primary_valid_counts}. Train/validation/test are the $70/15/15$ "
+        "episode-level split of the \\texttt{adapt\\_grid} family; \\texttt{eval\\_grid} is the "
+        "entire never-trained family.}\n"
         "\\label{tab:supp_splits}\n"
         "\\begin{tabular}{l rrrr}\n\\toprule\n"
         "\\textbf{Grid} & \\textbf{train} & \\textbf{val} & \\textbf{test} & "
@@ -841,9 +1039,10 @@ def _fc_class_support(grid: str, test_set: str = "test") -> dict:
     import glob
     import json
 
-    from evemtbench.version import BENCHMARK_VERSION
+    from evemtbench.version import results_version
 
-    pat = f"outputs/{BENCHMARK_VERSION}/fault_classification_line/held_out/{grid}/*/{test_set}/result.json"
+    ver = results_version("held_out")
+    pat = f"outputs/{ver}/fault_classification_line/held_out/{grid}/*/{test_set}/result.json"
     for f in sorted(glob.glob(pat)):
         try:
             bd = json.load(open(f)).get("breakdowns", {}).get("event_type", {})
@@ -875,15 +1074,18 @@ def fc_support_table() -> str:
             cells.append(f"{n:,}" if n else "0")  # 0 support = the class is absent on that grid
         body.append(f"{clabel} & " + " & ".join(cells) + r" \\")
     return (
-        "% AUTO-GENERATED by hpc/paper_artifacts/build_supp_tab_fc_support.py — do not edit.\n"
-        "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_fc_support.py",
+            [_held_out_glob("fault_classification_line", "test") + "  (breakdowns.event_type.n)"],
+        )
+        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
         "\\caption{Per-class support (test-set window count) for the 9 FC classes per grid. A count "
         "of $0$ means the class is absent on that grid (the two HIF subtypes are \\ac{mv}-only), so "
         "its per-class $\\text{F}_1$ is undefined rather than zero.}\n"
         "\\label{tab:supp_fc_support}\n" + _SHRINK_TO_FIT + "\\begin{tabular}{l rrrr}\n\\toprule\n"
         f"\\textbf{{Fault class}} & {heads} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}}\n\\end{table}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -927,8 +1129,14 @@ def diagnostic_overview_table() -> str:
         body.append("\\midrule")
     body = "\n".join(body[:-1])  # drop trailing midrule
     return (
-        "% AUTO-GENERATED by hpc/paper_artifacts/build_supp_tab_diagnostics.py — do not edit.\n"
-        "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{4pt}\n"
+        provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_diagnostics.py",
+            [
+                _held_out_glob("{fault_grounded,fault_phase,fault_category}_line"),
+                _held_out_glob("{fault_origin,event_state,switch_detection,switch_type}_global"),
+            ],
+        )
+        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{4pt}\n"
         "\\caption{Extended (diagnostic) functions: per-baseline balanced accuracy ($\\uparrow$) on "
         "the in-distribution test set, each function at its natural observability view. Reported "
         "per baseline (no single `best') for the full picture; \\pending{}~= pending. The "
@@ -938,7 +1146,7 @@ def diagnostic_overview_table() -> str:
         + f"\\begin{{tabular}}{{L{{3.4cm}} l {'c ' * len(_DIAG_BASELINES)}}}\n\\toprule\n"
         f"\\textbf{{Function}} & \\textbf{{Grid}} & {heads} \\\\\n\\midrule\n"
         + body
-        + "\n\\bottomrule\n\\end{tabular}}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
     )
 
 
@@ -989,8 +1197,17 @@ def val_selection_table() -> str:
         groups.append("\n".join(rows_out))
     body = "\n\\midrule\n".join(groups)
     return (
-        "% AUTO-GENERATED by hpc/make_supplement_tables.py from outputs/ — do not edit by hand.\n"
-        "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
+        provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_val_selection.py",
+            [
+                _held_out_glob(
+                    "{fault_detection,fault_classification,fault_location}_{local,line,global}",
+                    "val",
+                ),
+                _held_out_glob("{event_detection,event_classification}_global", "val"),
+            ],
+        )
+        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
         "\\caption{Validation-split selection audit: the headline score \\emph{and identity} (in "
         "parentheses) of the validation-selected reference baseline that drives the model selection "
         "reported in Tables~\\ref{tab:res_fd}--\\ref{tab:res_ec}, per primary function, grid, and "
@@ -1011,14 +1228,12 @@ def val_selection_table() -> str:
 
 
 def build_supplement_tables() -> dict[str, str]:
-    """``{filename: latex}`` for the supplementary tables (pure, deterministic): the ten
-    per-baseline held_out tables plus the F03 protection-grade + FC per-class F1 tables."""
-    tables = {
-        f"supp_tab_{key}_{ts}.tex": supp_table(key, ts)
-        for key, *_ in PAPER_FUNCTIONS
-        for ts in TEST_SETS
-    }
-    tables["supp_tab_protection.tex"] = protection_rate_table()
+    """``{filename: latex}`` for the supplementary tables (pure, deterministic)."""
+    # The ten per-baseline supp_tab_<fn>_{test,benchmark} fragments and supp_tab_protection were
+    # retired on 2026-08-17 and replaced by fig_supp_<fn> / fig_supp_protection: at 13 and 10
+    # columns they only fitted inside a scale-to-fit box, which rendered them at 3.76-4.98 pt.
+    # Their generators (supp_table, protection_rate_table) went with them.
+    tables = {}
     tables["supp_tab_fc_perclass.tex"] = fc_per_class_f1_table()
     tables["supp_tab_splits.tex"] = dataset_split_table()
     tables["supp_tab_fc_support.tex"] = fc_support_table()
@@ -1045,28 +1260,44 @@ def build_spec_tables() -> dict[str, str]:
     return {f"tab_{name}.tex": spec_table(name) for name in SPEC_TABLES}
 
 
-def write_all_tables(outputs: str | Path = "outputs") -> int:
-    """Regenerate every committed table fragment (held_out + supplement + transfer + spec) into
-    GEN_DIR — used by the paper build for a full preview (``hpc/build_paper.py``). The figure PDF is
-    built separately by ``build_fig_transfer_overview.py``. Returns the number of fragments written.
-    Populates from ``outputs/`` (cwd-relative for the held_out/supplement tables); commit populated
-    fragments ONLY from a frozen tag (``git restore`` after a preview otherwise)."""
-    GEN_DIR.mkdir(parents=True, exist_ok=True)
-    frags = {
-        **build_paper_tables(),
-        **build_supplement_tables(),
-        **build_transfer_tables(outputs),
-        **build_spec_tables(),
-    }
-    for name, content in frags.items():
-        (GEN_DIR / name).write_text(content)
-    return len(frags)
+def run(name: str, content: str, argv: list[str] | None = None) -> None:
+    """Write (or, with ``--check``, verify) exactly ONE artifact — the standalone entry point every
+    ``build_<x>.py`` calls in ``__main__``.
 
+    This is the write *primitive* the owning script drives; it never decides which artifacts exist,
+    so the golden rule ("one artifact = one generator") is enforced at the call site. ``--check``
+    regenerates in memory and exits non-zero if the committed file is stale or missing, and never
+    touches the file — the mode ``make check-supp-artifacts`` and CI use."""
+    import argparse
+    import difflib
 
-def run(name: str, content: str) -> None:
-    """Write exactly one artifact (``name``) under GEN_DIR and report — the standalone entry point
-    every ``build_<x>.py`` calls in ``__main__``."""
+    ap = argparse.ArgumentParser(description=f"Build (or --check) {name}.")
+    ap.add_argument(
+        "--check",
+        action="store_true",
+        help="verify the committed artifact matches a fresh rebuild; write nothing",
+    )
+    args = ap.parse_args(argv)
+    dest = GEN_DIR / name
+    if args.check:
+        if not dest.is_file():
+            sys.exit(f"MISSING {dest} — run this generator without --check")
+        committed = dest.read_text()
+        if committed == content:
+            print(f"ok {dest}")
+            return
+        diff = list(
+            difflib.unified_diff(
+                committed.splitlines(),
+                content.splitlines(),
+                fromfile=f"committed/{name}",
+                tofile=f"fresh/{name}",
+                lineterm="",
+            )
+        )
+        print("\n".join(diff[:60]))
+        sys.exit(f"STALE {dest} — regenerate it (see paper/manuscript/generated/README.md)")
     GEN_DIR.mkdir(parents=True, exist_ok=True)
-    (GEN_DIR / name).write_text(content)
+    dest.write_text(content)
     n_res = content.count(r"\res")
-    print(f"wrote {GEN_DIR / name} ({n_res} empty cells -> \\res)")
+    print(f"wrote {dest} ({n_res} empty cells -> \\res)")

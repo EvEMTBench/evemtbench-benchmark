@@ -12,7 +12,7 @@ import pytest
 
 from evemtbench.data import staging
 from evemtbench.tasks.task import TaskView, load_task
-from evemtbench.version import BENCHMARK_VERSION
+from evemtbench.version import BENCHMARK_VERSION, results_version
 
 
 def _task(fixture_root, held_out_splits, task_id):
@@ -286,7 +286,14 @@ def test_runner_end_to_end_persistent_cache(fixture_root, held_out_splits, tmp_p
     monkeypatch.setenv("EVEMTBENCH_CACHE_READONLY", "1")
     out2 = tmp_path / "out2"
     runner.main([*common, "--out", str(out2)])
-    base = out2 / BENCHMARK_VERSION / "fault_detection_local" / "held_out" / "double_line" / "mlp"
+    base = (
+        out2
+        / results_version("held_out")
+        / "fault_detection_local"
+        / "held_out"
+        / "double_line"
+        / "mlp"
+    )
     assert json.loads((base / "test" / "result.json").read_text())["baseline"] == "mlp"
 
     # 3) fail-fast: read-only with an empty cache dir must raise (no GPU-held build, no raw read)

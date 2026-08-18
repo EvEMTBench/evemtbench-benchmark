@@ -22,8 +22,22 @@ width (48–420 ch) and impossible on the double-line representation, hence loca
 line_idx`. Measured from the committed splits: 9 753 / 9 879 / 9 895 simulations (≈10 000 per
 voltage level, as the dataset paper states) expand to 119 153 / 138 512 / 173 407 episodes at
 20 / 110 / 345 kV — a mean of 12.2 / 14.0 / 17.5 observed lines per simulation, rising with
-generated grid size. Quote the right unit when comparing corpus sizes with the dataset paper, and
-see the split-granularity deviation in [../protocol.md](../protocol.md).
+generated grid size. Quote the right unit when comparing corpus sizes with the dataset paper.
+
+**Source-corpus splits are topology-grouped (v1.1).** The v1.0 in-corpus split was episode-level,
+so sibling lines of one simulation — and every generated topology — straddled train/val/test
+(the split-granularity deviation the v1.0 release documented in
+[../protocol.md](../protocol.md)). The v1.1 splits (`splits/v1.1/multi_grid_pretrain/`) group by
+`graph_id` (generated topology; ~104 per corpus, `result_id` = simulation nested inside), via
+`splits/generator.py::split_grouped_episodes`: groups are stratified by the rarest event class
+they contain and each stratum is split 70/15/15 on episode counts by a largest-group-first
+proportional greedy. Every fault class spans 87–104 topologies per corpus, so class support
+survives grouping (committed per-grid `audit.json` verifies: zero topology/simulation/episode
+overlap, class support per partition). A simulation-grouped variant is implemented
+(`--grouping simulation`) and audited (`docs/design/split_audits_v1.1_simulation_variant/`) as
+the fallback; topology grouping shipped because the metadata identifies topologies reliably
+(0 inconsistencies across all 431 072 episodes). Pretrain early-stopping and zero-shot checkpoint
+selection therefore now read a leakage-free validation signal.
 
 - Projection: `tasks/line_view.py::project_double_line` (slice, no oracle). Terminals are
   **bus-canonicalized** (`_double_line_near_end` in `task.py`, using `y.bus_a/bus_b`) so channel *k*

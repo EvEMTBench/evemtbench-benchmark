@@ -52,7 +52,7 @@ from evemtbench.coverage import LEARNED_BASELINES  # noqa: E402
 from evemtbench.evaluation.evaluate import _nan_to_none, evaluate  # noqa: E402
 from evemtbench.evaluation.significance import ci95_halfwidth  # noqa: E402
 from evemtbench.tasks.task import load_task  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
+from evemtbench.version import results_version  # noqa: E402
 
 _DEEP = {"mlp", "gru", "cnn", "resnet"}
 
@@ -181,7 +181,9 @@ def rescore_cell(
     out_dir = cell / "val"
     out_dir.mkdir(parents=True, exist_ok=True)
     doc = {
-        "benchmark_version": BENCHMARK_VERSION,
+        # Stamped with the CELL TREE's version (outputs/<results_version(protocol)>/...), so the
+        # val row stays version-consistent with the committed test/benchmark rows beside it.
+        "benchmark_version": results_version(protocol),
         "task": task_id,
         "protocol": protocol,
         "grid": grid,
@@ -226,7 +228,7 @@ def main(argv=None):
     )
     args = p.parse_args(argv)
 
-    base = f"outputs/{BENCHMARK_VERSION}"
+    base = f"outputs/{results_version(args.protocol)}"  # the protocol's CURRENT results tree
     pats = [f"{base}/*/{args.protocol}/*/*/test/result.json"]  # legacy source-less path
     if args.protocol == "transfer_finetune":
         # non-default transfer sources live under a pretrain-<src> subdir (see coverage.cell_dir)
