@@ -8,9 +8,9 @@
 | **Output** | Binary: fault active in window (1) vs. pre-fault (0) |
 | **Label rule** | `1` iff `event_type` is `flt_*` **and** the window overlaps the event (`overlap_ratio > 0`); else `0`. The negatives are the **pre-fault windows of the same fault episode**. Pure + test-pinned (`tasks/labels/event_present.py`). |
 | **Valid samples** | All windows of **fault episodes** (`y_fault_line` not null), so the local/line/global oracle is defined for every scored window. |
-| **Protocol** | `held_out` |
+| **Protocol** | `held_out` (all variants); the `local`/`line` variants also run `multi_grid_pretrain`, `transfer_zeroshot` and `transfer_finetune` (deep baselines only — see [protocol.md](../protocol.md)) |
 | **Metrics** | balanced accuracy, macro F1, **missed-fault rate**, **false-alarm rate**, accuracy |
-| **Baselines** | majority, threshold (overcurrent), random_forest, mlp, gru, cnn |
+| **Baselines** | majority, threshold (overcurrent; `local` only), random_forest, mlp, gru, cnn, resnet |
 
 ## Notes / claims
 

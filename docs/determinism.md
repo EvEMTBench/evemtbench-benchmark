@@ -34,26 +34,32 @@ section exists to prevent.
 | `requirements-ci-py3.10.lock`, `requirements-ci-py3.12.lock` | the **CI test gate** — a deliberately torch-free dependency set, hash-pinned | GitHub CI, with `--require-hashes` |
 | `requirements.lock` | *legacy.* The CI pin as it stood during the v1.0.0 sweep | nobody |
 
-- **Results pin.** `env/results-v1.0.0.lock` is *captured, not authored*
-  (`hpc/capture_results_env.sh`, run under SLURM): a `pip list --format=freeze` of the conda prefix
-  that produced `outputs/1.0.0`. Because that prefix is mutable, the file is a faithful record
-  rather than a byte-reconstructable specification. The guarantee that matters is the independent
-  cross-check: every `run_record.json` separately captured `numpy`/`pandas`/`scikit-learn`/`scipy`
-  plus `python`/`torch` at run time, and **all 1876 records agree with this file exactly**
-  (`PYTHONPATH=src python hpc/verify_results_env.py`, sidecar
-  `outputs/1.0.0/results_env_verification.json`). Agreement of two independently captured records
-  is stronger evidence than either alone.
+- **Results pin.** There is one results lock per results tree — `env/results-v1.0.0.lock` for
+  `outputs/1.0.0` (the `held_out` results, which stay current under the v1.1.0 contract, plus the
+  superseded v1.0 pre-training/transfer results) and `env/results-v1.1.0.lock` for `outputs/1.1.0`
+  (the re-scored pre-training/transfer results). Each is *captured, not authored*
+  (`hpc/capture_results_env.sh`, run under SLURM): a `pip list --format=freeze` of the conda prefix that produced that tree. Because that prefix is
+  mutable, the file is a faithful record rather than a byte-reconstructable specification. The
+  guarantee that matters is the independent cross-check: every `run_record.json` separately captured
+  `numpy`/`pandas`/`scikit-learn`/`scipy` plus `python`/`torch` at run time, and
+  `hpc/verify_results_env.py` compares each record against the lock and reports per-cell agreement
+  (exit 1 on any disagreement). It defaults to `--version` = `BENCHMARK_VERSION` (`1.1.0`), i.e.
+  `env/results-v1.1.0.lock` against `outputs/1.1.0`; pass `--version 1.0.0` for `outputs/1.0.0`
+  (`PYTHONPATH=src python hpc/verify_results_env.py --version 1.0.0`; `--write` saves the
+  sidecar `outputs/<version>/results_env_verification.json`). It needs a local `outputs/` tree,
+  which is not part of the repository. Agreement of two independently captured records is stronger
+  evidence than either alone.
 - **CI pin.** GitHub CI installs its lock with `uv pip install --require-hashes`, then the package
   with `--no-deps`. One lock per interpreter, because `uv` resolves per `--python-version` and a
   single hash-pinned file cannot serve both matrix legs. The **3.12 leg is additionally constrained
   to the results environment's scoring-package versions** (`env/results-scoring.constraints`), so
   the gate exercises the same numerics the paper reports; the 3.10 leg is unconstrained and only
-  proves the package still works on the oldest supported interpreter. The GitLab mirror (3.11) is
-  intentionally unpinned — see the comment in `.gitlab-ci.yml`.
+  proves the package still works on the oldest supported interpreter. The development repository's
+  GitLab mirror CI (3.11) is intentionally unpinned.
 - **`requirements.lock` is frozen, not current.** It was compiled on a pre-3.10 interpreter, pins a
   `[dev]`-only subset, and contains **no torch**, so it never described the results environment.
   It is kept **byte-for-byte unchanged** because its sha256
-  (`2685c1c2…`) is the `lockfile_sha256` recorded in all 1876 v1.0.0 run records; rewriting it
+  (`2685c1c2…`) is the `lockfile_sha256` recorded in every v1.0.0 run record; rewriting it
   would silently invalidate a published provenance field. New runs additionally record
   `results_env_sha256`.
 - On HPC, the `py_dl` conda base provides the interpreter + CUDA torch, and the package is run

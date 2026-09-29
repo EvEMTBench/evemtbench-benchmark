@@ -3,12 +3,15 @@
 # fresh rebuild from outputs/. Mirrors akmaier/Agent4CT's registry gate. Install with:
 #   bash hpc/install_hooks.sh   (sets git config core.hooksPath .githooks)
 #
-# Only fires when one of those rendered views is staged; otherwise it is a no-op. The checker itself
-# skips cleanly where outputs/ is absent (dev machines / CI), so this never blocks unrelated work.
+# Fires when a rendered view OR one of its inputs is staged: the views are rebuilt from outputs/ by
+# code under src/ and hpc/ and also read CITATION.cff (page citation), pyproject.toml, env/*.lock and
+# the manuscript mirror. (Triggering on the views alone let an input-only commit — e.g. a CITATION.cff
+# author change — leave every page stale; see docs/internal/lessons.md 2026-09-29.) The checker
+# itself skips cleanly where outputs/ is absent (dev machines / CI), so this never blocks unrelated work.
 set -uo pipefail
 
 staged="$(git diff --cached --name-only 2>/dev/null || true)"
-if ! grep -qE '^(RESULTS\.md|leaderboard\.html|coverage_snapshot\.json|audit/.*\.html|results/.*|paper/manuscript/generated/.*\.tex)$' <<<"$staged"; then
+if ! grep -qE '^(RESULTS\.md|leaderboard\.html|coverage_snapshot\.json|audit/.*\.html|results/.*|paper/manuscript/.*|CITATION\.cff|pyproject\.toml|env/.*|src/.*|hpc/.*)$' <<<"$staged"; then
   exit 0
 fi
 

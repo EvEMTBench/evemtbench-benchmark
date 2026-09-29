@@ -4,16 +4,12 @@ them), exactly like RESULTS.md. There is no freeze gate — a committed populate
 not a policy violation."""
 
 import json
-import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc", REPO / "hpc" / "paper_artifacts"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+import check_results_fresh as gate
+from evemtbench.version import results_version
 
-import check_results_fresh as gate  # noqa: E402
-from evemtbench.version import results_version  # noqa: E402
+REPO = Path(__file__).resolve().parents[2]
 
 POPULATED_FRAGMENT = "% AUTO-GENERATED\n\\begin{tabular}{l}\n0.883 $\\pm$ 0.030\n\\end{tabular}\n"
 

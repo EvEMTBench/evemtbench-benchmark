@@ -26,11 +26,12 @@ import subprocess
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+
+from build_paper import _find_tectonic  # single source for the tectonic lookup
+
 REPO = Path(__file__).resolve().parents[1]
 MANUSCRIPT = REPO / "paper" / "manuscript"
-sys.path.insert(0, str(REPO / "hpc"))
-
-from build_paper import _find_tectonic  # noqa: E402  (single source for the tectonic lookup)
 
 #: Log lines that must fail the build.
 _FATAL = (

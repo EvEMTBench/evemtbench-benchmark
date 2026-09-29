@@ -103,7 +103,7 @@ def main() -> None:
     for gk in grids:
         try:
             print(extract(gk, a.family, root=a.root, aux_root=a.aux_root, force=a.force))
-        except Exception as e:  # noqa: BLE001 - report per-grid, keep going
+        except Exception as e:  # report per-grid, keep going
             print({"grid": gk, "family": a.family, "status": "error", "error": str(e)})
 
 

@@ -4,7 +4,6 @@ content (so the gate can normalize it away and still detect real drift)."""
 
 import json
 import re
-import sys
 from pathlib import Path
 
 from evemtbench.leaderboard import render_html, scan_results
@@ -14,7 +13,6 @@ _VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
 
 
 def _build_results():
-    sys.path.insert(0, str(REPO / "hpc"))  # hpc/ isn't a package; load make_results directly
     from make_results import build_results
 
     return build_results()
@@ -32,7 +30,6 @@ def test_build_results_deterministic(tmp_path, monkeypatch):
 def test_make_results_labels_every_function():
     """Every registry Function has a human label + tier, so no task renders as a raw enum and the
     tier grouping is total (a new task without a label/tier fails here, not silently in RESULTS)."""
-    sys.path.insert(0, str(REPO / "hpc"))
     import make_results as mr
     from evemtbench.tasks.registry import get_task, list_tasks
     from evemtbench.tasks.taxonomy import Function

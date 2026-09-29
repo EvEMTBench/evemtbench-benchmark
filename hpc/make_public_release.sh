@@ -31,6 +31,7 @@ PRUNE=(
   docs/results_audit/03-evemtbench-design.md
   CLAUDE.md
   .claude
+  AGENTS.md
   ONBOARDING.md
   .gitlab
   .gitlab-ci.yml
@@ -47,8 +48,10 @@ PRUNE=(
   hpc/flip_split_stratified.sh
   hpc/train_nhr.sh
   hpc/build_paper.py
+  hpc/backfill_host_provenance.py
   hpc/rescore_val.sbatch
   hpc/rescore_transfer_val.sbatch
+  hpc/pwctrl_rescore.sbatch
   # One-time 1.0.0 -> 1.1.0 hardlink migration of OUR private project cache; hardcodes the
   # operator's cache root and means nothing without it.
   hpc/seed_cache_1.1.0.sh

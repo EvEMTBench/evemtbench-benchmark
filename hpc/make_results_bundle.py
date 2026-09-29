@@ -32,15 +32,16 @@ import json
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "paper_artifacts"))
+
+from paper_lib import GEN_DIR
+
+from evemtbench.leaderboard import Row, scan_results
+from evemtbench.version import BENCHMARK_VERSION, results_version
+
 _REPO = Path(__file__).resolve().parents[1]
-for _p in (_REPO / "src", _REPO / "hpc", _REPO / "hpc" / "paper_artifacts"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
-
-from paper_lib import GEN_DIR  # noqa: E402
-
-from evemtbench.leaderboard import Row, scan_results  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION, results_version  # noqa: E402
 
 # Flat schema: one record per (task, protocol, grid, baseline, test_set, metric).
 COLUMNS = (

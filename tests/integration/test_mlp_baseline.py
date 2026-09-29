@@ -5,9 +5,9 @@ import pytest
 
 pytest.importorskip("torch")
 
-from evemtbench.baselines.mlp import MLPBaseline  # noqa: E402
-from evemtbench.evaluation.evaluate import evaluate  # noqa: E402
-from evemtbench.tasks.task import load_task  # noqa: E402
+from evemtbench.baselines.mlp import MLPBaseline
+from evemtbench.evaluation.evaluate import evaluate
+from evemtbench.tasks.task import load_task
 
 
 def _load(task_id, fixture_root, held_out_splits):

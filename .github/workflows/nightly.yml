@@ -11,18 +11,22 @@ on:
     - cron: "17 3 * * *" # 03:17 UTC daily (off the :00 thundering herd)
   workflow_dispatch: {}
 
+# Least privilege: the jobs only read the repository (upload-artifact uses its own runtime token).
+permissions:
+  contents: read
+
 jobs:
   full-gate:
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     strategy:
       fail-fast: false
       matrix:
         python-version: ["3.10", "3.12"]
     steps:
-      - uses: actions/checkout@34e114876b0b11c390a56381ad16ebd13914f8d5 # v4
+      - uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
 
       - name: Install uv (no cache — fresh-world on purpose)
-        uses: astral-sh/setup-uv@d4b2f3b6ecc6e67c4457f6d3e41ec42d3d0fcb86 # v5
+        uses: astral-sh/setup-uv@c18668ad3cf93ea998bef934396af7bb5c839dc7 # v10.2.0
 
       - name: Set up Python ${{ matrix.python-version }}
         run: uv python install ${{ matrix.python-version }}

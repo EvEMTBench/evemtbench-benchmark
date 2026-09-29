@@ -7,14 +7,14 @@ import pytest
 
 pytest.importorskip("torch")
 
-import torch  # noqa: E402
+import torch
 
-from evemtbench import results_version  # noqa: E402
+from evemtbench import results_version
+from evemtbench.baselines import runner
+from evemtbench.baselines.resnet import ResNetBaseline, _ResNet
+from evemtbench.tasks.task import load_task
 
 HO_VER = results_version("held_out")
-from evemtbench.baselines import runner  # noqa: E402
-from evemtbench.baselines.resnet import ResNetBaseline, _ResNet  # noqa: E402
-from evemtbench.tasks.task import load_task  # noqa: E402
 
 
 def _run(baseline, task, fixture_root, held_out_splits, out, epochs="1"):

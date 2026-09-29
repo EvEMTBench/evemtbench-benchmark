@@ -6,17 +6,13 @@ outputs/ tree."""
 
 import json
 import re
-import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+import make_audit
+from evemtbench.coverage import expected_test_sets, iter_cells
+from evemtbench.version import results_version
 
-import make_audit  # noqa: E402
-from evemtbench.coverage import expected_test_sets, iter_cells  # noqa: E402
-from evemtbench.version import results_version  # noqa: E402
+REPO = Path(__file__).resolve().parents[2]
 
 _VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
 

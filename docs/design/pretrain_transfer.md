@@ -50,7 +50,7 @@ selection therefore now read a leakage-free validation signal.
 |---|---|---|---|
 | `multi_grid_pretrain` | multi_grid split (in-corpus) | in-corpus `test` | scratch |
 | `transfer_zeroshot` | — (none) | target `test` + `benchmark` | pretrain ckpt |
-| `transfer_finetune` | target `adapt_grid` | target `benchmark` | pretrain ckpt |
+| `transfer_finetune` | target `adapt_grid` | target `test` + `benchmark` | pretrain ckpt |
 
 Split assembly: `task.py::_protocol_triples`. `multi_grid_pretrain` reads a committed split
 (`splits/generator.py`, `train_family="multi_grid", benchmark_family=None`); the transfer protocols
@@ -70,7 +70,8 @@ The pre-training run saves a self-contained **bundle** (weights + dims + preproc
 `(task, baseline, seed)` at `<pretrain cell>/checkpoints/seed{seed}.pt`
 (`runner._save_transfer_bundle`). Because the portable view fixes `in_ch` and the class vocab is
 frozen, the architecture is identical across grids, so the `state_dict` loads without surgery. The
-runner resolves it (`--pretrained-from` / `--pretrain-grid`, default `template_20kv`) and either
+runner resolves it (`--pretrained-from` / `--pretrain-grid`, default `template_20kv`; each transfer
+cell's reproduce line pins its source via `--pretrain-grid <source>`) and either
 `restore_pretrained` (zero-shot, no training) or attaches it as `_pretrained_state` for `fit()` to
 continue from (fine-tune). Only the deep baselines (`mlp/gru/cnn/resnet`) participate; the
 `run_record.json` attestation records `fit_on` / `pretrained_from` per protocol.
@@ -78,17 +79,20 @@ continue from (fine-tune). Only the deep baselines (`mlp/gru/cnn/resnet`) partic
 ## Coverage & reporting
 
 `coverage.py` restricts these protocols to deep baselines (`DEEP_BASELINES`) and the right grids
-(`protocol_grid_applies`: pretrain → `template_20kv`; transfer → the 4 reference grids);
-`expected_test_sets` is in-corpus (`test` only) for `multi_grid_pretrain`. The leaderboard groups
-transfer targets by voltage match vs the 20 kV source.
+(`protocol_grid_applies`: pretrain → the 3 `PRETRAIN_GRIDS` `template_20kv` / `template_110kv` /
+`template_345kv`; transfer → the 4 reference grids), and `iter_cells` fans every transfer
+`(target, task, baseline)` out over all 3 pre-training sources (`Cell.source`; non-default sources
+get a `pretrain-<source>/` subdir). `expected_test_sets` is in-corpus (`test` only) for
+`multi_grid_pretrain` and `test` + `benchmark` for the transfer protocols. The leaderboard's transfer
+table has one row per (protocol, pre-training source) across the reference grids in voltage order.
 
 ## Caveats
 
 - The multi_grid pre-training corpus spans **20/110/345 kV** template grids (`template_20kv`,
-  `template_110kv`, `template_345kv`); the transfer results currently source from the **20 kV**
-  template (`--pretrain-grid template_20kv`), so same-voltage (`cigre_mv`) is the clean
-  positive-transfer test and 110/345 kV remain the hard cross-voltage OOD. Using the higher-voltage
-  templates as transfer sources (matched-voltage EHV -> IEEE-39) is the next step.
+  `template_110kv`, `template_345kv`), and each is both pre-trained on and used as a transfer
+  source, so every reference target is scored from same-voltage and cross-voltage sources alike
+  (e.g. 20 kV → `cigre_mv` vs 345 kV → `ieee39`). The 20 kV source remains the runner default and
+  keeps the legacy source-less output path.
 - `fault_location` reference terminal: `y_fault_location` is % on both sides (verified ~1..99); the
   bus-canonicalization aligns the 0%-end. If FL transfer looks degenerate, re-check that convention.
 
@@ -100,5 +104,5 @@ transfer targets by voltage match vs the 20 kV source.
       round-trip and the zero-shot no-target-training invariant.
 - [x] Transfer cells appear in `coverage_snapshot.json` / the audit matrix with reproduce
       arg-lines.
-- [ ] Remaining: all 384 transfer cells green and the transfer section of the paper written
-      against them.
+- [x] Transfer matrix complete (all transfer cells, over all 3 sources, done — see
+      `coverage_snapshot.json` / `python -m evemtbench.coverage --summary` for the counts).

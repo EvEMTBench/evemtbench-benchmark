@@ -15,10 +15,10 @@ import pytest
 
 pytest.importorskip("torch")
 
-from evemtbench.baselines.mlp import MLPBaseline  # noqa: E402
-from evemtbench.splits.generator import generate_held_out, write_held_out_artifact  # noqa: E402
-from evemtbench.tasks.task import load_task  # noqa: E402
-from evemtbench.version import SPLITS_VERSION  # noqa: E402
+from evemtbench.baselines.mlp import MLPBaseline
+from evemtbench.splits.generator import generate_held_out, write_held_out_artifact
+from evemtbench.tasks.task import load_task
+from evemtbench.version import SPLITS_VERSION
 
 
 @pytest.fixture(scope="module")

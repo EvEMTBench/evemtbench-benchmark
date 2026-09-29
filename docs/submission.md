@@ -44,7 +44,7 @@ Path: `outputs/<benchmark_version>/<task>/<protocol>/<grid>/<baseline>/<test_set
 
 ```json
 {
-  "benchmark_version": "0.2.0-dev",
+  "benchmark_version": "1.0.0",
   "task": "fault_detection_line", "protocol": "held_out", "grid": "cigre_mv",
   "baseline": "mlp", "test_set": "test",
   "n_test": 12345,
@@ -104,5 +104,8 @@ seeds) and `n_seeds` counts the seeds that reported the group. Strata are `grid`
 ## 5. Coverage / leaderboard
 
 `python -m evemtbench.coverage --summary` shows the expected matrix vs. produced `result.json`
-(done / pending / failed). `evemtbench-leaderboard --outputs ./outputs --out leaderboard.html`
+(done / pending / failed). It defaults to `--protocols held_out` (pass `--protocols held_out
+multi_grid_pretrain transfer_zeroshot transfer_finetune` to widen it) and reads a local `outputs/`
+tree, which is not part of the repository — in a fresh clone every cell reads as pending. The
+recorded state is the committed `coverage_snapshot.json`. `evemtbench-leaderboard --outputs ./outputs --out leaderboard.html`
 renders the sortable, filterable board (topology / test-set / model / version).

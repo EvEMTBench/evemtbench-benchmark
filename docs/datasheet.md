@@ -5,11 +5,13 @@ is a separate artifact (see [LICENSES/DATA-LICENSE.md](../LICENSES/DATA-LICENSE.
 documents how the benchmark uses it and its known limitations.
 
 > **Scope.** The benchmark evaluates **all four reference grids** (CigreMV 20 kV MV, DoubleLine
-> 110 kV HV, TestGrid110kV 110 kV HV, IEEE-39 345 kV EHV) on the **fault** tasks FD / FC / FL ×
-> {local, line, global} observability under the `held_out` protocol (see
-> [protocol.md](protocol.md), [grids.md](grids.md), [taxonomy.md](taxonomy.md)). The full event
-> space (switching / `no_event`) is present in the dataset and labeled; event-scope tasks beyond
-> the fault triad are planned, not yet scored.
+> 110 kV HV, TestGrid110kV 110 kV HV, IEEE-39 345 kV EHV) on **24 task ids** — the fault triad
+> FD / FC / FL and the fault attributes (grounded / phase / category) × {local, line, global}
+> observability, plus six `global`-only event-scope tasks (event detection / classification /
+> state, switch detection / type, fault origin) — under the `held_out` protocol. The three
+> `multi_grid` pre-training templates (20 / 110 / 345 kV) feed the `multi_grid_pretrain`,
+> `transfer_zeroshot` and `transfer_finetune` protocols at the portable `local` / `line` views (see
+> [protocol.md](protocol.md), [grids.md](grids.md), [taxonomy.md](taxonomy.md)).
 
 ## Motivation
 ML for power-system protection lacks shared datasets and reproducible evaluation. EvEMTBench
@@ -18,7 +20,7 @@ detailed EMT simulations across multiple grids and voltage levels, so methods ca
 under fixed tasks, splits, and metrics.
 
 ## Composition
-- **Signals:** three-phase V and I at each measurement cubicle, 9600 Hz; v0.2 windows are 0.05 s
+- **Signals:** three-phase V and I at each measurement cubicle, 9600 Hz; windows (window contract 1.0.0) are 0.05 s
   (480 samples) at 0.005 s stride. Per-cubicle channel order `[Iₐ,I_b,I_c,Vₐ,V_b,V_c]`.
   **Sign convention:** all current measurements are oriented **towards the branch element**
   (producer convention — a model that flips this sign is not evaluating the same quantity).

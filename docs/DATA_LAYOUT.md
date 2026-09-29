@@ -4,6 +4,13 @@ Everything the benchmark reads, where it lives, and how it joins. The data root 
 **producer-owned and actively written** — the benchmark treats it read-only; all derived
 assets go to the *auxiliary overlay* (separate root) or `outputs/`.
 
+**Where the windows come from.** The published download (FAUDataCloud) contains the producer's
+raw simulation exports (`raw/`); the `windows/` partitions below are produced from them by the
+producer pipeline, which is not public yet (release planned). A third-party windowing must
+satisfy the pinned contract in `src/evemtbench/contract/`: `load_windows` verifies each manifest
+against it, and `python -m evemtbench.data.input_digests --verify` checks the partitions against
+the committed reference digests.
+
 ## Roots (resolved from the environment, never hardcoded)
 
 | root | resolution | contents |
@@ -13,10 +20,11 @@ assets go to the *auxiliary overlay* (separate root) or `outputs/`.
 
 ## Families × grids
 
-Families (`evemtbench.data.roots.FAMILIES`): **`adapt_grid`** (in-distribution: train/val/test),
-**`benchmark`** (cross-distribution held-out; scored, never trained on), **`train`** (large-scale
-multi-grid pretraining — raw planned, not yet windowed). `fine_tune` is accepted as a read alias
-for `adapt_grid` (pre-v0.2 name).
+Families (`evemtbench.data.roots.FAMILIES`): **`benchmark`** (cross-distribution held-out;
+scored, never trained on), **`adapt_grid`** (in-distribution: train/val/test), **`multi_grid`**
+(multi-topology pre-training corpus — `template_20kv` / `template_110kv` / `template_345kv` — for
+the `multi_grid_pretrain` and transfer protocols). `fine_tune` is accepted as a read alias for
+`adapt_grid` and `train` for `multi_grid` (the pre-v0.2 names).
 
 Grids (`GRIDS`): `double_line` (110 kV HV) · `cigre_mv` (20 kV MV) · `testgrid_110kv` (110 kV HV)
 · `ieee39` (345 kV EHV, 60 Hz). Each maps to a `raw_foldername` (directory name, e.g.
@@ -37,9 +45,10 @@ Grids (`GRIDS`): `double_line` (110 kV HV) · `cigre_mv` (20 kV MV) · `testgrid
 ```
 
 The benchmark profile pins **W = 50 ms, step = 5 ms** (`W0p050_S0p005`, l = 480 @ 9.6 kHz).
-Some windows dirs also carry other configs (e.g. `W0p020`); `find_window_files` currently
-requires **exactly one** `X_*.raw` per dir — the single-config-read fix is an M7 prerequisite
-(see `docs/task_suite_roadmap.md`).
+Some windows dirs also carry other configs (e.g. `W0p020`) side by side; `find_window_files`
+(`data/windows.py`) narrows the `X_<topology>_*.raw` candidates to the pinned contract's
+`W…_S…` tag when given a `contract` (as the loaders do), and raises unless exactly one file remains
+and its `.manifest.json` / `.meta.json` / `y_*.parquet` companions exist.
 
 ## Auxiliary overlay (additive; never writes the data root)
 
@@ -77,7 +86,7 @@ golden-tested) — never from waveforms.
 
 | artifact | where | status |
 |---|---|---|
-| splits | `src/evemtbench/splits/v0.2/held_out/<grid>/` | **committed, frozen** (regenerate bit-for-bit; changing = major bump) |
+| splits | `src/evemtbench/splits/v1.0/held_out/<grid>/` (held_out; transfer reuses it) · `src/evemtbench/splits/v1.1/multi_grid_pretrain/<grid>/` (pre-training; `version.splits_version`) | **committed, frozen** (regenerate bit-for-bit; changing = major bump) |
 | results (raw) | `outputs/<version>/<task>/<protocol>/<grid>/<baseline>/<test_set>/` | derived, git-ignored; coverage manifest is the source of truth |
 | results (public bundle) | `results/<version>/` — `aggregated_results.{csv,json}` + `tables/*.tex` | committed, **builder-generated** (`hpc/make_results_bundle.py`, freshness-gated); the self-contained public tier between raw `outputs/` and the private `paper/manuscript/` (never hand-edit) |
 | rendered tables | `RESULTS.md`, `leaderboard.html` | committed but **builder-generated** (freshness-gated; never hand-edit) |

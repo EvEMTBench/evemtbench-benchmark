@@ -26,15 +26,13 @@ import sys
 from dataclasses import dataclass, field
 from pathlib import Path
 
-_REPO = Path(__file__).resolve().parents[1]
-for _p in (_REPO / "src", _REPO / "hpc"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import audit_manifest as MAN  # noqa: E402  (sibling hpc module)
-import verify_results_env as VRE  # noqa: E402  (sibling hpc module; lock parser + package list)
-from evemtbench.contract import CONTRACT_SHA256, EXPECTED_CONTRACT_VERSION  # noqa: E402
-from evemtbench.coverage import (  # noqa: E402
+import audit_manifest as MAN  # sibling hpc module
+import verify_results_env as VRE  # sibling hpc module; lock parser + package list
+from evemtbench.contract import CONTRACT_SHA256, EXPECTED_CONTRACT_VERSION
+from evemtbench.coverage import (
     ALL_BASELINES,
     DEEP_BASELINES,
     LEARNED_BASELINES,
@@ -50,10 +48,10 @@ from evemtbench.coverage import (  # noqa: E402
     protocol_grid_applies,
     scan,
 )
-from evemtbench.data.roots import GRIDS  # noqa: E402
-from evemtbench.evaluation.metrics import METRIC_DIRECTION  # noqa: E402
-from evemtbench.evaluation.significance import bootstrap_ci, ci95_halfwidth  # noqa: E402
-from evemtbench.leaderboard import (  # noqa: E402
+from evemtbench.data.roots import GRIDS
+from evemtbench.evaluation.metrics import METRIC_DIRECTION
+from evemtbench.evaluation.significance import bootstrap_ci, ci95_halfwidth
+from evemtbench.leaderboard import (
     BASE_CSS,
     DOCS_BASE,
     FAVICON,
@@ -65,15 +63,17 @@ from evemtbench.leaderboard import (  # noqa: E402
     _grid_spec_label,
     scan_results,
 )
-from evemtbench.splits.loader import read_held_out_splits  # noqa: E402
-from evemtbench.tasks.registry import get_task, list_tasks  # noqa: E402
-from evemtbench.version import (  # noqa: E402
+from evemtbench.splits.loader import read_held_out_splits
+from evemtbench.tasks.registry import get_task, list_tasks
+from evemtbench.version import (
     BENCHMARK_VERSION,
     CURRENT_RESULTS_VERSIONS,
     MULTI_GRID_SPLITS_VERSION,
     SPLITS_VERSION,
     results_version,
 )
+
+_REPO = Path(__file__).resolve().parents[1]
 
 PROTOCOLS = ("held_out", "multi_grid_pretrain", "transfer_zeroshot", "transfer_finetune")
 
@@ -688,7 +688,7 @@ def _esc(s: object) -> str:
 
 def _src(path: str, label: str | None = None, line: int | None = None) -> str:
     """A source link into the repo blob UI (works on the GitLab mirror of main)."""
-    if not path:
+    if not path or path == "—":  # "—" = nothing to link (e.g. a deferred claim's artifact)
         return _esc(label or "—")
     anchor = f"#L{line}" if line else ""
     return (
@@ -1447,9 +1447,22 @@ def build_grid_page(grid: str, rows: list[Row], cov: CoverageView, prov: dict | 
 def _detex_num(s: str) -> str:
     """Render a ``paper_lib._fmt_mean_ci`` cell (LaTeX) as readable HTML, preserving every digit so
     the value traces verbatim (``0.907 $\\pm$ 0.011`` -> ``0.907 ± 0.011``; a clipped interval
-    ``0.848$\\,{\\scriptscriptstyle[0.626,\\,1.000]}$`` -> ``0.848 [0.626, 1.000]``)."""
+    ``0.848$\\,{\\scriptscriptstyle[0.626,\\,1.000]}$`` -> ``0.848 [0.626, 1.000]``; a
+    below-display-precision bound ``0.970 $\\pm{<}0.001$`` -> ``0.970 ±<0.001``).
+
+    Every LaTeX form ``_fmt_mean_ci`` can emit must be handled EXPLICITLY before the catch-all
+    ``$``-strip, or the markup leaks into the HTML: the generic strip removes the delimiters but
+    leaves the command behind. That is what happened when the bound form was added -- the pages
+    rendered a literal ``\\pm{<}0.001``. If a new rendering is introduced in ``_fmt_mean_ci``, add
+    it here in the same commit."""
     s = s.replace("$\\,{\\scriptscriptstyle[", " [").replace(",\\,", ", ").replace("]}$", "]")
-    return s.replace("$\\pm$", "±").replace("$", "").replace("\\,", "").strip()
+    # compact subscript forms (dense per-baseline tables): plain and bound
+    s = s.replace("$\\,{\\scriptscriptstyle\\pm{<}", " ±<").replace(
+        "$\\,{\\scriptscriptstyle\\pm", " ±"
+    )
+    s = s.replace("}$", "")
+    s = s.replace("$\\pm{<}", "±<").replace("$\\pm$", "±")
+    return s.replace("$", "").replace("\\,", "").strip()
 
 
 def _derived_metrics_block(baseline: str, brows: list[Row]) -> str:
@@ -1457,7 +1470,7 @@ def _derived_metrics_block(baseline: str, brows: list[Row]) -> str:
     F1 (FC) for THIS baseline — the secondary metrics the Supplementary (Package C) tables select.
     Rendered from the same held_out result.json cells with paper_lib's 3-dp formatting, so every SI
     number resolves on the dashboard (enforced by tests/integration/test_paper_numbers_covered.py)."""
-    from paper_lib import _BINARY_RATE_KEYS, _FC_F1, _fmt_mean_ci  # noqa: PLC0415
+    from paper_lib import _BINARY_RATE_KEYS, _FC_F1, _fmt_mean_ci
 
     def _val(r: Row, metric: str) -> str | None:
         m = r.mean(metric)

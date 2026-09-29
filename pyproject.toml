@@ -31,6 +31,15 @@ dependencies = [
     "tqdm>=4.65",
 ]
 
+[project.urls]
+Homepage = "https://github.com/EvEMTBench/evemtbench-benchmark"
+Repository = "https://github.com/EvEMTBench/evemtbench-benchmark"
+Documentation = "https://github.com/EvEMTBench/evemtbench-benchmark/tree/main/docs"
+Leaderboard = "https://evemtbench.github.io/evemtbench-benchmark/leaderboard.html"
+Paper = "https://arxiv.org/abs/2609.28149"
+Dataset = "https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/"
+"Dataset paper" = "https://arxiv.org/abs/2608.19777"
+
 [project.optional-dependencies]
 # Deep-learning baselines + Hydra-driven runner (Steps 3-4). Kept optional so the
 # evaluation layer (the product) installs without a heavy torch dependency.
@@ -80,6 +89,9 @@ evemtbench = [
 ]
 
 [tool.pytest.ini_options]
+# hpc/ and hpc/paper_artifacts/ are script directories, not packages; tests import their modules
+# directly (src/ is listed so a checkout works without an editable install).
+pythonpath = ["src", "hpc", "hpc/paper_artifacts"]
 addopts = "-ra -m 'not data_integrity'"
 testpaths = ["tests"]
 markers = [
@@ -93,7 +105,7 @@ line-length = 100
 src = ["src", "tests", "hpc"]
 
 [tool.ruff.lint]
-select = ["E", "F", "I", "W", "UP", "B"]
+select = ["E", "F", "I", "W", "UP", "B", "RUF100"]
 
 [tool.ruff.lint.per-file-ignores]
 # leaderboard.py / make_audit.py embed CSS/JS/HTML string literals where line length is

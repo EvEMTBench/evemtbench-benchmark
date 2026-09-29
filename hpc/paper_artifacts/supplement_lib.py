@@ -26,16 +26,18 @@ import sys
 from collections import Counter
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+import paper_lib as pl
+
+from evemtbench.coverage import DEEP_BASELINES
+from evemtbench.version import BENCHMARK_VERSION, splits_version
+from make_results import load_rows
+
 _HERE = Path(__file__).resolve()
 _REPO = _HERE.parents[2]
-for _p in (_HERE.parent, _REPO / "hpc", _REPO / "src"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
-
-import paper_lib as pl  # noqa: E402
-
-from evemtbench.version import BENCHMARK_VERSION, splits_version  # noqa: E402
-from make_results import load_rows  # noqa: E402
 
 #: Builders that need the mounted EvEMTBench dataset (not just ``outputs/``).
 DATASET_BACKED = (
@@ -230,13 +232,24 @@ def transfer_scratch_rows() -> list[dict]:
     never-trained ``eval_grid`` family — the same protocol and the same evaluation set as the
     transfer tables, differing only in the initialisation (random instead of pre-trained). It
     therefore does not depend on the transfer source, which is exactly why it is tabulated once
-    here instead of repeated in every source row of S3."""
+    here instead of repeated in every source row of S3.
+
+    Selected out of ``DEEP_BASELINES``, NOT the full ``LEARNED_BASELINES``, because this reference is
+    read against the transfer tables and those apply only to the deep baselines
+    (``coverage.baseline_applies``: a classical baseline has no transferable weights, so no
+    ``random_forest`` transfer cell exists). Selecting out of all five drew the two sides of the
+    comparison from different candidate sets and could name a model the transfer arm cannot field --
+    it published ``rf`` at 0.499 balanced accuracy for FD/local/Double Line, where the random forest
+    wins the in-distribution validation split (0.889) and then collapses on the never-trained
+    ``eval_grid`` family while every deep baseline reaches 0.981--0.989."""
     per_grid = {g: load_rows(g) for g, _ in pl.GRID_ROWS}
     out = []
     for key, _lab, stem, metric, _arrow in TRANSFER_FUNCTIONS:
         for grid, glabel in pl.GRID_ROWS:
             for view in TRANSFER_VIEWS:
-                choice = pl.best_cell_choice(per_grid[grid], f"{stem}_{view}", "benchmark", metric)
+                choice = pl.best_cell_choice(
+                    per_grid[grid], f"{stem}_{view}", "benchmark", metric, DEEP_BASELINES
+                )
                 out.append(
                     {
                         "function": key,
@@ -297,9 +310,15 @@ def transfer_scratch_table() -> str:
         "\\emph{target} grid's validation split, and evaluated on that grid's never-trained "
         "\\texttt{eval\\_grid} family --- the same evaluation set the transfer tables report. The "
         "reference is independent of the pre-training source, so it is tabulated once here rather "
-        "than repeated in every source row. \\textbf{ref.} names the selected architecture; the "
+        "than repeated in every source row. The architecture is selected out of the four deep "
+        "baselines only, matching the candidate set the transfer protocols can field (a classical "
+        "baseline carries no transferable weights), so both sides of the comparison are drawn from "
+        "the same pool; the unrestricted per-baseline \\texttt{held\\_out} results are in "
+        "Tables~\\ref{tab:res_fd}--\\ref{tab:res_fl}. \\textbf{ref.} names the selected architecture; the "
         "\\texttt{eval\\_grid} family is prediction-only and takes no part in any selection. Cells "
-        "are mean\\,$\\pm$\\,95\\% CI over five seeds; \\pending{}~= pending.}\n"
+        "are mean\\,$\\pm$\\,95\\% CI over five seeds."
+        + pl._pending_legend("\n".join(body), " \\pending{}~= pending.")
+        + "}\n"
         "\\label{tab:supp_transfer_scratch}\n"
         + pl._SHRINK_TO_FIT
         + "\\begin{tabular}{ll ll ll}\n\\toprule\n"

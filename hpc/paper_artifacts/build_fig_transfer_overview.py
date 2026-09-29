@@ -42,12 +42,12 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 os.environ.setdefault("MPLBACKEND", "Agg")  # headless rendering (no display / no X server)
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
-import paperfig_style as style  # noqa: E402
-from matplotlib.lines import Line2D  # noqa: E402
-from matplotlib.ticker import MaxNLocator  # noqa: E402
-from paper_lib import (  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
+import paperfig_style as style
+from matplotlib.lines import Line2D
+from matplotlib.ticker import MaxNLocator
+from paper_lib import (
     GRID_ROWS,
     PAPER_FUNCTIONS,
     PRETRAIN_GRIDS,

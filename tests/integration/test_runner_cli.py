@@ -11,7 +11,7 @@ from evemtbench.evaluation import cli
 HO_VER = results_version("held_out")
 
 
-def _run(baseline, task, fixture_root, held_out_splits, out, seeds=("0",)):
+def _run(baseline, task, fixture_root, held_out_splits, out, seeds=("0",), extra=()):
     runner.main(
         [
             "--task",
@@ -30,6 +30,7 @@ def _run(baseline, task, fixture_root, held_out_splits, out, seeds=("0",)):
             str(held_out_splits),
             "--out",
             str(out),
+            *extra,
         ]
     )
 
@@ -187,3 +188,46 @@ def test_broken_harness_aborts_the_cell(fixture_root, held_out_splits, tmp_path,
         _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
     base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
     assert not (base / "test" / "result.json").exists()
+
+
+def test_normalize_override_is_resolved_and_recorded(fixture_root, held_out_splits, tmp_path):
+    """``held_out --normalize per_window`` must resolve AND record ``per_window``.
+
+    This is the one semantic requirement of the per-window normalization control: ``held_out``
+    resolves to ``none`` by default (``splits.protocols.default_input_normalize``), so the control
+    runs it with the transfer protocols' normalization to separate the cost of that normalization
+    from the effect of the pre-trained initialisation. Two fields matter and are asserted
+    separately: ``args.normalize`` is what the caller asked for, while the top-level ``normalize``
+    is the RESOLVED value — ``hpc/rescore_validation.py`` reads the latter to rebuild the model, and
+    reload does not re-resolve ``auto``, so a cell that recorded only ``auto`` would be rescored
+    with the wrong transform and fail its positive control.
+    """
+    pytest.importorskip("torch")  # the mlp baseline needs torch; CI is torch-free
+    out = tmp_path / "out"
+    _run(
+        "mlp",
+        "fault_detection_local",
+        fixture_root,
+        held_out_splits,
+        out,
+        extra=("--normalize", "per_window"),
+    )
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "mlp"
+    rec = json.loads((base / "run_record.json").read_text())
+    assert rec["normalize"] == "per_window", "resolved value must be recorded for the rescore path"
+    assert rec["args"]["normalize"] == "per_window"
+    assert rec["args"]["protocol"] == "held_out"
+    # The cell path does NOT encode normalize -- which is exactly why such a run needs an isolated
+    # --out (see hpc/sweep.sh's NORMALIZE knob). Pin that so the hazard cannot silently change.
+    assert base.is_dir(), "variant lands on the plain baseline path, not a tagged one"
+
+
+def test_normalize_defaults_to_the_protocol_resolution(fixture_root, held_out_splits, tmp_path):
+    """Without the flag ``held_out`` still resolves to ``none``: the campaign path is untouched."""
+    pytest.importorskip("torch")
+    out = tmp_path / "out"
+    _run("mlp", "fault_detection_local", fixture_root, held_out_splits, out)
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "mlp"
+    rec = json.loads((base / "run_record.json").read_text())
+    assert rec["normalize"] == "none"
+    assert rec["args"]["normalize"] == "auto"

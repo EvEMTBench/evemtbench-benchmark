@@ -7,23 +7,35 @@ authors:
     given-names: Julian
   - family-names: Kordowich
     given-names: Georg
-  - family-names: Loebel
-    given-names: Jonathan
-  - family-names: Bergler
-    given-names: Christian
-  - family-names: Bayer
-    given-names: Siming
-  - family-names: Maier
-    given-names: Andreas
-  - family-names: Jaeger
-    given-names: Johann
 repository-code: "https://github.com/EvEMTBench/evemtbench-benchmark"
 license: MIT
 version: 1.1.0
 date-released: 2026-08-06
-# A per-release Zenodo DOI will be added here on the first tagged release so the benchmark
-# software is citable independently of the dataset and the paper.
-# doi: 10.5281/zenodo.XXXXXXX
+preferred-citation:
+  type: article
+  title: "EvEMTBench: An Open Benchmark for Machine Learning in Power System Protection"
+  authors:
+    - family-names: Oelhaf
+      given-names: Julian
+    - family-names: Kordowich
+      given-names: Georg
+    - family-names: Bergler
+      given-names: Christian
+    - family-names: Maier
+      given-names: Andreas
+    - family-names: Jäger
+      given-names: Johann
+    - family-names: Bayer
+      given-names: Siming
+  year: 2026
+  month: 9
+  journal: "arXiv preprint"
+  doi: "10.48550/arXiv.2609.28149"
+  url: "https://arxiv.org/abs/2609.28149"
+  identifiers:
+    - type: other
+      value: "arXiv:2609.28149"
+      description: "arXiv identifier"
 references:
   - type: data
     title: "A simulation based dataset of faults and events for machine learning in power systems"
@@ -47,4 +59,28 @@ references:
       The EvEMTBench dataset this benchmark evaluates on: point-on-wave EMT waveforms,
       window-level labels, per-episode settings and topology graphs. Hosted on FAUDataCloud,
       CC-BY-4.0; DOI 10.48742/fau.1fkx-ef11 reserved. The dataset paper is under review at
-      Scientific Data; the data-generation code (PowerFactory) is archived separately.
+      Scientific Data (preprint: arXiv:2608.19777); the data-generation code (PowerFactory) is
+      archived separately.
+  - type: article
+    title: "A simulation based dataset of faults and events for machine learning in power systems"
+    authors:
+      - family-names: Kordowich
+        given-names: Georg
+      - family-names: Loebel
+        given-names: Jonathan
+      - family-names: Oelhaf
+        given-names: Julian
+      - family-names: Maier
+        given-names: Andreas
+      - family-names: Bayer
+        given-names: Siming
+      - family-names: Bergler
+        given-names: Christian
+      - family-names: Jaeger
+        given-names: Johann
+    year: 2026
+    month: 8
+    journal: "arXiv preprint"
+    doi: "10.48550/arXiv.2608.19777"
+    url: "https://arxiv.org/abs/2608.19777"
+    notes: "The dataset paper (preprint)."

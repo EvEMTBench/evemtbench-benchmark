@@ -39,5 +39,6 @@ The benchmark in one line: **24 protection tasks in 3 difficulty tiers × 4 refe
 
 ## Internal (operations, agent memory, history)
 
-[internal/](internal/) holds the operating playbook, lessons log, agent session memory and
-archived result sets — needed to *run* the benchmark's compute, not to *use* the benchmark.
+The development repository additionally keeps `docs/internal/` — the operating playbook, lessons
+log, agent session memory and archived result sets. It is needed to *run* the benchmark's compute,
+not to *use* the benchmark, and is not part of the public release.

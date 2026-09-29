@@ -6,7 +6,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from paper_lib import fc_per_class_f1_table, run  # noqa: E402
+from paper_lib import fc_per_class_f1_table, run
 
 if __name__ == "__main__":
     run("supp_tab_fc_perclass.tex", fc_per_class_f1_table())

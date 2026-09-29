@@ -2,7 +2,7 @@
 
 Records written before ``results_env_sha256`` existed (the whole v1.0.0 corpus) cannot carry that
 hash honestly: stamping it in after the fact would make a July artifact look like the runner had
-recorded it. So, following ``hpc/backfill_host_provenance.py``, this script NEVER mutates
+recorded it. So, like the host-provenance backfill, this script NEVER mutates
 run_record.json. Instead it does the check the hash only *gestures* at — it compares each record's
 independently captured ``versions`` / ``python`` / ``torch`` against
 ``env/results-v<version>.lock`` and reports agreement per cell.
@@ -26,11 +26,11 @@ import re
 import sys
 from pathlib import Path
 
-_REPO = Path(__file__).resolve().parents[1]
-if str(_REPO / "src") not in sys.path:
-    sys.path.insert(0, str(_REPO / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
 
-from evemtbench.version import BENCHMARK_VERSION  # noqa: E402
+from evemtbench.version import BENCHMARK_VERSION
+
+_REPO = Path(__file__).resolve().parents[1]
 
 # Only the packages whose version can move a metric value are compared. The rest of the lock
 # (build tooling, plotting, CUDA shims) does not enter a score, and demanding equality there would

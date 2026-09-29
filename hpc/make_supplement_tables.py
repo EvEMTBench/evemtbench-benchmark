@@ -27,7 +27,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent / "paper_artifacts"))
-from paper_lib import (  # noqa: E402,F401  (re-exported for downstream importers)
+from paper_lib import (  # noqa: F401  (re-exported for downstream importers)
     GEN_DIR,
     build_supplement_tables,
 )

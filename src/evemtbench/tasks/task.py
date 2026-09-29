@@ -162,7 +162,7 @@ def _load_stats(path: Path) -> tuple[np.ndarray, np.ndarray] | None:
         if mean.ndim != 3 or mean.shape[:2] != (1, 1):
             return None
         return mean, std
-    except Exception:  # noqa: BLE001 — deliberately broad: any unreadable file means "recompute"
+    except Exception:  # deliberately broad: any unreadable file means "recompute"
         return None
 
 

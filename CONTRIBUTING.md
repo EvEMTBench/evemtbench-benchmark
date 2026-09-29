@@ -21,8 +21,7 @@ Thanks for helping build a fair, reproducible protection benchmark. Orientation:
   the CI-reported figure minus one point after a stable week; it is never lowered without a dated,
   reasoned note in the PR that lowers it. New `src/` modules join the strict-mypy list in
   `pyproject.toml`.
-- **Maintainers**: `.github/CODEOWNERS` currently names a single owner —
-  <!-- TODO(juoelhaf): nominate a second maintainer (e.g. a co-author) to lift the bus factor. -->
+- **Maintainers**: `.github/CODEOWNERS` currently names a single owner.
 
 ## What is frozen (and why)
 
@@ -44,9 +43,12 @@ A user must be able to evaluate their own model using only `data/`, `tasks/`, `s
 ## Adding a baseline
 
 1. Implement `evemtbench.baselines.interface.Baseline` (`fit` / `predict` → predictions file).
-2. Add a config under `src/evemtbench/configs/baseline/`.
-3. A **results PR** must include: the config, the seed list, and a predictions file that
-   `evemtbench-evaluate` reproduces to the reported numbers, tagged with the `BENCHMARK_VERSION`.
+2. Register it by name: third parties call `register_baseline(name, factory)` before
+   `runner.main()` (see `examples/byo_model.py`); an in-tree baseline adds its factory to
+   `BASELINE_FACTORIES` in `src/evemtbench/baselines/runner.py` (the `--baseline` choices are
+   derived from that registry) and its name to `coverage.py::ALL_BASELINES` (the coverage matrix).
+3. A **results PR** must include: the baseline's hyperparameters, the seed list, and a predictions
+   file that `evemtbench-evaluate` reproduces to the reported numbers, tagged with the `BENCHMARK_VERSION`.
 
 ## Dev setup
 

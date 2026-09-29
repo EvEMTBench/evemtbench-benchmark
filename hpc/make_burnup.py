@@ -21,12 +21,12 @@ import subprocess
 import sys
 from pathlib import Path
 
-_REPO = Path(__file__).resolve().parents[1]
-for _p in (_REPO / "src", _REPO / "hpc"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-from make_audit import _esc, _git_short_sha, _page  # noqa: E402
+from make_audit import _esc, _git_short_sha, _page
+
+_REPO = Path(__file__).resolve().parents[1]
 
 SNAPSHOT = "coverage_snapshot.json"
 

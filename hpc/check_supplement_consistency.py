@@ -32,16 +32,17 @@ import re
 import sys
 from pathlib import Path
 
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
+sys.path.insert(0, str(Path(__file__).resolve().parent / "paper_artifacts"))
+
+import paper_lib as pl
+import supplement_lib as sl
+
+from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRIDS
+from make_results import BASELINES, load_rows, mean_val
+
 _REPO = Path(__file__).resolve().parents[1]
-for _p in (_REPO / "src", _REPO / "hpc", _REPO / "hpc" / "paper_artifacts"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
-
-import paper_lib as pl  # noqa: E402
-import supplement_lib as sl  # noqa: E402
-
-from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRIDS  # noqa: E402
-from make_results import BASELINES, load_rows, mean_val  # noqa: E402
 
 PRIMARY = {
     "fault_detection": ("balanced_accuracy", pl.OBS),

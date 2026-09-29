@@ -22,7 +22,7 @@
 # background prefetch (2026-07-17 audit: the old up-front full copy idled the GPU up to 2.4 h/link).
 #
 # Env knobs: CLUSTER (alex|tinygpu, selects hpc/clusters/<CLUSTER>.env), GRID (required), TASKS,
-#            BASELINES, PROTOCOL, SEEDS, EPOCHS, DEVICE, ZERO_SEQ, OUT.
+#            BASELINES, PROTOCOL, SEEDS, EPOCHS, DEVICE, ZERO_SEQ, NORMALIZE, OUT.
 # ============================================================================
 set -eo pipefail
 mkdir -p ./hpc/hpc_logs
@@ -73,6 +73,15 @@ if [ "$WANDB_MODE" = "online" ]; then
   export https_proxy="${https_proxy:-http://proxy.nhr.fau.de:80}"
 fi
 ZERO_SEQ="${ZERO_SEQ:-0}"; ZS_FLAG=$([ "$ZERO_SEQ" = 1 ] && echo "--zero-seq" || echo "")
+# Input-normalization override. 'auto' (the default) leaves the per-protocol resolution alone
+# (splits/protocols.py::default_input_normalize: none for held_out, per_window for pretrain/transfer),
+# so the main campaign is unaffected. An explicit value forces it — the seam the per-window
+# normalization control needs to run held_out (random init) WITH the transfer protocols'
+# normalization, which is the only way to tell the cost of that normalization apart from the effect
+# of the pre-trained initialisation. Such a run MUST go to an isolated OUT: the cell directory does
+# not encode `normalize`, so under the default OUT it would overwrite the published cell.
+NORMALIZE="${NORMALIZE:-auto}"
+NORM_FLAG=$([ "$NORMALIZE" = auto ] && echo "" || echo "--normalize $NORMALIZE")
 # Stop starting new cells past this elapsed time so a link exits on a whole-cell boundary before the
 # 24h wall kills it mid-training; the next afterany chain link continues the rest (default 23h).
 SOFT_DEADLINE_SEC="${SOFT_DEADLINE_SEC:-82800}"
@@ -149,7 +158,7 @@ else
   stage_grid "$GRID" "$STAGE_FAMS" || { echo "ERROR: staging failed for $GRID"; exit 1; }
   export EVEMTBENCH_DATA_ROOT="$STAGE"
 fi
-echo "Data root: $EVEMTBENCH_DATA_ROOT | proj_cache=$EVEMTBENCH_PROJECTION_CACHE | use_cache=$USE_CACHE | zero_seq=$ZERO_SEQ"
+echo "Data root: $EVEMTBENCH_DATA_ROOT | proj_cache=$EVEMTBENCH_PROJECTION_CACHE | use_cache=$USE_CACHE | zero_seq=$ZERO_SEQ | normalize=$NORMALIZE | out=$DEST_OUT"
 
 # --- stage-cell helpers (USE_CACHE=1 only): copy exactly ONE task's <=4 view-cache files
 #     node-local, atomically (write .tmp.$$ then rename, so an existing file is ALWAYS complete —
@@ -244,9 +253,9 @@ for idx in "${!PENDING[@]}"; do
     fi
     start_prefetch "$(next_distinct_task "$idx")"   # overlaps the training below
   fi
-  echo "===== $(date '+%H:%M:%S')  $line $ZS_FLAG ====="
+  echo "===== $(date '+%H:%M:%S')  $line $ZS_FLAG $NORM_FLAG ====="
   # shellcheck disable=SC2086
-  if ! python -m evemtbench.baselines.runner $line $ZS_FLAG \
+  if ! python -m evemtbench.baselines.runner $line $ZS_FLAG $NORM_FLAG \
       --seeds $SEEDS --epochs "$EPOCHS" --device "$DEVICE" --out "$DEST_OUT"; then
     echo "!! FAILED: $line (continuing)"; fail=1
   fi

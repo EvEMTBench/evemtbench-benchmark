@@ -58,11 +58,15 @@ possible future addition.
   degrades the ideal inputs (additive noise / SNR sweep, channel dropout / sensor loss, amplitude
   quantization, timing jitter) and reports metric-vs-degradation curves per task on saved
   checkpoints — no retraining. Turns the Tier-1 anchors into live research targets.
-- **`cross_topology` protocol + `gnn` baseline**: train on the diverse-topology `train` family
-  (`multi_grid`, e.g. `Template20kV` — **105+ varied networkx topologies** already on disk under
-  `multi_grid/.../graphs/`), test on each unseen grid — true topology transfer, beyond the current
-  operating-point shift. The graph artifacts exist (see "Auxiliary artifacts" below); still needs the
-  `train` family windowed + a variable-channel `gnn`.
+- **`cross_topology` protocol + `gnn` baseline** *(planned, not implemented)*: train on the
+  diverse-topology `multi_grid` family (formerly `train`; e.g. `Template20kV` — **105+ varied
+  networkx topologies** already on disk under `multi_grid/.../graphs/`), test on each unseen grid —
+  true topology transfer, beyond the current operating-point shift. The graph artifacts exist (see
+  "Auxiliary artifacts" below), and the `multi_grid` family is already windowed and used for
+  pre-training by the built `multi_grid_pretrain` / `transfer_*` protocols — but it is
+  stored in the portable 12-channel double-line view, which yields only the `local` / `line` inputs ([design/pretrain_transfer.md](design/pretrain_transfer.md)).
+  Still needed: the `cross_topology` protocol itself, a variable-channel (cubicle-set) view, and
+  the `gnn`.
 - **Fault-resistance stratification / regression**: fault resistance is a physical difficulty knob
   and is **available per-episode** in each grid's `labels/settings.csv`
   (`events/event_flt_shc_resistance`, `event_flt_hif_resistance`; `grounding/*_resistance` on MV),

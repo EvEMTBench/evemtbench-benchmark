@@ -3,7 +3,6 @@ deterministic, empty-outputs → all-`\\res`, a real result populates exactly it
 committed fragments stay well-formed (they now populate live from the sweep — no freeze)."""
 
 import json
-import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
@@ -18,7 +17,6 @@ STD_PER_BASELINE = {
 
 
 def _load_builder():
-    sys.path.insert(0, str(REPO / "hpc"))  # hpc/ isn't a package
     import make_supplement_tables as mst
 
     return mst

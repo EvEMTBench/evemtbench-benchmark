@@ -46,14 +46,14 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 os.environ.setdefault("MPLBACKEND", "Agg")  # headless rendering (no display / no X server)
 
-import matplotlib.pyplot as plt  # noqa: E402
-import numpy as np  # noqa: E402
+import matplotlib.pyplot as plt
+import numpy as np
 
 # paper_lib is the data seam AND the sys.path shim: it puts hpc/ and src/ on the path and
 # re-exports the make_results helpers (warn_once), so nothing here imports across hpc/ directly.
-import paperfig_style as style  # noqa: E402
-from matplotlib.gridspec import GridSpec  # noqa: E402
-from paper_lib import (  # noqa: E402
+import paperfig_style as style
+from matplotlib.gridspec import GridSpec
+from paper_lib import (
     GRID_ROWS,
     SYNTHESIS_BACC_ROWS,
     SYNTHESIS_FL_ROWS,
@@ -67,7 +67,7 @@ TEST_SETS = ("test", "benchmark")
 # DISPLAY labels for the two held_out families. The manuscript calls the never-trained family
 # `eval_grid` to keep it distinct from "the benchmark" (the evaluation framework as a whole); the
 # on-disk/result-path key stays `benchmark`, exactly as in paper_lib._TS_LABEL.
-_BLOCK_LABEL = {"test": "In-distribution (test)", "benchmark": "Never-trained (eval_grid)"}
+_BLOCK_LABEL = {"test": "In-distribution (test)", "benchmark": "Evaluation-only (eval_grid)"}
 
 # The two panels' rows live in paper_lib so the figure-value test checks the same coverage.
 _BACC_ROWS = SYNTHESIS_BACC_ROWS

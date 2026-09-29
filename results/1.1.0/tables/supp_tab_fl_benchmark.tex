@@ -1,0 +1,33 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_fl_benchmark.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/fault_location_{local,line,global}/held_out/<grid>/<baseline>/{val,benchmark}/result.json
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\caption{Fault localisation (\ac{fl}) --- full per-baseline results on the never-trained \texttt{eval\_grid} family (\texttt{held\_out} protocol), headline metric (\acs{mae}\,\% $\downarrow$). Rows are grid and observability view (loc/lin/glo = local/line/global); columns are the reference baselines, where maj.\ is the trivial majority floor and thr.\ the conventional overcurrent threshold. Cells are mean\,$\pm$\,95\% CI over seeds (Student's $t$); the 95\% CI half-width is shown as a compact subscript ($\pm h$) at 2 d.p. \notapp{}~= not defined for this (function, view) or baseline.}
+\label{tab:supp_fl_benchmark}
+\begin{tabular}{l l ccccccc}
+\toprule
+\textbf{Grid} & \textbf{View} & \textbf{maj.} & \textbf{thr.} & \textbf{\acs{rf}} & \textbf{\acs{mlp}} & \textbf{\acs{gru}} & \textbf{\acs{cnn}} & \textbf{\acs{resnet}} \\
+\midrule
+\multirow{3}{*}{CIGR\'E MV (20\,kV)}         & loc   & 30.35$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 32.53$\,{\scriptscriptstyle\pm0.03}$ & 30.53$\,{\scriptscriptstyle\pm0.16}$ & 30.48$\,{\scriptscriptstyle\pm0.05}$ & 30.71$\,{\scriptscriptstyle\pm0.12}$ & 30.97$\,{\scriptscriptstyle\pm0.62}$ \\
+                                             & lin   & 30.35$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 31.08$\,{\scriptscriptstyle\pm0.05}$ & 30.47$\,{\scriptscriptstyle\pm0.10}$ & 30.49$\,{\scriptscriptstyle\pm0.06}$ & 24.52$\,{\scriptscriptstyle\pm4.37}$ & 29.67$\,{\scriptscriptstyle\pm2.19}$ \\
+                                             & glo   & 30.35$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 30.48$\,{\scriptscriptstyle\pm0.08}$ & 18.87$\,{\scriptscriptstyle\pm0.94}$ & 20.39$\,{\scriptscriptstyle\pm2.24}$ & 19.52$\,{\scriptscriptstyle\pm1.00}$ & 21.11$\,{\scriptscriptstyle\pm2.29}$ \\
+\addlinespace
+\multirow{3}{*}{Double Line (110\,kV)}       & loc   & 31.09$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 26.96$\,{\scriptscriptstyle\pm0.05}$ & 15.20$\,{\scriptscriptstyle\pm0.16}$ & 11.70$\,{\scriptscriptstyle\pm0.53}$ & 15.65$\,{\scriptscriptstyle\pm0.43}$ & 15.43$\,{\scriptscriptstyle\pm1.56}$ \\
+                                             & lin   & 31.09$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 14.99$\,{\scriptscriptstyle\pm0.06}$ & 5.18$\,{\scriptscriptstyle\pm0.24}$ & 6.25$\,{\scriptscriptstyle\pm0.52}$ & 10.42$\,{\scriptscriptstyle\pm1.15}$ & 8.81$\,{\scriptscriptstyle\pm1.12}$ \\
+                                             & glo   & 31.09$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 17.82$\,{\scriptscriptstyle\pm0.09}$ & 6.30$\,{\scriptscriptstyle\pm0.27}$ & 5.10$\,{\scriptscriptstyle\pm0.72}$ & 10.11$\,{\scriptscriptstyle\pm0.33}$ & 8.27$\,{\scriptscriptstyle\pm1.42}$ \\
+\addlinespace
+\multirow{3}{*}{Prot.\ Ref.\ (110\,kV)}      & loc   & 31.17$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 27.03$\,{\scriptscriptstyle\pm0.05}$ & 17.46$\,{\scriptscriptstyle\pm0.12}$ & 10.85$\,{\scriptscriptstyle\pm0.57}$ & 14.99$\,{\scriptscriptstyle\pm0.64}$ & 15.94$\,{\scriptscriptstyle\pm0.65}$ \\
+                                             & lin   & 31.17$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 19.55$\,{\scriptscriptstyle\pm0.09}$ & 6.55$\,{\scriptscriptstyle\pm0.54}$ & 6.41$\,{\scriptscriptstyle\pm0.90}$ & 8.84$\,{\scriptscriptstyle\pm1.20}$ & 8.73$\,{\scriptscriptstyle\pm0.83}$ \\
+                                             & glo   & 31.17$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 23.95$\,{\scriptscriptstyle\pm0.09}$ & 6.54$\,{\scriptscriptstyle\pm0.12}$ & 7.80$\,{\scriptscriptstyle\pm0.64}$ & 11.59$\,{\scriptscriptstyle\pm0.44}$ & 12.35$\,{\scriptscriptstyle\pm0.64}$ \\
+\addlinespace
+\multirow{3}{*}{IEEE 39-Bus (345\,kV)}       & loc   & 31.13$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 28.37$\,{\scriptscriptstyle\pm0.04}$ & 21.40$\,{\scriptscriptstyle\pm0.01}$ & 21.98$\,{\scriptscriptstyle\pm0.50}$ & 22.97$\,{\scriptscriptstyle\pm0.66}$ & 23.97$\,{\scriptscriptstyle\pm0.64}$ \\
+                                             & lin   & 31.13$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 23.63$\,{\scriptscriptstyle\pm0.04}$ & 9.40$\,{\scriptscriptstyle\pm0.26}$ & 10.26$\,{\scriptscriptstyle\pm0.66}$ & 13.89$\,{\scriptscriptstyle\pm0.55}$ & 15.23$\,{\scriptscriptstyle\pm0.96}$ \\
+                                             & glo   & 31.13$\,{\scriptscriptstyle\pm{<}0.01}$ & \notapp & 29.82$\,{\scriptscriptstyle\pm0.04}$ & 20.39$\,{\scriptscriptstyle\pm0.72}$ & 24.93$\,{\scriptscriptstyle\pm1.09}$ & 27.13$\,{\scriptscriptstyle\pm4.91}$ & 21.76$\,{\scriptscriptstyle\pm3.88}$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -50,5 +50,5 @@ therefore a single `global` task (matching the EC card's global-only decision).
   broader: it also sees switching and quiescent windows, and separates them.
 - **FC** (9-class) subtypes faults *within* fault-active windows. ES is coarser: it stops at the
   family level. FC/FD are unchanged and complementary.
-- **EC** (planned) is the full 23-`event_type` classification. ES is its family-level warm-up,
+- **EC** (shipped as `event_classification_global`) is the full 23-`event_type` classification. ES is its family-level warm-up,
   now shipped as its own task.

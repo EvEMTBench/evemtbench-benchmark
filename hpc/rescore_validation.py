@@ -46,13 +46,13 @@ import numpy as np
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent / "src"))
 
-from evemtbench.baselines import _transfer  # noqa: E402
-from evemtbench.baselines.runner import _make_baseline  # noqa: E402
-from evemtbench.coverage import LEARNED_BASELINES  # noqa: E402
-from evemtbench.evaluation.evaluate import _nan_to_none, evaluate  # noqa: E402
-from evemtbench.evaluation.significance import ci95_halfwidth  # noqa: E402
-from evemtbench.tasks.task import load_task  # noqa: E402
-from evemtbench.version import results_version  # noqa: E402
+from evemtbench.baselines import _transfer
+from evemtbench.baselines.runner import _make_baseline
+from evemtbench.coverage import LEARNED_BASELINES
+from evemtbench.evaluation.evaluate import _nan_to_none, evaluate
+from evemtbench.evaluation.significance import ci95_halfwidth
+from evemtbench.tasks.task import load_task
+from evemtbench.version import results_version
 
 _DEEP = {"mlp", "gru", "cnn", "resnet"}
 
@@ -265,7 +265,7 @@ def main(argv=None):
             status = rescore_cell(
                 cell, task_id, grid, baseline, tol=args.tol, protocol=args.protocol
             )
-        except Exception as e:  # noqa: BLE001
+        except Exception as e:
             status = f"ERROR {type(e).__name__}: {e}"
         flag = "FAIL" in status or "ERROR" in status
         fails += flag

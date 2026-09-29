@@ -17,6 +17,10 @@ would leak. See [fault_origin.py](../../src/evemtbench/tasks/labels/fault_origin
 distinction is *also* a leakage-free **stratification axis** (`origin`) reported for every fault
 task — busbar vs line protection are distinct relay schemes, so per-origin FD/FC/FL scores matter.
 
+Protocols: `held_out` for every id; the `local`/`line` variants of grounded / phase / category also
+run `multi_grid_pretrain`, `transfer_zeroshot` and `transfer_finetune` (deep baselines only — see
+[protocol.md](../protocol.md)).
+
 Metrics: `balanced_accuracy`, `macro_f1`, `accuracy` (+ per-class F1 for the multiclass ones).
 Derivers: [fault_grounded.py](../../src/evemtbench/tasks/labels/fault_grounded.py),
 [fault_phase.py](../../src/evemtbench/tasks/labels/fault_phase.py),

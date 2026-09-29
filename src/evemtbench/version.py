@@ -33,12 +33,13 @@ selection for the transfer protocols. v1.1 regenerates those three splits **topo
 :func:`results_version` / :func:`splits_version` encode that per-protocol scoping; see
 ``docs/versioning.md`` ("scoped revision") and ``CHANGELOG.md``.
 
-v1.0.0 (current): first frozen release, cut on the fully re-simulated EvEMTBench dataset. Every grid
-is re-windowed to the psp_helper window-contract 1.0.0 across the ``held_out`` (adapt_grid +
-benchmark) and pre-training/transfer (multi_grid) families. The multi_grid pre-training set is
-Template20kV, Template110kV and Template345kV (EHV). Split files are regenerated for the new data,
-so this is a **major**
-bump — all pre-1.0 scores are NOT comparable. (Results land under ``outputs/1.0.0/``.)
+v1.0.0 (superseded by v1.1.0; its ``held_out`` artifacts and results remain current under the
+v1.1.0 contract and keep their 1.0.0 identifiers by design): first frozen release, cut on the fully
+re-simulated EvEMTBench dataset. Every grid is re-windowed to the psp_helper window-contract 1.0.0
+across the ``held_out`` (adapt_grid + benchmark) and pre-training/transfer (multi_grid) families.
+The multi_grid pre-training set is Template20kV, Template110kV and Template345kV (EHV). Split files
+are regenerated for the new data, so this is a **major** bump — all pre-1.0 scores are NOT
+comparable. (Results land under ``outputs/1.0.0/``.)
 
 v0.2: the in-distribution adaptation family is renamed ``fine_tune`` → ``adapt_grid``
 to match the producer (``power-grid-and-ai-helper-functions``), which now writes windows under

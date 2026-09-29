@@ -3,16 +3,12 @@ fresh rebuild, fails on drift, and skips when outputs/ is absent. Driven against
 the EVEMTBENCH_REPO override so it never touches the real committed artifacts. Torch-free."""
 
 import json
-import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+import check_results_fresh as gate  # needs hpc/ on the path
+from evemtbench.version import results_version
 
-import check_results_fresh as gate  # noqa: E402  (needs hpc/ on the path)
-from evemtbench.version import results_version  # noqa: E402
+REPO = Path(__file__).resolve().parents[2]
 
 # the seeded cell is held_out -> it must live in that protocol's current tree (1.0.0)
 HO_VER = results_version("held_out")

@@ -1,7 +1,8 @@
 """Official benchmark protocols (Benchmark Plan §7).
 
-Splits are at the **simulation-episode level** (one ``sample_id`` = one EMT simulation; all its
-windows share a split), so no window crosses a partition boundary.
+Reference-grid splits are at the **simulation-episode level** (one ``sample_id`` = one EMT
+simulation; all its windows share a split), so no window crosses a partition boundary. The
+``multi_grid_pretrain`` source-corpus split is coarser (topology-grouped, see below).
 
 * ``held_out`` — train/val/test are disjoint episode splits of the **adapt_grid** family of one
   grid (in-distribution generalization), and the model is *additionally* evaluated on the entire
@@ -13,14 +14,17 @@ pre-training corpus and generalize to the reference grids' held-out families, at
 LOCAL/LINE observability views only (fixed 6/12 channels). They map to the paper's goals G2
 (zero-shot) and G3 (adaptation); see ``docs/protocol.md`` / ``docs/design/cross_topology.md``.
 
-* ``multi_grid_pretrain`` — train/val/test on an episode split of the ``multi_grid`` family of the
-  pre-training grid (in-corpus). Reports in-corpus performance AND produces the checkpoints that
-  the transfer protocols initialise from.
+* ``multi_grid_pretrain`` — train/val/test on a split of the ``multi_grid`` family of the
+  pre-training grid (in-corpus). Since v1.1 this split is **topology-grouped** (by ``graph_id``;
+  ``splits/v1.1/multi_grid_pretrain/``), not episode-level — see ``CHANGELOG.md`` 1.1.0.
+  Reports in-corpus performance AND produces the checkpoints that the transfer protocols
+  initialise from.
 * ``transfer_zeroshot`` — initialise from a ``multi_grid_pretrain`` checkpoint and evaluate,
   WITHOUT any target training, on a reference grid's ``adapt_grid`` held-out ``test`` and its
   ``benchmark`` family (the target topology is never seen).
 * ``transfer_finetune`` — initialise from that checkpoint, fine-tune on the reference grid's
-  ``adapt_grid`` train split, then evaluate on its ``benchmark`` family (target adaptation).
+  ``adapt_grid`` train split, then evaluate on its ``adapt_grid`` held-out ``test`` and its
+  ``benchmark`` family (target adaptation).
 """
 
 from __future__ import annotations
@@ -54,8 +58,8 @@ PROTOCOLS: dict[str, Protocol] = {
     ),
     "multi_grid_pretrain": Protocol(
         "multi_grid_pretrain",
-        "Train/val/test on an episode split of the multi_grid pre-training corpus (in-corpus); "
-        "produces the checkpoints the transfer protocols initialise from.",
+        "Train/val/test on a topology-grouped split of the multi_grid pre-training corpus "
+        "(in-corpus); produces the checkpoints the transfer protocols initialise from.",
         target_topology_seen=True,
         claim="in-corpus multi-grid pre-training performance",
     ),

@@ -9,7 +9,7 @@
 \centering
 \small
 \setlength{\tabcolsep}{4.5pt}
-\caption{Fault-type classification (\ac{fc}, 9-class) --- cross-grid transfer reference baseline (best of MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported \texttt{eval\_grid} set: \emph{fine-tune} on the target grid's validation split, \emph{zero-shot} on the pre-training source's \texttt{multi\_grid} validation --- so the zero-shot choice is grid-independent), headline metric (balanced accuracy $\uparrow$), pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) then \emph{zero-shot} vs.\ \emph{fine-tuned} on each target grid, scored on the never-trained \texttt{eval\_grid} family per observability view. Cells are mean\,$\pm$\,95\% CI; \pending{}~= pending (no result yet); \oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent \emph{global} width).}
+\caption{Fault-type classification (\ac{fc}, 9-class) --- cross-grid transfer reference baseline (best of MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported \texttt{eval\_grid} set: \emph{fine-tune} on the target grid's validation split, \emph{zero-shot} on the pre-training source's \texttt{multi\_grid} validation --- so the zero-shot choice is grid-independent), headline metric (balanced accuracy $\uparrow$), pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) then \emph{zero-shot} vs.\ \emph{fine-tuned} on each target grid, scored on the never-trained \texttt{eval\_grid} family per observability view. Cells are mean\,$\pm$\,95\% CI; \oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent \emph{global} width).}
 \label{tab:transfer_fc}
 \begin{tabular}{ll ccc ccc}
 \toprule

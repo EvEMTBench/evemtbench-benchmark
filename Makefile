@@ -58,7 +58,7 @@ ALL_BUILDERS  := $(REPO_BUILDERS) $(DATASET_BUILDERS)
 
 .PHONY: help supp-artifacts supp-artifacts-repo supp-artifacts-dataset paper-artifacts \
         supp-figures check-supp-artifacts check-supp-artifacts-dataset check-supplement \
-        supplementary manuscript list-artifacts
+        norm-control check-norm-control supplementary manuscript list-artifacts
 
 help:
 	@sed -n '1,24p' Makefile
@@ -82,6 +82,18 @@ check-supp-artifacts:
 
 check-supp-artifacts-dataset:
 	@for b in $(DATASET_BUILDERS); do $(PY) $$b --check || exit 1; done
+
+## Regenerate the input-normalization control SI table. ANALYSIS-ONLY: needs the isolated control
+## tree (held_out re-run with --normalize per_window), which is NOT in outputs/ and NOT in this
+## repository, so this fragment is deliberately outside the commit-time freshness gate -- same
+## arrangement as the dataset-backed fragments above. Pass the tree with ABL=<dir containing outputs/>.
+norm-control:
+	@test -n "$(ABL)" || { echo "usage: make norm-control ABL=<control tree>"; exit 2; }
+	$(PY) hpc/paper_artifacts/build_supp_tab_norm_control.py --abl "$(ABL)"
+
+check-norm-control:
+	@test -n "$(ABL)" || { echo "usage: make check-norm-control ABL=<control tree>"; exit 2; }
+	@$(PY) hpc/paper_artifacts/build_supp_tab_norm_control.py --abl "$(ABL)" --check
 
 ## Rebuild the SI data figures (needs matplotlib: PAPERFIGS_PY, and a SLURM allocation).
 supp-figures:

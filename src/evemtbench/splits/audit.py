@@ -374,7 +374,7 @@ def main() -> None:
     for gk in a.grids or list(GRIDS):
         try:
             rep = audit_grid(gk, root=a.root, splits_root=a.splits_root, stratify_by=a.stratify_by)
-        except Exception as e:  # noqa: BLE001 - report per grid, keep going
+        except Exception as e:  # report per grid, keep going
             print(f"[{gk}] AUDIT ERROR: {e}")
             all_ok = False
             continue

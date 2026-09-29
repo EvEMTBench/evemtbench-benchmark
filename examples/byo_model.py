@@ -9,7 +9,13 @@ no-tuning attestation).
 **Path B (quick look): evaluate a predictions frame directly.** ``load_task`` → predict →
 ``evaluate``. Shown at the bottom.
 
-Run on a SLURM node with the dataset mounted (never the login node):
+Run from the repository root on any machine with the dataset available:
+
+    EVEMTBENCH_DATA_ROOT=/path/to/evemtbench PYTHONPATH=src \
+        python examples/byo_model.py --grid double_line
+
+On a shared cluster, use a compute node rather than the login node — e.g. the maintainers'
+NHR@FAU Alex SLURM invocation (site-specific partition/GRES names):
 
     srun --partition=a100mig --gres=gpu:a100small:1 --time=30:00 \
         bash -lc 'PYTHONPATH=src python examples/byo_model.py --grid double_line'

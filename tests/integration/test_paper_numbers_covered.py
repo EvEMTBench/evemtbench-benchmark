@@ -17,21 +17,17 @@ Data-free except (4), which skips until ``outputs/`` is populated. Torch-free.""
 
 import os
 import re
-import sys
 from collections import Counter
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+import make_audit
+from evemtbench.coverage import REFERENCE_GRIDS
+from evemtbench.tasks.registry import get_task, list_tasks
+from make_paper_tables import GRID_ROWS, OBS, PAPER_FUNCTIONS
 
-import make_audit  # noqa: E402
-from evemtbench.coverage import REFERENCE_GRIDS  # noqa: E402
-from evemtbench.tasks.registry import get_task, list_tasks  # noqa: E402
-from make_paper_tables import GRID_ROWS, OBS, PAPER_FUNCTIONS  # noqa: E402
+REPO = Path(__file__).resolve().parents[2]
 
 MANUSCRIPT = REPO / "paper" / "manuscript"
 # Every test here is a paper<->dashboard correspondence check — meaningless without the private
@@ -45,6 +41,15 @@ pytestmark = pytest.mark.skipif(
 _RESULT_CELL = re.compile(r"\d\.\d{3}\s*\$?\s*\\pm\s*\$?\s*\d\.\d{3}")
 # Any three-decimal token — a paper "number" once populated (means and CIs).
 _NUM = re.compile(r"\d\.\d{3}")
+# `$\pm{<}0.001$` states the DISPLAY PRECISION of a confidence interval, not a measured value, so
+# its literal must not be counted as a paper number the dashboard has to reproduce. Stripped before
+# extraction rather than added to an ignore set, so a genuine 0.001 measurement elsewhere is still
+# checked.
+_BOUND = re.compile(r"\$\\pm\{<\}[0-9.]+\$")
+
+
+def _nums(text: str) -> list[str]:
+    return _NUM.findall(_BOUND.sub("", text))
 
 
 def _handwritten_tex() -> list[Path]:
@@ -109,20 +114,20 @@ def test_every_paper_number_appears_on_the_dashboard():
     """When the sweep has run: every three-decimal number in the generated paper tables appears
     verbatim on the dashboard's paper-numbers page (same selection, same result.json). Skips until
     outputs/ is populated (pre-sweep the tables are all \\res)."""
-    from evemtbench.leaderboard import scan_results  # noqa: PLC0415
-    from make_paper_tables import build_paper_tables  # noqa: PLC0415
-    from make_supplement_tables import build_supplement_tables  # noqa: PLC0415
+    from evemtbench.leaderboard import scan_results
+    from make_paper_tables import build_paper_tables
+    from make_supplement_tables import build_supplement_tables
 
     os.chdir(REPO)  # load_rows / scan_results glob 'outputs/...' relative to cwd
     # Multiset, not set: a dropped/misplaced cell must not be masked when its value string happens
     # to coincide with another number elsewhere on the page — require the page to contain each
     # value at least as many times as the paper does.
-    paper_counts = Counter(_NUM.findall("".join(build_paper_tables().values())))
+    paper_counts = Counter(_nums("".join(build_paper_tables().values())))
     if not paper_counts:
         pytest.skip("no paper numbers wired yet (pre-sweep: generated tables are all \\res)")
     rows = scan_results("outputs")
     prov = make_audit.provenance_cells(rows, make_audit.collect_run_records("outputs"))
-    page_counts = Counter(_NUM.findall(make_audit.build_paper_numbers(rows, prov)))
+    page_counts = Counter(_nums(make_audit.build_paper_numbers(rows, prov)))
     deficient = {n: (c, page_counts[n]) for n, c in paper_counts.items() if page_counts[n] < c}
     assert not deficient, (
         f"main-text paper numbers under-represented on the dashboard paper-numbers page "
@@ -136,11 +141,11 @@ def test_every_paper_number_appears_on_the_dashboard():
     # (hpc/rescore_validation.py) that drive best_cell_choice, not to the held_out drill-down pages.
     _skip = "supp_tab_val_selection.tex"
     _supp = {k: v for k, v in build_supplement_tables().items() if k != _skip}
-    supp_counts = Counter(_NUM.findall("".join(_supp.values())))
+    supp_counts = Counter(_nums("".join(_supp.values())))
     baseline_pages = "".join(
         make_audit.build_baseline_page(b, rows, prov) for b in make_audit.ALL_BASELINES
     )
-    bp_counts = Counter(_NUM.findall(baseline_pages))
+    bp_counts = Counter(_nums(baseline_pages))
     # Membership, not multiplicity: an SI table may legitimately restate a value the headline
     # tables already carry (the protection table repeats the selected reference's balanced accuracy
     # beside its MDR/FAR so a collapse cell is readable in one row). What must hold is that every

@@ -29,6 +29,15 @@
 #   SPLIT_BASELINES=1 CHAIN=3 GRIDS="double_line testgrid_110kv cigre_mv ieee39" \
 #     BASELINES="mlp gru cnn resnet" hpc/submit.sh --submit
 #
+# NORMALIZE=auto|none|per_window -> forces the input normalization (default auto = per-protocol:
+#                         none for held_out, per_window for pretrain/transfer). Only for ablations.
+# Ablation example — held_out (random init) WITH the transfer protocols' per-window normalization,
+# into an ISOLATED tree, W&B off, and job names that do NOT match autonomous_loop.sh's '^held_out'
+# idle-guard (JOBNAME takes one grid at a time; see the guard below):
+#   OUT=$ABL/outputs NORMALIZE=per_window EVEMTBENCH_WANDB=0 GRIDS=double_line \
+#     JOBNAME=pwctrl.double_line TASKS="fault_location_line fault_classification_line" \
+#     BASELINES="mlp gru cnn resnet" SPLIT_BASELINES=1 hpc/submit.sh --submit
+#
 # DRY-RUN BY DEFAULT: prints the plan + sbatch lines. Pass --submit to actually queue.
 #   hpc/submit.sh                                    # dry-run, ready grids, full task suite
 #   GRIDS="double_line testgrid_110kv" hpc/submit.sh --submit
@@ -172,7 +181,13 @@ submit_job() {  # $1=grid  $2=baselines  $3=job-name  — submits a CHAIN of aft
   local -a cpus=()
   [ -n "$cpt" ] && cpus=(--cpus-per-task="$cpt")
   local sdl; sdl="${SOFT_DEADLINE_OVERRIDE:-$(grid_soft_deadline "$grid" "$bl")}"
-  local exp; exp="ALL,CLUSTER=$CLUSTER,GRID=$grid,PROTOCOL=$PROTOCOL,TASKS=$TASKS,BASELINES=$bl,SEEDS=$SEEDS,EPOCHS=$EPOCHS,DEVICE=$device,ZERO_SEQ=${ZERO_SEQ:-0},SOFT_DEADLINE_SEC=$sdl"
+  # NORMALIZE/OUT/EVEMTBENCH_WANDB are named EXPLICITLY rather than left to ride on `ALL`, so the
+  # dry-run plan line below shows them before anything is queued. Both of the unnamed ones were
+  # silent, irreversible hazards for an ablation wave: a wrong OUT overwrites published cells (the
+  # cell dir does not encode `normalize`), and W&B resumes by a cell key that ignores --out entirely
+  # (runner.cell_identity + _tracking.run_id_for, resume="allow"), so it would overwrite the
+  # official run's config/summary even with a perfectly isolated offline tree.
+  local exp; exp="ALL,CLUSTER=$CLUSTER,GRID=$grid,PROTOCOL=$PROTOCOL,TASKS=$TASKS,BASELINES=$bl,SEEDS=$SEEDS,EPOCHS=$EPOCHS,DEVICE=$device,ZERO_SEQ=${ZERO_SEQ:-0},NORMALIZE=${NORMALIZE:-auto},OUT=${OUT:-},EVEMTBENCH_WANDB=${EVEMTBENCH_WANDB:-1},SOFT_DEADLINE_SEC=$sdl"
   local prev="" link jid lname
   for link in $(seq 1 "$CHAIN"); do
     local -a dep=()

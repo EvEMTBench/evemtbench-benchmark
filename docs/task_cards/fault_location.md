@@ -8,9 +8,9 @@
 | **Output** | Continuous: distance along the faulted line, ~1–99 % |
 | **Label** | `y_fault_location` (% along the faulted line). **Episode-constant** and present only on **line faults** (NaN on bus faults and non-fault episodes). `tasks/labels/fault_location.py`. |
 | **Valid samples** | fault-active windows of **line-fault** episodes only (`y_fault_location` not null) |
-| **Protocol** | `held_out` |
+| **Protocol** | `held_out` (all variants); the `local`/`line` variants also run `multi_grid_pretrain`, `transfer_zeroshot` and `transfer_finetune` (deep baselines only — see [protocol.md](../protocol.md)) |
 | **Metrics** | MAE, RMSE, R², median absolute error (all in % distance; MAE/RMSE/median ↓, R² ↑) |
-| **Baselines** | majority (train-mean predictor), random_forest (regressor), mlp + gru (MSE head, target-standardized) |
+| **Baselines** | majority (train-mean predictor), random_forest (regressor), mlp / gru / cnn / resnet (MSE head, target-standardized) |
 
 ## Notes / claims
 

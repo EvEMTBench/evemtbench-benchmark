@@ -17,18 +17,11 @@ Skips until ``outputs/`` is populated, like ``test_paper_numbers_covered.py``.
 """
 
 import re
-import sys
 from pathlib import Path
 
+import paper_lib
 import pytest
-
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc", REPO / "hpc" / "paper_artifacts"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
-
-import paper_lib  # noqa: E402
-from paper_lib import (  # noqa: E402
+from paper_lib import (
     _PF_BY_KEY,
     _TRANSFER_PROTOS,
     GRID_ROWS,
@@ -44,6 +37,8 @@ from paper_lib import (  # noqa: E402
     synthesis_matrix,
     transfer_series,
 )
+
+REPO = Path(__file__).resolve().parents[2]
 
 MANUSCRIPT = REPO / "paper" / "manuscript"
 GEN = MANUSCRIPT / "generated"

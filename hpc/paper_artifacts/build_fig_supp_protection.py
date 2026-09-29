@@ -12,7 +12,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from supp_figure_lib import build_protection_figure  # noqa: E402
+from supp_figure_lib import build_protection_figure
 
 if __name__ == "__main__":
     build_protection_figure()

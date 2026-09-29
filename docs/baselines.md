@@ -54,14 +54,16 @@ params). Shares the identical training regime as mlp/gru/cnn — only the archit
 
 **`gnn`** *(planned)* — message-passing over the grid graph (`grid_graph.pickle`), the natural
 contender for the **`cross_topology`** protocol (train on diverse topologies → test on unseen
-grids), where fixed-input models (MLP/CNN) cannot ingest a different channel count. Pending the
-`train` family + graph artifacts.
+grids), where fixed-input models (MLP/CNN) cannot ingest a different channel count. The `multi_grid` family
+(formerly `train`) is windowed and the graph artifacts exist; pending the `cross_topology`
+protocol and a variable-channel (cubicle-set) view.
 
 ## Hyperparameters & determinism
 
-Defaults: `--epochs 60 --batch-size 256 --lr 1e-3 --seeds 0 1 2 3 4`. The four deep baselines
-(mlp/gru/cnn/resnet) share **one** training regime via `baselines/_train.py` — AdamW + weight decay
-`1e-4`, `CosineAnnealingLR`, and **validation early-stopping** (patience 12, best-val checkpoint,
+Defaults: `--epochs 60 --batch-size 256 --lr 1e-3`; the runner's own `--seeds` default is `0` (a
+single seed), while the official sweep (`hpc/sweep.sh`, `SEEDS`) runs seeds `0 1 2 3 4`. The four
+deep baselines (mlp/gru/cnn/resnet) share **one** training regime via `baselines/_train.py` —
+AdamW + weight decay `1e-4`, `CosineAnnealingLR`, and **validation early-stopping** (patience 12, best-val checkpoint,
 restored before predict) — so only the architecture differs (a cross-baseline fairness requirement).
 GPU training is **not** bit-identical run-to-run (reported as mean ± std over 5 seeds); splits,
 labels, and metrics are deterministic (see [determinism.md](determinism.md)). Deep baselines require
@@ -97,6 +99,8 @@ become **post-hoc, no re-training required**:
 ## Adding a baseline
 
 Implement the `fit(task)` / `predict(view) -> predictions_frame` interface (mirror `cnn.py`),
-register it in `baselines/runner.py::_make_baseline` and the `--baseline` choices + `coverage.py`
-`ALL_BASELINES`. See [extending.md](extending.md). Third-party submissions need **not** add a
+register its factory by name — `register_baseline()` for a third-party model (see
+[`examples/byo_model.py`](../examples/byo_model.py)), or an entry in
+`baselines/runner.py::BASELINE_FACTORIES` in-tree; `_make_baseline` just looks the name up there and
+the `--baseline` choices are derived from it — and add it to `coverage.py::ALL_BASELINES`. See [extending.md](extending.md). Third-party submissions need **not** add a
 baseline — score directly via the evaluation layer ([submission.md](submission.md)).

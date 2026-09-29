@@ -16,7 +16,7 @@ def test_evaluate_export_survives_submodule_import():
     order crashed examples/byo_model.py with "'module' object is not callable"."""
     import types
 
-    import evemtbench.baselines.runner  # noqa: F401 - imports evaluation.evaluate (the trigger)
+    import evemtbench.baselines.runner  # imports evaluation.evaluate (the trigger)
     from evemtbench.evaluation import evaluate as pkg_evaluate
 
     assert callable(pkg_evaluate) and not isinstance(pkg_evaluate, types.ModuleType)

@@ -1,0 +1,33 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_fd_benchmark.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/fault_detection_{local,line,global}/held_out/<grid>/<baseline>/{val,benchmark}/result.json
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\caption{Fault detection (\ac{fd}) --- full per-baseline results on the never-trained \texttt{eval\_grid} family (\texttt{held\_out} protocol), headline metric (balanced accuracy $\uparrow$). Rows are grid and observability view (loc/lin/glo = local/line/global); columns are the reference baselines, where maj.\ is the trivial majority floor and thr.\ the conventional overcurrent threshold. Cells are mean\,$\pm$\,95\% CI over seeds (Student's $t$); the 95\% CI half-width is shown as a compact subscript ($\pm h$); an interval that would exceed $[0,1]$ is instead shown truncated as $[\text{lo},\text{hi}]$. \notapp{}~= not defined for this (function, view) or baseline.}
+\label{tab:supp_fd_benchmark}
+\begin{tabular}{l l ccccccc}
+\toprule
+\textbf{Grid} & \textbf{View} & \textbf{maj.} & \textbf{thr.} & \textbf{\acs{rf}} & \textbf{\acs{mlp}} & \textbf{\acs{gru}} & \textbf{\acs{cnn}} & \textbf{\acs{resnet}} \\
+\midrule
+\multirow{3}{*}{CIGR\'E MV (20\,kV)}         & loc   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.810$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.983$\,{\scriptscriptstyle\pm0.001}$ & 0.958$\,{\scriptscriptstyle\pm0.003}$ & 0.975$\,{\scriptscriptstyle\pm0.013}$ & 0.970$\,{\scriptscriptstyle\pm0.004}$ & 0.969$\,{\scriptscriptstyle\pm0.008}$ \\
+                                             & lin   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.980$\,{\scriptscriptstyle\pm0.003}$ & 0.964$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.965$\,{\scriptscriptstyle\pm0.005}$ & 0.965$\,{\scriptscriptstyle\pm0.008}$ & 0.963$\,{\scriptscriptstyle\pm0.010}$ \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.985$\,{\scriptscriptstyle\pm0.001}$ & 0.959$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.963$\,{\scriptscriptstyle\pm0.006}$ & 0.961$\,{\scriptscriptstyle\pm0.008}$ & 0.964$\,{\scriptscriptstyle\pm0.015}$ \\
+\addlinespace
+\multirow{3}{*}{Double Line (110\,kV)}       & loc   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.916$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.499$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.981$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.984$\,{\scriptscriptstyle\pm0.004}$ & 0.987$\,{\scriptscriptstyle\pm0.001}$ & 0.989$\,{\scriptscriptstyle\pm0.008}$ \\
+                                             & lin   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.987$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.955$\,{\scriptscriptstyle[0.87,1.00]}$ & 0.987$\,{\scriptscriptstyle\pm0.001}$ & 0.991$\,{\scriptscriptstyle\pm0.008}$ \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.986$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.943$\,{\scriptscriptstyle[0.83,1.00]}$ & 0.987$\,{\scriptscriptstyle\pm0.001}$ & 0.987$\,{\scriptscriptstyle\pm0.001}$ \\
+\addlinespace
+\multirow{3}{*}{Prot.\ Ref.\ (110\,kV)}      & loc   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.886$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.672$\,{\scriptscriptstyle\pm0.002}$ & 0.982$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.963$\,{\scriptscriptstyle\pm0.035}$ & 0.987$\,{\scriptscriptstyle\pm0.002}$ & 0.995$\,{\scriptscriptstyle\pm0.004}$ \\
+                                             & lin   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.681$\,{\scriptscriptstyle\pm0.028}$ & 0.985$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.967$\,{\scriptscriptstyle[0.91,1.00]}$ & 0.987$\,{\scriptscriptstyle\pm0.002}$ & 0.990$\,{\scriptscriptstyle\pm0.003}$ \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.985$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.985$\,{\scriptscriptstyle\pm0.003}$ & 0.987$\,{\scriptscriptstyle\pm0.003}$ & 0.987$\,{\scriptscriptstyle\pm0.004}$ \\
+\addlinespace
+\multirow{3}{*}{IEEE 39-Bus (345\,kV)}       & loc   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.914$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.886$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.984$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.979$\,{\scriptscriptstyle\pm0.016}$ & 0.987$\,{\scriptscriptstyle\pm0.001}$ & 0.989$\,{\scriptscriptstyle\pm0.001}$ \\
+                                             & lin   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.868$\,{\scriptscriptstyle\pm0.004}$ & 0.987$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.989$\,{\scriptscriptstyle\pm0.004}$ & 0.987$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.988$\,{\scriptscriptstyle\pm0.003}$ \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.714$\,{\scriptscriptstyle\pm0.072}$ & 0.848$\,{\scriptscriptstyle[0.63,1.00]}$ & 0.594$\,{\scriptscriptstyle\pm0.267}$ & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

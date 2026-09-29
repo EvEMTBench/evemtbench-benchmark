@@ -3,14 +3,12 @@ deterministic, empty-outputs → all-`\\res` (so the manuscript builds with no d
 result populates its cell as `mean ± ci`."""
 
 import json
-import sys
 from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
 
 def _load_builder():
-    sys.path.insert(0, str(REPO / "hpc"))  # hpc/ isn't a package
     import make_paper_tables as mpt
 
     return mpt
@@ -87,11 +85,14 @@ def test_committed_fragments_are_well_formed():
             assert len(cells) == 6, f"{key}: row has {len(cells)} cells, expected 6"
             for c in cells:
                 c = c.rstrip("\\").strip()
-                # a cell is a five-state marker, a `mean ± ci` value, an F10-clipped interval
-                # (mean + a bracketed [lo,hi], no ±), or a bare number
+                # a cell is a five-state marker, a `mean ± ci` value, a `mean ±<bound` value
+                # (half-width below the displayed precision -- reported as a bound rather than
+                # dropped, so it stays distinguishable from "no interval exists"), an F10-clipped
+                # interval (mean + a bracketed [lo,hi], no ±), or a bare number
                 assert (
                     c in ("\\res", "\\pending", "\\notapp", "\\oos", "\\undefm")
                     or "$\\pm$" in c
+                    or "$\\pm{<}" in c
                     or "scriptscriptstyle" in c
                     or _is_number(c)
                 ), f"{key}: bad cell {c!r}"

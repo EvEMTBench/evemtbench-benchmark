@@ -14,8 +14,13 @@ uv pip install -e ".[baselines]"
 Point the package at the dataset (never hardcoded):
 
 ```bash
-export EVEMTBENCH_DATA_ROOT=/path/to/EvEMTBench   # contains benchmark/ adapt_grid/ train/
+export EVEMTBENCH_DATA_ROOT=/path/to/EvEMTBench   # contains benchmark/ adapt_grid/ multi_grid/
 ```
+
+The root must hold the **windowed** partitions ([DATA_LAYOUT.md](DATA_LAYOUT.md)). The public
+download currently contains only the raw simulation exports, and the producer windowing pipeline
+is not public yet — see the note under *Dataset* in the [README](../README.md#dataset) for how to
+build and verify windows against the pinned contract.
 
 ## Evaluate a model (library)
 
@@ -57,15 +62,23 @@ produced — this is what makes third-party results comparable.
 
 ## Protocol
 
-v0.2 has a single protocol:
+There are four protocols (`src/evemtbench/splits/protocols.py`):
 
 | Protocol | Trains on | Tests on | Claim |
 |---|---|---|---|
-| `held_out` | `adapt_grid` family, episode train split (70%) | `adapt_grid` `test` split (15%, in-distribution) **and** the whole `benchmark` family (never trained on) | in-distribution generalization + held-out benchmark test |
+| `held_out` | reference grid's `adapt_grid` family, episode train split (70%) | `adapt_grid` `test` split (15%, in-distribution) **and** the whole `benchmark` family (never trained on) | in-distribution generalization + held-out benchmark test |
+| `multi_grid_pretrain` | `multi_grid` pre-training corpus (Template20kV / 110kV / 345kV), train split | the corpus' own `test` split (in-corpus) | in-corpus pre-training; produces the transfer checkpoints |
+| `transfer_zeroshot` | nothing on the target (initialised from a `multi_grid_pretrain` checkpoint) | reference grid's `test` and `benchmark` | zero-shot cross-grid generalization |
+| `transfer_finetune` | pre-trained checkpoint, fine-tuned on the reference grid's `adapt_grid` train split | reference grid's `test` and `benchmark` | pre-train, then adapt to the target |
 
-The runner fits once and evaluates **both** test sets, writing one `result.json` per `test_set`.
-Splits are committed under `src/evemtbench/splits/v0.2/` and are the source of truth (see
-[versioning.md](versioning.md)). On HPC (NHR@FAU Alex), run a narrow slice via the sweep worker
+`held_out` covers all 24 tasks and every applicable baseline; the three pre-training/transfer protocols run
+only on the portable `local`/`line` task variants and only with the deep baselines
+(`mlp`, `gru`, `cnn`, `resnet`), and each transfer cell is scored once per pre-training source.
+The runner fits once and evaluates every applicable test set, writing one `result.json` per
+`test_set`. Splits are committed under `src/evemtbench/splits/` and are the source of truth (see
+[versioning.md](versioning.md)): `splits/v1.0/held_out/` for `held_out` (the transfer protocols
+reuse the target grid's held_out split) and the topology-grouped `splits/v1.1/multi_grid_pretrain/`
+for pre-training. On HPC (NHR@FAU Alex), run a narrow slice via the sweep worker
 (`GRID=double_line BASELINES=mlp TASKS=fault_detection_local sbatch hpc/sweep.sh`), or fill the
 matrix via `hpc/submit.sh` (one GPU job per grid, all baselines); see those scripts. A single
 cell also runs anywhere via the runner directly:

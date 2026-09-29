@@ -1,0 +1,23 @@
+# Normalise every text file to LF in the working tree, on every platform.
+#
+# This repository pins the sha256 of committed bytes in several places:
+#   - CONTRACT_SHA256 in src/evemtbench/contract/__init__.py, checked against
+#     contract.json via read_bytes(), so line endings are part of the digest;
+#   - the committed split audits verified by tests/integration/test_leakage.py;
+#   - the byte-copy assertions in tests/integration/test_results_bundle.py.
+#
+# Without this file a Windows clone gets CRLF, every one of those digests changes,
+# and the suite fails with messages that read like real drift -- "update
+# CONTRACT_SHA256 after an intentional re-vendor" -- rather than a platform artifact.
+* text=auto eol=lf
+
+# Binary formats: never convert, never diff as text.
+*.pdf     binary
+*.png     binary
+*.parquet binary
+*.raw     binary
+
+# Committed with CRLF and kept that way: this is reference input under paper/
+# (pruned from the public export), and rewriting it would change the file the
+# reference settings are read from.
+paper/reference/settings.csv -text

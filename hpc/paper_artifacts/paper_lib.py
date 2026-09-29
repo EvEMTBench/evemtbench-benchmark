@@ -20,16 +20,16 @@ from pathlib import Path
 
 # hpc/ is not a package; make the sibling RESULTS builder + the src/ package importable regardless
 # of the cwd a standalone build_*.py is launched from.
+sys.path.insert(0, str(Path(__file__).resolve().parents[1]))
+sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
+
+from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRID, PRETRAIN_GRIDS
+from evemtbench.evaluation.metrics import METRIC_DIRECTION
+from make_results import BASELINES, ci_val, load_rows, mean_val, warn_once
+
 _HERE = Path(__file__).resolve()
 _HPC = _HERE.parents[1]  # hpc/
 _REPO = _HERE.parents[2]  # repo root
-for _p in (_HPC, _REPO / "src"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
-
-from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRID, PRETRAIN_GRIDS  # noqa: E402
-from evemtbench.evaluation.metrics import METRIC_DIRECTION  # noqa: E402
-from make_results import BASELINES, ci_val, load_rows, mean_val, warn_once  # noqa: E402
 
 GEN_DIR = _REPO / "paper" / "manuscript" / "generated"
 FIG_DIR = _REPO / "paper" / "manuscript" / "figures"
@@ -76,6 +76,9 @@ GRID_ROWS: list[tuple[str, str]] = [
     ("ieee39", r"IEEE 39-Bus (345\,kV)"),
 ]
 OBS = ("local", "line", "global")
+#: Compact column labels for the transposed per-baseline tables, where the view is a narrow column
+#: rather than a group header. Expanded in each caption.
+_OBS_SHORT = {"local": "loc", "line": "lin", "global": "glo"}
 TEST_SETS = ("test", "benchmark")
 
 _BACC = r"balanced accuracy $\uparrow$"
@@ -160,7 +163,9 @@ def _fmt_mean_ci(mean: float, ci: float | None, metric: str, compact: bool = Fal
     bound, show the truncated interval ``mean [lo, hi]`` instead (F10). ``compact`` (used by the
     12-column per-baseline supplement tables, which otherwise overflow the two-column text width by
     >100 pt) renders the CI half-width as a subscript instead of `` $\\pm$ ci``: bounded metrics keep
-    3 d.p., unbounded (MAE/RMSE) drop to 2 d.p.; a half-width that rounds to zero is omitted."""
+    3 d.p., unbounded (MAE/RMSE) drop to 2 d.p.). A half-width below the displayed precision is
+    reported as a BOUND (``$\\pm{<}0.001$``), never dropped: an omitted interval is reserved for
+    ``ci is None``, i.e. no interval exists at all, and the two states must stay distinguishable."""
     if ci is None:
         return f"{mean:.3f}"
     bounded = _is_bounded01(metric)
@@ -171,11 +176,16 @@ def _fmt_mean_ci(mean: float, ci: float | None, metric: str, compact: bool = Fal
         return f"{mean:.3f}$\\,{{\\scriptscriptstyle[{lo:.3f},\\,{hi:.3f}]}}$"
     if compact:
         nd = 3 if bounded else 2
-        if ci < 0.5 * 10 ** (-nd):  # half-width rounds to zero at nd d.p. -> show mean only
-            return f"{mean:.{nd}f}"
+        if ci < 0.5 * 10 ** (-nd):  # below display precision -> report the BOUND, not nothing
+            return f"{mean:.{nd}f}$\\,{{\\scriptscriptstyle\\pm{{<}}{10**-nd:.{nd}f}}}$"
         return f"{mean:.{nd}f}$\\,{{\\scriptscriptstyle\\pm{ci:.{nd}f}}}$"
-    if ci < 0.5e-3:  # half-width rounds to 0.000 -> show mean only (seeds agree; no "± 0.000")
-        return f"{mean:.3f}"
+    if ci < 0.5e-3:
+        # Below display precision. Report "$\\pm{<}0.001$" rather than dropping the interval: an
+        # absent interval already means "no interval exists" (ci is None -- a single seed, or a
+        # deterministic baseline), and collapsing the two states made a STRONG result (five seeds
+        # agreeing to better than 0.001) look like an ABSENCE of information. Printing "± 0.000"
+        # was rejected instead because it reads as a rounding artifact.
+        return f"{mean:.3f} $\\pm{{<}}0.001$"
     return f"{mean:.3f} $\\pm$ {ci:.3f}"
 
 
@@ -185,6 +195,18 @@ def _fmt_mean_ci(mean: float, ci: float | None, metric: str, compact: bool = Fal
 # structurally defined is \notapp (n/a); a defined cell with no result yet is \pending (P); a
 # fixed-width transfer cell at the grid-dependent *global* width is out of scope (\oos, ---).
 _EVENT_SCOPE_STEMS = {"event_detection", "event_classification"}
+
+
+def _pending_legend(body: str, clause: str) -> str:
+    """``clause`` if ``body`` actually carries a ``\\pending`` cell, else "".
+
+    Every cell of the v1.1.0 matrix is complete, so the clause is dead text today, and printing a
+    key for a state the table does not contain is noise the reader has to discount. Making it
+    conditional rather than deleting it keeps the table self-explaining if a future extension -- a
+    new grid, baseline or protocol -- reintroduces an unrun cell: the marker would otherwise appear
+    with no key. The ``\\pending`` emit sites in the cell builders are untouched for the same
+    reason."""
+    return clause if r"\pending" in body else ""
 
 
 def _held_unsupported(stem: str, view: str, baseline: str | None = None) -> bool:
@@ -199,17 +221,25 @@ def _held_unsupported(stem: str, view: str, baseline: str | None = None) -> bool
 # --------------------------------------------------------------------------------------------------
 # Cell selection (single source of truth, shared with the audit dashboard's paper-numbers page).
 # --------------------------------------------------------------------------------------------------
-def _argbest_baseline(metric: str, doc_of) -> str | None:
-    """The winning ``LEARNED_BASELINES`` entry by a per-baseline score, or ``None`` if none scored.
+def _argbest_baseline(metric: str, doc_of, pool=LEARNED_BASELINES) -> str | None:
+    """The winning ``pool`` entry by a per-baseline score, or ``None`` if none scored.
 
     ``doc_of(baseline)`` returns that baseline's result doc (or ``None``); the winner is the argmax
     of ``mean_val(doc, metric)`` in METRIC_DIRECTION (lower-is-better metrics pick the minimum), ties
-    keeping the earlier ``LEARNED_BASELINES`` entry (strict ``>``). Shared kernel for the F06
+    keeping the earlier ``pool`` entry (strict ``>``). Shared kernel for the F06
     validation-selection (``best_cell_choice`` / ``best_transfer_row``) and the legacy
-    select-on-reported-set fallback."""
+    select-on-reported-set fallback.
+
+    ``pool`` is the candidate set. It defaults to :data:`LEARNED_BASELINES` — the five the held_out
+    matrix fields — which is what every result table wants. A caller that compares against an arm
+    with a NARROWER pool must pass that narrower pool, or the two sides of the comparison are drawn
+    from different candidate sets: the cross-grid transfer protocols apply only to
+    ``DEEP_BASELINES`` (``coverage.baseline_applies``), because a classical baseline has no
+    transferable weights, so a from-scratch reference selected out of all five can name a model the
+    transfer arm structurally cannot field. See :func:`supplement_lib.transfer_scratch_rows`."""
     direction = METRIC_DIRECTION.get(metric, 1)
     sel_base, sel_val = None, None
-    for baseline in LEARNED_BASELINES:
+    for baseline in pool:
         v = mean_val(doc_of(baseline), metric)
         if v is None:
             continue
@@ -218,21 +248,25 @@ def _argbest_baseline(metric: str, doc_of) -> str | None:
     return sel_base
 
 
-def best_cell_choice(rows: dict, task_id: str, test_set: str, metric: str) -> dict | None:
+def best_cell_choice(
+    rows: dict, task_id: str, test_set: str, metric: str, pool=LEARNED_BASELINES
+) -> dict | None:
     """The reported learned baseline for (task_id, test_set), or ``None`` if no result exists.
 
     F06: the reported baseline is selected on the **validation** split (``rows[...]["val"]``, the
     offline re-score written by ``hpc/rescore_validation.py``) and then its value on the requested
     ``test_set`` is reported. Selecting on validation rather than on the very test set being
     reported removes the winner's-curse (selection-on-test) bias. Direction from METRIC_DIRECTION
-    (lower-is-better metrics like MAE pick the minimum); ties keep the earlier LEARNED_BASELINES
+    (lower-is-better metrics like MAE pick the minimum); ties keep the earlier ``pool``
     entry (strict ``>``). Falls back to legacy selection-on-``test_set`` when no ``val`` doc exists
     for the cell (e.g. protocols not re-scored), so the function degrades gracefully. Returns
     ``{baseline, mean, ci, n_seeds, selected_on}``.
 
+    ``pool`` narrows the candidate set; see :func:`_argbest_baseline` for when that is required.
+
     ``rows`` is ``load_rows(grid)`` = ``{(task_id, baseline): {test_set: doc}}``."""
     # 1) select the winner by its validation-split score
-    sel_base = _argbest_baseline(metric, lambda b: rows.get((task_id, b), {}).get("val"))
+    sel_base = _argbest_baseline(metric, lambda b: rows.get((task_id, b), {}).get("val"), pool)
     if sel_base is not None:
         # 2) report the validation-selected baseline's value on the requested test_set
         rep = rows.get((task_id, sel_base), {}).get(test_set)
@@ -247,7 +281,7 @@ def best_cell_choice(rows: dict, task_id: str, test_set: str, metric: str) -> di
             "selected_on": "val",
         }
     # 3) fallback: no validation re-score for this cell -> legacy selection on the reported set
-    best_base = _argbest_baseline(metric, lambda b: rows.get((task_id, b), {}).get(test_set))
+    best_base = _argbest_baseline(metric, lambda b: rows.get((task_id, b), {}).get(test_set), pool)
     best_doc = rows.get((task_id, best_base), {}).get(test_set) if best_base is not None else None
     if best_doc is None:
         return None
@@ -461,6 +495,79 @@ def _supp_cell(rows: dict, stem: str, view: str, baseline: str, test_set: str, m
 
 
 # --------------------------------------------------------------------------------------------------
+# Full per-baseline supplement tables (supp_tab_<fn>_{test,benchmark}).
+#
+# RESTORED 2026-08-20, TRANSPOSED. The retired version laid these out as
+# ``baseline x (grid x view)`` = 1 + 4*3 = 13 columns, which overran \textwidth and only fitted
+# inside the scale-to-fit box that rendered it at 3.76-4.98 pt -- under the ~5 pt legibility floor.
+# The fix is layout, not type size (the rule recorded at _SHRINK_TO_FIT): transposing to
+# ``(grid, view) x baseline`` gives 2 + 7 = 9 columns, which fits at \scriptsize with normal
+# tabcolsep, so no scaling is involved and every table in the SI is set at the same size.
+#
+# Reading direction is also better this way round: a reader compares BASELINES against each other
+# for a fixed (grid, view), which is now a row-wise scan across adjacent columns instead of a
+# hop across four column groups.
+#
+# The body must contain exactly ONE ``\midrule`` before it, because
+# tests/integration/test_supplement_tables.py counts the five-state markers in
+# ``latex.split("\midrule")[1]`` and expects N_BODY_CELLS = 7 * 12. Grid groups are therefore
+# separated with \addlinespace, never with a rule.
+# --------------------------------------------------------------------------------------------------
+def supp_table(key: str, test_set: str) -> str:
+    r"""Full per-baseline results for one function on one held_out test set.
+
+    Rows are ``(grid, observability view)`` in :data:`GRID_ROWS` x :data:`OBS` order; columns are the
+    seven :data:`BASELINES`. Cells come from :func:`_supp_cell`, so a (view, baseline) combination
+    the function does not define renders ``\notapp`` and a defined-but-unrun cell ``\pending`` --
+    the same five-state marker set the rest of the SI uses."""
+    _, name, stem, metric, metric_label = _PF_BY_KEY[key]
+    per_grid = {g: load_rows(g) for g, _ in GRID_ROWS}
+    # Column HEADERS, so the compact _BASELINE_ACS forms rather than _BASELINE_LABEL: transposing
+    # turned these from row labels into headers, and "threshold (overcurrent)" / "majority (floor)"
+    # as headers set the column width for the whole table -- measured at up to 53.9 pt over
+    # \textwidth on the first restored draft. The long names are given in the caption instead.
+    heads = " & ".join(f"\\textbf{{{_BASELINE_ACS[b]}}}" for b in BASELINES)
+    body: list[str] = []
+    for gi, (grid, glabel) in enumerate(GRID_ROWS):
+        for vi, view in enumerate(OBS):
+            cells = [
+                _supp_cell(per_grid[grid], stem, view, baseline, test_set, metric)
+                for baseline in BASELINES
+            ]
+            head = f"\\multirow{{{len(OBS)}}}{{*}}{{{glabel}}}" if vi == 0 else ""
+            body.append(f"{head:<44} & {_OBS_SHORT[view]:<5} & " + " & ".join(cells) + r" \\")
+        if gi < len(GRID_ROWS) - 1:
+            # \addlinespace, NOT \midrule: a second rule would break the marker-count test above
+            body.append(r"\addlinespace")
+    ci_note = (
+        "the 95\\% CI half-width is shown as a compact subscript ($\\pm h$); an interval that would "
+        "exceed $[0,1]$ is instead shown truncated as $[\\text{lo},\\text{hi}]$"
+        if _is_bounded01(metric)
+        else "the 95\\% CI half-width is shown as a compact subscript ($\\pm h$) at 2 d.p"
+    )
+    return (
+        provenance_header(
+            f"hpc/paper_artifacts/build_supp_tab_{key}_{test_set}.py",
+            [_held_out_glob(f"{stem}_{{local,line,global}}", "{val," + test_set + "}")],
+        )
+        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{4pt}\n"
+        f"\\caption{{{name} --- full per-baseline results on the {_TS_LABEL[test_set]} "
+        f"(\\texttt{{held\\_out}} protocol), headline metric ({metric_label}). Rows are grid and "
+        "observability view (loc/lin/glo = local/line/global); columns are the reference baselines, "
+        "where maj.\\ is the trivial majority floor and thr.\\ the conventional overcurrent "
+        "threshold. Cells are "
+        f"mean\\,$\\pm$\\,95\\% CI over seeds (Student's $t$); {ci_note}. "
+        + _pending_legend(body, "\\pending{}~= pending; ")
+        + "\\notapp{}~= not defined for this (function, view) or baseline.}\n"
+        f"\\label{{tab:supp_{key}_{test_set}}}\n"
+        f"\\begin{{tabular}}{{l l {'c' * len(BASELINES)}}}\n\\toprule\n"
+        f"\\textbf{{Grid}} & \\textbf{{View}} & {heads} \\\\\n\\midrule\n"
+        + "\n".join(body)
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+    )
+
+
+# --------------------------------------------------------------------------------------------------
 # Main result tables (held_out) — verbatim layout of the pre-refactor make_paper_tables._table.
 # --------------------------------------------------------------------------------------------------
 def result_table(key: str) -> str:
@@ -493,8 +600,10 @@ def result_table(key: str) -> str:
         "in the Supplementary), headline metric "
         f"({metric_label}) per grid and observability view, for the two \\texttt{{held\\_out}} "
         "test sets (in-distribution vs.\\ never-trained \\texttt{eval\\_grid} family). Cells are "
-        "mean\\,$\\pm$\\,95\\% CI (Student's $t$); " + ci_note + "\\pending{}~= pending (no result "
-        "yet); \\notapp{}~= not defined for this view. Full per-baseline tables in the "
+        "mean\\,$\\pm$\\,95\\% CI (Student's $t$); "
+        + ci_note
+        + _pending_legend(body, "\\pending{}~= pending (no result yet); ")
+        + "\\notapp{}~= not defined for this view. Full per-baseline tables in the "
         "Supplementary.}\n"
         f"\\label{{tab:res_{key}}}\n" + _SHRINK_TO_FIT + "\\begin{tabular}{l ccc ccc}\n\\toprule\n"
         " & \\multicolumn{3}{c}{\\textbf{In-distribution (test)}} & "
@@ -713,8 +822,9 @@ def transfer_table(
         "\\texttt{multi\\_grid} source (20/110/345\\,kV) then \\emph{zero-shot} vs.\\ "
         "\\emph{fine-tuned} on each target grid, scored on the never-trained "
         "\\texttt{eval\\_grid} family per "
-        "observability view. Cells are mean\\,$\\pm$\\,95\\% CI; \\pending{}~= pending (no result "
-        "yet); \\oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent "
+        "observability view. Cells are mean\\,$\\pm$\\,95\\% CI; "
+        + _pending_legend(body, "\\pending{}~= pending (no result yet); ")
+        + "\\oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent "
         "\\emph{global} width).}\n"
         f"\\label{{tab:transfer_{key}}}\n"
         + _SHRINK_TO_FIT
@@ -905,7 +1015,9 @@ _FC_F1 = [
 ]
 
 
-def _sel_metric_cell(rows: dict, task_id: str, test_set: str, metric: str) -> str:
+def _sel_metric_cell(
+    rows: dict, task_id: str, test_set: str, metric: str, compact: bool = False
+) -> str:
     """The validation-selected reference baseline's value of ``metric`` on ``test_set`` (the same
     baseline chosen for the headline), as clipped mean$\\pm$ci; ``\\pending``/``\\undefm`` markers
     otherwise. The headline selection uses balanced accuracy; here we read a secondary metric of
@@ -917,7 +1029,7 @@ def _sel_metric_cell(rows: dict, task_id: str, test_set: str, metric: str) -> st
     m = mean_val(doc, metric)
     if m is None:
         return r"\undefm"  # metric undefined for this cell (e.g. class absent) -- never zero
-    return _fmt_mean_ci(m, ci_val(doc, metric), metric)
+    return _fmt_mean_ci(m, ci_val(doc, metric), metric, compact=compact)
 
 
 #: Short LaTeX label for a selected baseline, used where the table names the reference identity.
@@ -938,6 +1050,80 @@ def _sel_baseline_cell(rows: dict, task_id: str, test_set: str) -> str:
     if choice is None:
         return r"\pending"
     return _BASELINE_ACS.get(choice["baseline"], choice["baseline"])
+
+
+def protection_rate_table() -> str:
+    """SI table: the protection-grade confusion pair for the binary functions (FD, ED) of the
+    validation-selected reference, alongside that reference's identity and headline balanced
+    accuracy, per (function, view, grid) on the in-distribution and never-trained sets.
+
+    Carrying balanced accuracy and the selected architecture in the SAME row as MDR/FAR is what
+    makes the ``eval_grid`` collapse cells self-evident: a row reading ``0.50`` balanced accuracy
+    with MDR $\\approx 0$ and FAR $\\approx 1$ is an always-positive decision rule, not a random
+    one. No test against random prediction is performed or implied --- the behaviour is read
+    directly off the confusion-derived rates.
+
+    RESTORED 2026-08-20. The two test-set blocks stay SIDE BY SIDE, because comparing a cell's
+    in-distribution behaviour against its ``eval_grid`` behaviour is the entire point of the table
+    and stacking them would put the pair four rows apart. What changed is the cell rendering: the
+    six numeric columns now use the compact subscript CI form (as the per-baseline tables do)
+    instead of ``mean $\\pm$ ci``, which is what let the old 10-column layout fit only inside the
+    scale-to-fit box that rendered it at 3.76--4.98 pt. Compact cells fit at \\scriptsize with no
+    scaling."""
+    per_grid = {g: load_rows(g) for g, _ in GRID_ROWS}
+    body = []
+    specs = [("FD", "fault_detection", OBS), ("ED", "event_detection", ("global",))]
+    for flabel, stem, views in specs:
+        mk, fk = _BINARY_RATE_KEYS[stem]
+        for v in views:
+            for g, glabel in GRID_ROWS:
+                r = per_grid[g]
+                tid = f"{stem}_{v}"
+                cells = []
+                for ts in TEST_SETS:
+                    cells.append(_sel_baseline_cell(r, tid, ts))
+                    cells.append(_sel_metric_cell(r, tid, ts, "balanced_accuracy", compact=True))
+                    cells += [_sel_metric_cell(r, tid, ts, key, compact=True) for key in (mk, fk)]
+                # ASCII-safe separator: a literal U+00B7 in the .tex renders as mojibake under the
+                # T1/inputenc combination this document uses.
+                body.append(f"{flabel}\\,/\\,{v} & {glabel} & " + " & ".join(cells) + r" \\")
+            body.append(r"\midrule")
+    body = body[:-1]  # drop the trailing rule
+    return (
+        provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_protection.py",
+            [
+                _held_out_glob("{fault_detection_{local,line,global},event_detection_global}"),
+                "  metrics: balanced_accuracy, missed_fault_rate / missed_event_rate,",
+                "           false_alarm_rate / false_event_trip_rate (aggregate over five seeds)",
+            ],
+        )
+        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{3.4pt}\n"
+        "\\caption{Protection-grade behaviour of the binary functions (\\ac{fd}, \\ac{ed}) for the "
+        "\\emph{validation-selected} reference baseline: its identity, headline balanced accuracy "
+        "($\\uparrow$), dependability (\\ac{mdr}, missed-fault/-event rate $\\downarrow$) and "
+        "security (\\ac{far}, false-alarm/-trip rate $\\downarrow$), on the in-distribution test "
+        "split and the evaluation-only \\texttt{eval\\_grid} family. \\ac{fd} is scored on windows of "
+        "fault episodes, so its \\ac{far} is measured on the pre-/post-fault negatives of those "
+        "episodes and does not describe security against benign switching. A row with balanced "
+        "accuracy $\\approx 0.5$, \\ac{mdr}~$\\approx 0$ and \\ac{far}~$\\approx 1$ is a degenerate "
+        "\\emph{always-positive} decision rule rather than random prediction; no statistical test "
+        "against a random predictor is performed. Cells are mean with the 95\\% CI half-width as a "
+        "compact subscript ($\\pm h$) over five seeds."
+        + _pending_legend(body, " \\pending{}~= pending.")
+        + "}\n"
+        "\\label{tab:supp_protection}\n"
+        "\\begin{tabular}{l l l ccc l ccc}\n\\toprule\n"
+        " & & \\multicolumn{4}{c}{\\textbf{In-distribution (test)}} & "
+        "\\multicolumn{4}{c}{\\textbf{Evaluation-only (\\texttt{eval\\_grid})}} \\\\\n"
+        "\\cmidrule(lr){3-6}\\cmidrule(lr){7-10}\n"
+        "\\textbf{Function\\,/\\,view} & \\textbf{Grid} & \\textbf{ref.} & "
+        "\\textbf{bal.\\ acc.} & "
+        "\\textbf{\\acs{mdr}} & \\textbf{\\acs{far}} & \\textbf{ref.} & \\textbf{bal.\\ acc.} & "
+        "\\textbf{\\acs{mdr}} & \\textbf{\\acs{far}} \\\\\n\\midrule\n"
+        + "\n".join(body)
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+    )
 
 
 def fc_per_class_f1_table() -> str:
@@ -1139,8 +1325,10 @@ def diagnostic_overview_table() -> str:
         + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{4pt}\n"
         "\\caption{Extended (diagnostic) functions: per-baseline balanced accuracy ($\\uparrow$) on "
         "the in-distribution test set, each function at its natural observability view. Reported "
-        "per baseline (no single `best') for the full picture; \\pending{}~= pending. The "
-        "never-trained, per-class, and protection-grade breakdowns are in the leaderboard.}\n"
+        "per baseline (no single `best') for the full picture."
+        + _pending_legend(body, " \\pending{}~= pending.")
+        + " The never-trained, per-class, and protection-grade breakdowns are in the "
+        "leaderboard.}\n"
         "\\label{tab:supp_diagnostics}\n"
         + _SHRINK_TO_FIT
         + f"\\begin{{tabular}}{{L{{3.4cm}} l {'c ' * len(_DIAG_BASELINES)}}}\n\\toprule\n"
@@ -1230,10 +1418,17 @@ def val_selection_table() -> str:
 def build_supplement_tables() -> dict[str, str]:
     """``{filename: latex}`` for the supplementary tables (pure, deterministic)."""
     # The ten per-baseline supp_tab_<fn>_{test,benchmark} fragments and supp_tab_protection were
-    # retired on 2026-08-17 and replaced by fig_supp_<fn> / fig_supp_protection: at 13 and 10
-    # columns they only fitted inside a scale-to-fit box, which rendered them at 3.76-4.98 pt.
-    # Their generators (supp_table, protection_rate_table) went with them.
+    # retired on 2026-08-17 (they only fitted inside a scale-to-fit box, which rendered them at
+    # 3.76-4.98 pt) and RESTORED on 2026-08-20 with layouts that fit \textwidth unscaled: the
+    # per-baseline tables transposed to (grid, view) x baseline = 9 columns, and the protection
+    # table keeping its side-by-side test-set blocks but rendering cells in the compact subscript
+    # CI form. The fig_supp_<fn> / fig_supp_protection figures remain; tables and figures now show
+    # the same numbers in the two registers (scannable vs at-a-glance).
     tables = {}
+    for k in ("fd", "fc", "fl", "ed", "ec"):
+        for ts in TEST_SETS:
+            tables[f"supp_tab_{k}_{ts}.tex"] = supp_table(k, ts)
+    tables["supp_tab_protection.tex"] = protection_rate_table()
     tables["supp_tab_fc_perclass.tex"] = fc_per_class_f1_table()
     tables["supp_tab_splits.tex"] = dataset_split_table()
     tables["supp_tab_fc_support.tex"] = fc_support_table()

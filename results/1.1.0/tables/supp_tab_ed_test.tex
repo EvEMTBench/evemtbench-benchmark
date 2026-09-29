@@ -1,0 +1,33 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_ed_test.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/event_detection_{local,line,global}/held_out/<grid>/<baseline>/{val,test}/result.json
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{4pt}
+\caption{Event detection (\ac{ed}) --- full per-baseline results on the in-distribution (test) (\texttt{held\_out} protocol), headline metric (balanced accuracy $\uparrow$). Rows are grid and observability view (loc/lin/glo = local/line/global); columns are the reference baselines, where maj.\ is the trivial majority floor and thr.\ the conventional overcurrent threshold. Cells are mean\,$\pm$\,95\% CI over seeds (Student's $t$); the 95\% CI half-width is shown as a compact subscript ($\pm h$); an interval that would exceed $[0,1]$ is instead shown truncated as $[\text{lo},\text{hi}]$. \notapp{}~= not defined for this (function, view) or baseline.}
+\label{tab:supp_ed_test}
+\begin{tabular}{l l ccccccc}
+\toprule
+\textbf{Grid} & \textbf{View} & \textbf{maj.} & \textbf{thr.} & \textbf{\acs{rf}} & \textbf{\acs{mlp}} & \textbf{\acs{gru}} & \textbf{\acs{cnn}} & \textbf{\acs{resnet}} \\
+\midrule
+\multirow{3}{*}{CIGR\'E MV (20\,kV)}         & loc   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & lin   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.810$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.748$\,{\scriptscriptstyle\pm0.002}$ & 0.785$\,{\scriptscriptstyle\pm0.083}$ & 0.752$\,{\scriptscriptstyle\pm0.015}$ & 0.884$\,{\scriptscriptstyle\pm0.019}$ \\
+\addlinespace
+\multirow{3}{*}{Double Line (110\,kV)}       & loc   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & lin   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.804$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.786$\,{\scriptscriptstyle\pm0.001}$ & 0.911$\,{\scriptscriptstyle\pm0.012}$ & 0.797$\,{\scriptscriptstyle\pm0.007}$ & 0.866$\,{\scriptscriptstyle\pm0.033}$ \\
+\addlinespace
+\multirow{3}{*}{Prot.\ Ref.\ (110\,kV)}      & loc   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & lin   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.784$\,{\scriptscriptstyle\pm0.001}$ & 0.790$\,{\scriptscriptstyle\pm0.003}$ & 0.881$\,{\scriptscriptstyle\pm0.045}$ & 0.761$\,{\scriptscriptstyle\pm0.009}$ & 0.873$\,{\scriptscriptstyle\pm0.027}$ \\
+\addlinespace
+\multirow{3}{*}{IEEE 39-Bus (345\,kV)}       & loc   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & lin   & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp & \notapp \\
+                                             & glo   & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & \notapp & 0.930$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.843$\,{\scriptscriptstyle\pm0.001}$ & 0.770$\,{\scriptscriptstyle\pm0.051}$ & 0.786$\,{\scriptscriptstyle\pm0.005}$ & 0.832$\,{\scriptscriptstyle\pm0.058}$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -1,0 +1,41 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_protection.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   outputs/1.0.0/{fault_detection_{local,line,global},event_detection_global}/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
+%     metrics: balanced_accuracy, missed_fault_rate / missed_event_rate,
+%              false_alarm_rate / false_event_trip_rate (aggregate over five seeds)
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{3.4pt}
+\caption{Protection-grade behaviour of the binary functions (\ac{fd}, \ac{ed}) for the \emph{validation-selected} reference baseline: its identity, headline balanced accuracy ($\uparrow$), dependability (\ac{mdr}, missed-fault/-event rate $\downarrow$) and security (\ac{far}, false-alarm/-trip rate $\downarrow$), on the in-distribution test split and the evaluation-only \texttt{eval\_grid} family. \ac{fd} is scored on windows of fault episodes, so its \ac{far} is measured on the pre-/post-fault negatives of those episodes and does not describe security against benign switching. A row with balanced accuracy $\approx 0.5$, \ac{mdr}~$\approx 0$ and \ac{far}~$\approx 1$ is a degenerate \emph{always-positive} decision rule rather than random prediction; no statistical test against a random predictor is performed. Cells are mean with the 95\% CI half-width as a compact subscript ($\pm h$) over five seeds.}
+\label{tab:supp_protection}
+\begin{tabular}{l l l ccc l ccc}
+\toprule
+ & & \multicolumn{4}{c}{\textbf{In-distribution (test)}} & \multicolumn{4}{c}{\textbf{Evaluation-only (\texttt{eval\_grid})}} \\
+\cmidrule(lr){3-6}\cmidrule(lr){7-10}
+\textbf{Function\,/\,view} & \textbf{Grid} & \textbf{ref.} & \textbf{bal.\ acc.} & \textbf{\acs{mdr}} & \textbf{\acs{far}} & \textbf{ref.} & \textbf{bal.\ acc.} & \textbf{\acs{mdr}} & \textbf{\acs{far}} \\
+\midrule
+FD\,/\,local & CIGR\'E MV (20\,kV) & \acs{rf} & 0.836$\,{\scriptscriptstyle\pm0.002}$ & 0.26$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.06$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.983$\,{\scriptscriptstyle\pm0.001}$ & 0.02$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.01$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+FD\,/\,local & Double Line (110\,kV) & \acs{rf} & 0.881$\,{\scriptscriptstyle\pm0.001}$ & 0.20$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.04$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.499$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 1.00$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+FD\,/\,local & Prot.\ Ref.\ (110\,kV) & \acs{resnet} & 0.949$\,{\scriptscriptstyle\pm0.016}$ & 0.09$\,{\scriptscriptstyle\pm0.02}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ & \acs{resnet} & 0.995$\,{\scriptscriptstyle\pm0.004}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ \\
+FD\,/\,local & IEEE 39-Bus (345\,kV) & \acs{rf} & 0.931$\,{\scriptscriptstyle\pm0.001}$ & 0.07$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.07$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.886$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.23$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+\midrule
+FD\,/\,line & CIGR\'E MV (20\,kV) & \acs{rf} & 0.838$\,{\scriptscriptstyle\pm0.002}$ & 0.25$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.08$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.980$\,{\scriptscriptstyle\pm0.003}$ & 0.02$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.03$\,{\scriptscriptstyle\pm0.01}$ \\
+FD\,/\,line & Double Line (110\,kV) & \acs{resnet} & 0.906$\,{\scriptscriptstyle\pm0.051}$ & 0.19$\,{\scriptscriptstyle\pm0.10}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{resnet} & 0.991$\,{\scriptscriptstyle\pm0.008}$ & 0.02$\,{\scriptscriptstyle\pm0.02}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+FD\,/\,line & Prot.\ Ref.\ (110\,kV) & \acs{resnet} & 0.914$\,{\scriptscriptstyle\pm0.026}$ & 0.16$\,{\scriptscriptstyle\pm0.06}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ & \acs{resnet} & 0.990$\,{\scriptscriptstyle\pm0.003}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ \\
+FD\,/\,line & IEEE 39-Bus (345\,kV) & \acs{rf} & 0.935$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.07$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.06$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.868$\,{\scriptscriptstyle\pm0.004}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.26$\,{\scriptscriptstyle\pm0.01}$ \\
+\midrule
+FD\,/\,global & CIGR\'E MV (20\,kV) & \acs{rf} & 0.827$\,{\scriptscriptstyle\pm0.003}$ & 0.24$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.11$\,{\scriptscriptstyle\pm0.01}$ & \acs{rf} & 0.985$\,{\scriptscriptstyle\pm0.001}$ & 0.02$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.01$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+FD\,/\,global & Double Line (110\,kV) & \acs{rf} & 0.890$\,{\scriptscriptstyle\pm0.001}$ & 0.19$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.03$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 1.00$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+FD\,/\,global & Prot.\ Ref.\ (110\,kV) & \acs{cnn} & 0.878$\,{\scriptscriptstyle\pm0.010}$ & 0.23$\,{\scriptscriptstyle\pm0.03}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ & \acs{cnn} & 0.987$\,{\scriptscriptstyle\pm0.003}$ & 0.03$\,{\scriptscriptstyle\pm0.01}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+FD\,/\,global & IEEE 39-Bus (345\,kV) & \acs{rf} & 0.934$\,{\scriptscriptstyle\pm0.001}$ & 0.06$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.07$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.500$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 1.00$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+\midrule
+ED\,/\,global & CIGR\'E MV (20\,kV) & \acs{resnet} & 0.884$\,{\scriptscriptstyle\pm0.019}$ & 0.21$\,{\scriptscriptstyle\pm0.04}$ & 0.02$\,{\scriptscriptstyle\pm0.01}$ & \acs{resnet} & 0.989$\,{\scriptscriptstyle\pm0.007}$ & 0.01$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ \\
+ED\,/\,global & Double Line (110\,kV) & \acs{gru} & 0.911$\,{\scriptscriptstyle\pm0.012}$ & 0.16$\,{\scriptscriptstyle\pm0.02}$ & 0.02$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{gru} & 0.990$\,{\scriptscriptstyle\pm0.003}$ & 0.01$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.01$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+ED\,/\,global & Prot.\ Ref.\ (110\,kV) & \acs{gru} & 0.881$\,{\scriptscriptstyle\pm0.045}$ & 0.22$\,{\scriptscriptstyle\pm0.09}$ & 0.02$\,{\scriptscriptstyle\pm0.01}$ & \acs{gru} & 0.994$\,{\scriptscriptstyle\pm0.004}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ & 0.01$\,{\scriptscriptstyle\pm0.01}$ \\
+ED\,/\,global & IEEE 39-Bus (345\,kV) & \acs{rf} & 0.930$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.08$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.06$\,{\scriptscriptstyle\pm{<}0.01}$ & \acs{rf} & 0.506$\,{\scriptscriptstyle\pm{<}0.001}$ & 0.00$\,{\scriptscriptstyle\pm{<}0.01}$ & 0.99$\,{\scriptscriptstyle\pm{<}0.01}$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

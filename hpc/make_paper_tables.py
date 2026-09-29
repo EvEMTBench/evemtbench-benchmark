@@ -28,7 +28,7 @@ from pathlib import Path
 
 # hpc/ is not a package; the per-artifact builders live in the paper_artifacts/ sibling dir.
 sys.path.insert(0, str(Path(__file__).resolve().parent / "paper_artifacts"))
-from paper_lib import (  # noqa: E402,F401  (re-exported for downstream importers)
+from paper_lib import (  # noqa: F401  (re-exported for downstream importers)
     GEN_DIR,
     GRID_ROWS,
     OBS,

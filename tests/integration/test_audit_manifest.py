@@ -5,20 +5,16 @@ paper_anchor / Contributions bullet is still backed by the manuscript. A reword 
 moved gate assertion fails here, naming the exact row to update."""
 
 import re
-import sys
 from pathlib import Path
 
 import pytest
 
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+import audit_manifest as MAN
+import make_audit
+from evemtbench.coverage import ALL_BASELINES
+from evemtbench.tasks.registry import get_task, list_tasks
 
-import audit_manifest as MAN  # noqa: E402
-import make_audit  # noqa: E402
-from evemtbench.coverage import ALL_BASELINES  # noqa: E402
-from evemtbench.tasks.registry import get_task, list_tasks  # noqa: E402
+REPO = Path(__file__).resolve().parents[2]
 
 MAIN_TEX = REPO / "paper" / "manuscript" / "main.tex"
 

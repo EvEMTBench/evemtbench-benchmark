@@ -4,7 +4,6 @@ a swallowed corrupt ``result.json`` must each print a ``[warn]`` line to stderr 
 table bytes stay identical (the warnings are observability only, never content)."""
 
 import json
-import sys
 from pathlib import Path
 
 import pytest
@@ -15,9 +14,6 @@ REPO = Path(__file__).resolve().parents[2]
 
 
 def _load_modules():
-    for p in (str(REPO / "hpc"), str(REPO / "hpc" / "paper_artifacts")):
-        if p not in sys.path:
-            sys.path.insert(0, p)
     import paper_lib
 
     import make_results

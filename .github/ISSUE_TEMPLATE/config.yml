@@ -1,8 +1,8 @@
 blank_issues_enabled: true
 contact_links:
   - name: Security report (private)
-    url: https://github.com/
+    url: https://github.com/EvEMTBench/evemtbench-benchmark/security/policy
     about: "Do not file security issues publicly — email julian.oelhaf@fau.de (see SECURITY.md)."
   - name: Documentation
-    url: https://github.com/
+    url: https://github.com/EvEMTBench/evemtbench-benchmark/tree/main/docs
     about: "Start with docs/README.md (index), docs/quickstart.md, and docs/DATA_LAYOUT.md."

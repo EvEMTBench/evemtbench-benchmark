@@ -7,22 +7,26 @@ tree."""
 import csv
 import io
 import json
-import sys
 from pathlib import Path
 
-REPO = Path(__file__).resolve().parents[2]
-for p in (REPO / "src", REPO / "hpc", REPO / "hpc" / "paper_artifacts"):
-    if str(p) not in sys.path:
-        sys.path.insert(0, str(p))
+import pytest
 
-import make_results_bundle as MRB  # noqa: E402
-from evemtbench.version import BENCHMARK_VERSION, results_version  # noqa: E402
+import make_results_bundle as MRB
+from evemtbench.version import BENCHMARK_VERSION, results_version
+
+REPO = Path(__file__).resolve().parents[2]
 
 VER = BENCHMARK_VERSION
 # held_out fixtures must live in the tree the per-protocol resolution reads (1.0.0 under the
 # v1.1.0 scoped revision); the bundle DIRECTORY stays keyed by the contract version.
 HO_VER = results_version("held_out")
 BASE = f"results/{VER}"
+# The bundle copies the manuscript's committed fragments; the public export prunes paper/, so the
+# tests that need those fragments skip there (the shipped results/<v>/tables/ are the copy).
+_FRAGMENTS = REPO / "paper" / "manuscript" / "generated"
+needs_manuscript = pytest.mark.skipif(
+    not _FRAGMENTS.is_dir(), reason="private manuscript not present (public release clone)"
+)
 
 
 def _write_cell(root: Path, task, grid, baseline, mean, *, version=HO_VER, ci95=0.02):
@@ -49,6 +53,7 @@ def _write_cell(root: Path, task, grid, baseline, mean, *, version=HO_VER, ci95=
         )
 
 
+@needs_manuscript
 def test_builder_deterministic_and_wellformed_without_outputs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # no outputs/ -> empty aggregate; tables are copied, not rendered
     a = MRB.build_results_bundle("outputs")
@@ -107,6 +112,7 @@ def test_strictly_version_scoped(tmp_path, monkeypatch):
     assert all(r["mean"] != 0.10 for r in records), "the 9.9.9 value must not appear"
 
 
+@needs_manuscript
 def test_tables_are_a_byte_copy_of_the_committed_fragments(tmp_path, monkeypatch):
     """results/<v>/tables/*.tex must be a byte-identical COPY of the manuscript's committed
     fragments — so the public bundle and the private manuscript can never disagree.

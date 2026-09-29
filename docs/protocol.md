@@ -7,9 +7,15 @@ here rather than restating it. Grids are documented in [grids.md](grids.md), eve
 
 ## Task matrix
 
-Tasks = **{FD, FC, FL} × {local, line, global}** = 9 task ids per grid
-(`<function>_<observability>`, e.g. `fault_detection_line`). Observability is defined in
-[grids.md](grids.md).
+The registry (`src/evemtbench/tasks/registry.py`) holds **24 task ids across 12 functions**
+(`<function>_<observability>`, e.g. `fault_detection_line`): the fault triad (FD, FC, FL) and the
+three fault attributes (`fault_grounded`, `fault_phase`, `fault_category`) at each of
+**{local, line, global}** (18 ids), plus six **`global`-only** event-scope tasks
+(`event_detection_global`, `switch_detection_global`, `event_state_global`,
+`switch_type_global`, `fault_origin_global`, `event_classification_global`). The full list with
+tiers and label types is the task table in the [README](../README.md#tasks). Observability is
+defined in [grids.md](grids.md). The table below covers the fault triad; the other functions are
+specified in their [task cards](task_cards/).
 
 | function | id stem | label kind | classes | valid samples (windows scored) |
 |---|---|---|---|---|
@@ -34,12 +40,14 @@ Tasks = **{FD, FC, FL} × {local, line, global}** = 9 task ids per grid
 - Label derivation is pure functions of the windows `y` (`tasks/labels/`), valid-sample masks in
   `tasks/valid_samples.py`. A window outside a task’s valid set is never scored.
 
-**Planned (not yet implemented/scored) — event-scope tasks** that extend beyond faults across the
-full [taxonomy](taxonomy.md): **Event Detection** (relay trip/no-trip incl. benign switching /
-`no_event` negatives — [task_cards/event_detection.md](task_cards/event_detection.md)) and **Event
-Classification** (family 3-class, then the full event-type taxonomy —
-[task_cards/event_classification.md](task_cards/event_classification.md)). Those cards are the
-implementation contract; the data already supports them.
+**Event-scope tasks** extend beyond faults across the full [taxonomy](taxonomy.md) and are
+registered and scored (`global` only): **Event Detection** (relay trip/no-trip incl. benign
+switching / `no_event` negatives — [task_cards/event_detection.md](task_cards/event_detection.md))
+and **Event Classification** (the full event-type taxonomy —
+[task_cards/event_classification.md](task_cards/event_classification.md)), alongside event state,
+switch detection/type and fault origin ([task_cards/event_state.md](task_cards/event_state.md),
+[task_cards/switch_tasks.md](task_cards/switch_tasks.md),
+[task_cards/fault_attributes.md](task_cards/fault_attributes.md)).
 
 ## Protocols
 
@@ -98,20 +106,23 @@ Design: [design/pretrain_transfer.md](design/pretrain_transfer.md).
   > topologies per corpus, so per-class support survives grouping. Leakage gates:
   > `splits.leakage.assert_group_disjoint`, `verify_protocol_regenerates`, and the committed
   > per-grid `audit.json`. Adopting the grouped splits invalidated the v1.0 pre-trained
-  > checkpoints and transfer results (144 pre-training + 1 152 transfer cells → re-run under
-  > `outputs/1.1.0/`; see `docs/versioning.md`).
+  > checkpoints and transfer results (every pre-training and transfer cell → re-run under
+  > `outputs/1.1.0/`; see `docs/versioning.md` and the committed `coverage_snapshot.json`).
 - **`transfer_zeroshot`** — initialise from that checkpoint and evaluate a reference grid's
   `adapt_grid` `test` and `benchmark` families with **no target training** (target topology unseen).
 - **`transfer_finetune`** — initialise from the checkpoint, fine-tune on the reference grid's
-  `adapt_grid` train split, then score its `benchmark` family. Reuses the target's committed
+  `adapt_grid` train split, then score its `adapt_grid` `test` and `benchmark` families (the same
+  test sets as `held_out`; `coverage.expected_test_sets`). Reuses the target's committed
   `held_out` split at load time (no new split files).
 - **Normalization:** these default to **per-window z-score** (each window standardized by its own
   per-channel mean/std over time) — leakage-free and voltage-invariant, so a 20 kV-pretrained model
   transfers across voltage levels. `held_out` keeps `none`. Recorded in `run_record.json`.
 - **Baselines:** the deep baselines only (`mlp/gru/cnn/resnet` — transferable weights). The target's
   in-distribution `held_out` majority is the reference floor.
-- Reporting groups targets by **voltage match vs the 20 kV source** (same-voltage `cigre_mv` vs
-  cross-voltage 110/345 kV), never pooled.
+- **Sources:** every transfer cell is scored once per pre-training source grid
+  (`template_20kv`, `template_110kv`, `template_345kv`; `coverage.PRETRAIN_GRIDS`). Reporting
+  groups results **by source** (matched- vs cross-voltage source→target pairs), never pooled
+  across sources.
 
 **`cross_topology` / GNN** (planned, not yet implemented). The `global`-view cross-grid track: a
 graph-aware model consuming variable cubicle sets across the 4 reference grids. See

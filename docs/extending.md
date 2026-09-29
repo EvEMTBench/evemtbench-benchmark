@@ -3,9 +3,10 @@
 For maintainers/collaborators: how to add grids, tasks, and baselines, and how the HPC run/results
 machinery works. Public-facing usage is in [submission.md](submission.md). **How to *operate* the
 benchmark** (dispatch checklist, cadence tiers, loop/watcher conventions, results-integrity gate) is
-in [operating.md](internal/operating.md); dated mistakes + fixes are in [lessons.md](internal/lessons.md). The
+in `docs/internal/operating.md`; dated mistakes + fixes are in `docs/internal/lessons.md`. The
 engineering *principles* to apply when writing/changing code (SWE + MLOps, with primary sources) are in
-[internal/agent/engineering.md](internal/agent/engineering.md).
+`docs/internal/agent/engineering.md`. These internal documents live in the development repository
+only; they are not part of the public release.
 
 ## Add a grid
 
@@ -31,8 +32,10 @@ fault type outside the vocab must be excluded by `valid_samples`).
 ## Add a baseline
 
 Implement `fit(task)` / `predict(view) -> predictions_frame` (mirror `baselines/cnn.py`); register
-in `runner.py::_make_baseline`, the `--baseline` choices, and `coverage.py::ALL_BASELINES`
-(+ `baseline_applies` if it's restricted, like `threshold`). See [baselines.md](baselines.md).
+its factory in `runner.py::BASELINE_FACTORIES` (in-tree) or via `runner.register_baseline()`
+(third-party, before `runner.main()`; see `examples/byo_model.py`) — `_make_baseline` and the
+`--baseline` choices both read that registry, so nothing else in the runner changes — and add it to
+`coverage.py::ALL_BASELINES` (+ `baseline_applies` if it's restricted, like `threshold`). See [baselines.md](baselines.md).
 
 ## Add a protocol
 
@@ -92,13 +95,18 @@ The `global` view scales with topology (48 → 420 ch). Two mechanisms keep it i
 - **Per-batch standardization** (mlp/gru/cnn) — no full standardized copy; predict moves batches to
   the GPU one at a time (a 33 GB view won't fit a 16 GB GPU otherwise).
 
-With these two mechanisms the `global` view runs on a single GPU at **`GPU_MEM=50G`** for every grid
-(streaming view; per-batch standardization never materializes the full array) — the loop submits one
-GPU job per global family (FD/FC/FL) so they run concurrently. IEEE-39 just gets a longer walltime
-(`TIME=23:00:00`); the classical CPU baselines run at `CPU_MEM=120G`.
+With these two mechanisms the `global` view runs within a single GPU allocation for every grid
+(streaming view; per-batch standardization never materializes the full array). `hpc/submit.sh`
+does not request host memory on Alex (`--mem` is forbidden there; Alex allocates host RAM per GPU;
+`USE_MEM=1 MEM=…` is honoured only on TinyGPU). Its resource knobs are `GRES` (default from the
+cluster profile, `hpc/clusters/<CLUSTER>.env`), `TIME` (default `24:00:00`, the cluster cap),
+`CPUS_PER_TASK`, and `MIG_CPUS` for all-classical baseline sets, which are auto-routed to an
+`a100mig` slice instead of a full GPU. Sweeps longer than the 24 h wall use `SPLIT_BASELINES=1`
+and/or `CHAIN=K` (see the `hpc/submit.sh` header).
 
 ## Gotchas & lessons
 
 Operating mistakes (duplicate loops, NFS-idle staging, noisy watchers, result drift, …) and the
 standing gotchas (`GROUPS` builtin, running-cells-read-as-pending, refit-from-scratch) now live in
-the dated [lessons.md](internal/lessons.md) log. Add a row there when something bites.
+the dated `docs/internal/lessons.md` log (development repository only). Add a row there when
+something bites.

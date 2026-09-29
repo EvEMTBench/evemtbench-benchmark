@@ -32,9 +32,9 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 
 os.environ.setdefault("MPLBACKEND", "Agg")  # headless rendering (no display / no X server)
 
-import matplotlib.pyplot as plt  # noqa: E402
-import paperfig_style as style  # noqa: E402
-from paper_lib import (  # noqa: E402
+import matplotlib.pyplot as plt
+import paperfig_style as style
+from paper_lib import (
     _BINARY_RATE_KEYS,
     _PF_BY_KEY,
     BASELINES,
@@ -50,9 +50,9 @@ from paper_lib import (  # noqa: E402
     per_baseline_matrix,
     transfer_series,
 )
-from supplement_lib import TRANSFER_VIEWS  # noqa: E402
+from supplement_lib import TRANSFER_VIEWS
 
-from evemtbench.coverage import PRETRAIN_GRIDS  # noqa: E402
+from evemtbench.coverage import PRETRAIN_GRIDS
 
 #: Functions whose only defined view is ``global`` — one panel row instead of three.
 _GLOBAL_ONLY = {"ed", "ec"}

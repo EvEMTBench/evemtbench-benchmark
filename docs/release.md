@@ -24,8 +24,8 @@ is enforced by `tests/unit/test_version_consistency.py`, so drift fails CI long 
    the consistency test forces all three to move together.
 5. **Finalize `CHANGELOG.md`** for the version (the consistency test requires the section).
 6. **Snapshot the live tables**: the paper tables are already a live gated view (populated from
-   `outputs/`, committed by the publisher each cycle — see `paper/AGENTS.md`). For a submission
-   snapshot ensure the sweep is complete (or accounted for), then
+   `outputs/`, committed by the publisher each cycle — see the paper-agent notes in the development
+   repository, which are not part of the public tree). For a submission snapshot ensure the sweep is complete (or accounted for), then
    `PYTHONPATH=src python hpc/check_results_fresh.py --fix` so `generated/*.tex` match the frozen
    corpus, then rebuild **both** data figures from the matplotlib env (`$PAPERFIGS_PY`, via `srun`):
    `hpc/paper_artifacts/build_fig_synthesis.py` and `build_fig_transfer_overview.py`. Each writes

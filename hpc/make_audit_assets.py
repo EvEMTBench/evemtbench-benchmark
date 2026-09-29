@@ -17,27 +17,26 @@ from __future__ import annotations
 
 import argparse
 import json
+import os
 import sys
 from pathlib import Path
 
 import numpy as np
 
-_REPO = Path(__file__).resolve().parents[1]
-for _p in (_REPO / "src", _REPO / "hpc"):
-    if str(_p) not in sys.path:
-        sys.path.insert(0, str(_p))
+sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "src"))
+sys.path.insert(0, str(Path(__file__).resolve().parent))
 
-import os  # noqa: E402
+from evemtbench.data.roots import GRIDS
+from evemtbench.data.schema import is_fault
+from evemtbench.data.windows import CHANNELS_PER_CUBICLE, load_windows
+from evemtbench.splits.loader import read_held_out_splits
+from evemtbench.tasks.registry import get_task, list_tasks
 
 # The asset builder needs the real data root from the environment (no hardcoded machine paths).
 if not (os.environ.get("EVEMTBENCH_DATA_ROOT") or os.environ.get("EVEMT_ROOT")):
     raise SystemExit("make_audit_assets: set EVEMT_ROOT (or EVEMTBENCH_DATA_ROOT) to the data root")
 
-from evemtbench.data.roots import GRIDS  # noqa: E402
-from evemtbench.data.schema import is_fault  # noqa: E402
-from evemtbench.data.windows import CHANNELS_PER_CUBICLE, load_windows  # noqa: E402
-from evemtbench.splits.loader import read_held_out_splits  # noqa: E402
-from evemtbench.tasks.registry import get_task, list_tasks  # noqa: E402
+_REPO = Path(__file__).resolve().parents[1]
 
 ASSETS = _REPO / "audit" / "assets"
 WAVE_GRID = "double_line"  # the illustrative grid for per-function example windows

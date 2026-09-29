@@ -5,7 +5,7 @@ import sys
 from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent))
-from paper_lib import result_table, run  # noqa: E402
+from paper_lib import result_table, run
 
 if __name__ == "__main__":
     run("tab_res_fd.tex", result_table("fd"))

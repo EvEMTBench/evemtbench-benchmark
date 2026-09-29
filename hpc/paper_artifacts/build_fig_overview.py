@@ -16,14 +16,14 @@ from pathlib import Path
 sys.path.insert(0, str(Path(__file__).resolve().parent))
 os.environ.setdefault("MPLBACKEND", "Agg")
 
-import matplotlib.pyplot as plt  # noqa: E402
+import matplotlib.pyplot as plt
+from matplotlib.patches import FancyArrowPatch, FancyBboxPatch
+from paper_lib import FIG_DIR
 
 # Embed TrueType fonts (Type 42), not Type 3 bitmap fonts, so the PDF meets the journal's
 # scalable-font figure requirement (see paper/manuscript/document_check.md).
 plt.rcParams["pdf.fonttype"] = 42
 plt.rcParams["ps.fonttype"] = 42
-from matplotlib.patches import FancyArrowPatch, FancyBboxPatch  # noqa: E402
-from paper_lib import FIG_DIR  # noqa: E402
 
 NAME = "fig_overview.pdf"
 _INK = "#1a1a1a"

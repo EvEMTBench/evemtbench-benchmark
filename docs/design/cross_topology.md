@@ -14,13 +14,15 @@
 
 The strongest form of generalization for protection ML is **train on some grids, protect an
 unseen one**. Today's tasks are per-grid (`held_out` within a topology); the `benchmark` family
-shifts the *scenario distribution*, not the *topology*. The `train` family (multi-grid,
-Template20kV variants) exists in raw form precisely for this — and the M2 aux layer already
-serves each grid's networkx topology graph, so graph-conditioned models have their input.
+shifts the *scenario distribution*, not the *topology*. The `multi_grid` family (formerly `train`;
+20/110/345 kV template variants) is windowed and already used for pre-training by the built
+transfer protocols, though stored in the portable 12-channel double-line view, which yields only the `local` / `line` inputs — and the M2 aux layer
+already serves each grid's networkx topology graph, so graph-conditioned models have their input.
 
 ## Protocol sketch (`cross_topology`)
 
-- **Train:** all episodes of grids G \ {g} (+ the `train` family once windowed).
+- **Train:** all episodes of grids G \ {g} (+ the `multi_grid` family, which is stored in the
+  portable 12-channel double-line view, which yields only the `local` / `line` inputs).
 - **Test:** grid g, both held-out families — zero-shot; a small-adaptation variant
   (few episodes of g's `adapt_grid`) is the second axis.
 - Leave-one-grid-out over the 4 reference grids ⇒ 4 folds; per-fold reporting (never pooled —
@@ -39,7 +41,9 @@ serves each grid's networkx topology graph, so graph-conditioned models have the
 
 ## Prerequisites (why this is post-freeze)
 
-1. `train` family windowed (producer pipeline; not yet generated).
+1. ~~`train` family windowed~~ — done: the `multi_grid` family (formerly `train`) is windowed and
+   used for pre-training, but stored in the portable 12-channel double-line view, which yields only the `local` / `line` inputs; the global-view case still needs
+   the cubicle-set view of item 3.
 2. Single-config window read (the W0p020/W0p050 coexistence fix — also an M7 prerequisite).
 3. A cubicle-set view API (`feature_groups` already names per-cubicle channel blocks).
 

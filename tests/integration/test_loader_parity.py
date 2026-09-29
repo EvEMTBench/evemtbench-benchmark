@@ -6,8 +6,11 @@ import pytest
 
 from evemtbench.tasks.task import add_zero_sequence
 
-torch = pytest.importorskip("torch")
-from evemtbench.baselines._loader import _pin_enabled, num_workers, prefetched_batches  # noqa: E402
+pytest.importorskip("torch")
+
+import torch
+
+from evemtbench.baselines._loader import _pin_enabled, num_workers, prefetched_batches
 
 
 @pytest.mark.parametrize(

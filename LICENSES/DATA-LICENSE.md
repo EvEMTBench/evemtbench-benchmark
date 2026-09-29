@@ -7,7 +7,7 @@ The **EvEMTBench dataset** (waveform recordings, labels, metadata, topology grap
 
 ## Dataset license: CC-BY-4.0 (intended)
 
-The EvEMTBench dataset is released separately (IEEE DataPort / Zenodo) under the
+The EvEMTBench dataset is released separately (FAUDataCloud; see the README's *Dataset* section) under the
 **Creative Commons Attribution 4.0 International (CC-BY-4.0)** license, unless the dataset's
 own landing page states otherwise. When you use the dataset, cite it per the dataset DOI and
 this repository's [`CITATION.cff`](../CITATION.cff).
@@ -17,13 +17,10 @@ this repository's [`CITATION.cff`](../CITATION.cff).
 The dataset was generated with **DIgSILENT PowerFactory**, a proprietary EMT simulation tool.
 
 - The **released waveform exports and derived windows** are data products and may be used and
-  redistributed under the dataset license above.
+  redistributed under the dataset license above. The redistribution terms for the PowerFactory
+  **simulation outputs** have been confirmed.
 - **Regeneration** of the raw data from the PowerFactory models may require a PowerFactory
   license. This benchmark does not redistribute PowerFactory or its model files.
-- Before publishing a public dataset DOI, the redistribution terms of PowerFactory **simulation
-  outputs** must be confirmed (this is the gated legal item in the project plan). If raw exports
-  cannot be redistributed, only the **derived windows + manifests** are published, and
-  `evemtbench.data.download` points at that derived-only artifact.
 
 ## What this repository does contain
 

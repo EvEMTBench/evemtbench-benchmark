@@ -13,10 +13,10 @@
 | | |
 |---|---|
 | **Objective** | Window-level detection of grid events — distinguishing a disturbance from quiescent operation, framed as a protection relay's trip/no-trip decision. |
-| **Task ids** | `event_detection_{local,line,global}` |
+| **Task ids** | `event_detection_global` (shipped); `event_detection_{local,line}` planned (per-line framing below) |
 | **Output** | Binary |
 | **Protocol** | `held_out` (in-distribution primary; transfer caveated — see below) |
-| **Metrics** | `balanced_accuracy`, **`missed_detection_rate`** (dependability), **`false_trip_rate`** (security), `macro_f1`, accuracy; + episode-level **detection latency** ([metrics.md](../metrics.md)) |
+| **Metrics** | `balanced_accuracy`, **`missed_event_rate`** (dependability), **`false_event_trip_rate`** (security), `macro_f1`, accuracy; + episode-level **detection latency** ([metrics.md](../metrics.md)) |
 
 ## Two framings (by observability)
 

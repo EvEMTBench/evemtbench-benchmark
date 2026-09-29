@@ -651,7 +651,7 @@ CLAIMS: list[Claim] = [
             "tests/integration/test_new_tasks_load.py",
         ),
         status="enforced",
-        paper_anchor="Each task has a frozen target derivation and valid-sample mask",
+        paper_anchor="frozen target derivation and valid-sample mask",
         contribution=2,
     ),
     Claim(
@@ -692,7 +692,7 @@ CLAIMS: list[Claim] = [
         hardware="any (CI re-runs it)",
         verified_by=("leakage", "splits_audit"),
         status="enforced",
-        paper_anchor="episode-level leakage controls",
+        paper_anchor="Episodes rather than windows are the unit of partitioning",
         contribution=1,
     ),
     Claim(
@@ -824,7 +824,7 @@ CLAIMS: list[Claim] = [
         verified_by=("tests/integration/test_paper_tables.py", "freshness"),
         status="enforced",
         paper_anchor=(
-            "Full results for every baseline are retained in the Supplementary Information"
+            "Full results for all candidate baselines are retained in the Supplementary Information"
         ),
     ),
     Claim(
@@ -902,7 +902,7 @@ CLAIMS: list[Claim] = [
         hardware="—",
         verified_by=(),
         status="deferred",
-        paper_anchor="require topology-agnostic models",
+        paper_anchor="models that use topology and grid parameters explicitly",
         contribution=None,
     ),
     Claim(
@@ -975,8 +975,7 @@ CLAIMS: list[Claim] = [
         ),
         status="enforced",
         paper_anchor=(
-            "We release the reference baselines, splits, evaluation software, and provenance "
-            "records"
+            "the benchmark implementation, reference baselines, and evaluation resources released"
         ),
         contribution=3,
     ),
