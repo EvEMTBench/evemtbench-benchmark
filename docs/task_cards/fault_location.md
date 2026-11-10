@@ -6,8 +6,8 @@
 | **Task ids** | `fault_location_local`, `fault_location_line`, `fault_location_global` |
 | **Observability** | `local` (6 ch) ⊂ `line` (12 ch) ⊂ `global` (48 ch) — same nested oracle as FD |
 | **Output** | Continuous: distance along the faulted line, ~1–99 % |
-| **Label** | `y_fault_location` (% along the faulted line). **Episode-constant** and present only on **line faults** (NaN on bus faults and non-fault episodes). `tasks/labels/fault_location.py`. |
-| **Valid samples** | fault-active windows of **line-fault** episodes only (`y_fault_location` not null) |
+| **Label** | `y_fault_location` (% along the faulted line). **Episode-constant**; NaN on non-fault episodes. Meant for **line faults** only, but in `adapt_grid` bus-target fault episodes also carry a (non-physical) value — see [known_issues.md](../known_issues.md). `tasks/labels/fault_location.py`. |
+| **Valid samples** | fault-active windows with `y_fault_location` not null. This includes the `adapt_grid` bus-target windows above; `valid_samples.line_target_fault_location_mask` gives the line-only subset for diagnostics |
 | **Protocol** | `held_out` (all variants); the `local`/`line` variants also run `multi_grid_pretrain`, `transfer_zeroshot` and `transfer_finetune` (deep baselines only — see [protocol.md](../protocol.md)) |
 | **Metrics** | MAE, RMSE, R², median absolute error (all in % distance; MAE/RMSE/median ↓, R² ↑) |
 | **Baselines** | majority (train-mean predictor), random_forest (regressor), mlp / gru / cnn / resnet (MSE head, target-standardized) |

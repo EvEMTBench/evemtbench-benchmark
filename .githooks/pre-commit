@@ -4,14 +4,16 @@
 #   bash hpc/install_hooks.sh   (sets git config core.hooksPath .githooks)
 #
 # Fires when a rendered view OR one of its inputs is staged: the views are rebuilt from outputs/ by
-# code under src/ and hpc/ and also read CITATION.cff (page citation), pyproject.toml, env/*.lock and
-# the manuscript mirror. (Triggering on the views alone let an input-only commit — e.g. a CITATION.cff
+# code under src/ and hpc/ and also read CITATION.cff (page citation), pyproject.toml, env/*.lock,
+# requirements*.lock (environment page), tests/ (provenance test count, gates-page line anchors),
+# audit/ inputs (assets/manifest.json, provenance/*.json) and the manuscript mirror. (Triggering on the views alone let an input-only commit — e.g. a CITATION.cff
 # author change — leave every page stale; see docs/internal/lessons.md 2026-09-29.) The checker
 # itself skips cleanly where outputs/ is absent (dev machines / CI), so this never blocks unrelated work.
+# It checks the STAGED views (--staged), so a partially staged --fix cannot ship stale files.
 set -uo pipefail
 
 staged="$(git diff --cached --name-only 2>/dev/null || true)"
-if ! grep -qE '^(RESULTS\.md|leaderboard\.html|coverage_snapshot\.json|audit/.*\.html|results/.*|paper/manuscript/.*|CITATION\.cff|pyproject\.toml|env/.*|src/.*|hpc/.*)$' <<<"$staged"; then
+if ! grep -qE '^(RESULTS\.md|leaderboard\.html|coverage_snapshot\.json|audit/.*|results/.*|paper/manuscript/.*|CITATION\.cff|pyproject\.toml|env/.*|requirements[^/]*\.lock|src/.*|hpc/.*|tests/.*)$' <<<"$staged"; then
   exit 0
 fi
 
@@ -27,7 +29,7 @@ if [ -z "${PY:-}" ]; then
   done
 fi
 
-if ! "$PY" hpc/check_results_fresh.py; then
+if ! "$PY" hpc/check_results_fresh.py --staged; then
   echo
   echo "pre-commit: the freshness gate failed. Either the results views are stale" >&2
   echo "  (regenerate with: \$PY hpc/check_results_fresh.py --fix, stage, re-commit)" >&2

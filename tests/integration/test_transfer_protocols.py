@@ -131,3 +131,19 @@ def test_pretrain_then_zeroshot_and_finetune_roundtrip(fixture_root, transfer_sp
     assert "adapt_grid" in frec["attestation"]["fit_on"]
     assert frec["attestation"]["pretrained_from"] is not None
     assert (fdir / "benchmark" / "result.json").is_file()
+    # one checkpoints/ dir for all seeds, never just the last seed's file
+    assert frec["attestation"]["pretrained_from"] == str(ckpt.parent)
+
+    # 4) a run whose input preprocessing differs from the bundle's is refused, not scored
+    with pytest.raises(ValueError, match="trained with normalize='per_window'"):
+        _run([
+            "--task", task, "--protocol", "transfer_zeroshot", "--grid", "double_line",
+            "--normalize", "none", *common,
+        ])  # fmt: skip
+
+    # 5) --pretrained-from without --pretrain-grid would file the run under the 20 kV cell
+    with pytest.raises(SystemExit):
+        _run([
+            "--task", task, "--protocol", "transfer_zeroshot", "--grid", "double_line",
+            "--pretrained-from", str(ckpt.parent), *common,
+        ])  # fmt: skip

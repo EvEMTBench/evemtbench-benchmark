@@ -1,5 +1,8 @@
 """Main-line projection + LOCAL/LINE/GLOBAL faulted-element oracle, derived from feature_names."""
 
+import uuid
+import warnings
+
 import pytest
 
 from evemtbench.tasks import line_view as lv
@@ -88,3 +91,47 @@ def test_oracle_generalizes_to_a_different_topology():
     assert list(o.line_channels) == list(range(12))  # first two cubicles, transformer dropped
     assert o.observation_columns("MainLn1-2", "line") == list(range(12))
     assert o.observation_columns("MainLn1-2", "local") == list(range(6))
+
+
+def test_two_ended_grid_has_no_one_ended_lines_and_no_warning():
+    # A grid name of its own keeps the build uncached, so a spurious warning would be raised here.
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        o = lv.build_oracle(f"two_ended_{uuid.uuid4().hex}", _FEATURES)
+    assert o.one_ended_lines == ()
+
+
+def test_one_ended_line_is_flagged_and_its_frozen_padding_pinned():
+    # Drop the Bus_2 end of 2-3B: like CIGRE MV line 8-14, only one terminal is exported.
+    cubicles = [c for c in _CUBICLES if c != "Bus_2_Line_2-3B"]
+    features = [
+        f"{k}_{q}_{ph}_{u}"
+        for k in cubicles
+        for q, u in (("Isec", "A"), ("Usec", "V"))
+        for ph in ("L1", "L2", "L3")
+    ]
+    # A grid name of its own keeps the build uncached: the warning fires on build only.
+    with pytest.warns(lv.OneEndedLineWarning, match="MainLn2-3B has a single measured terminal"):
+        o = lv.build_oracle(f"one_ended_{uuid.uuid4().hex}", features)
+    assert o.one_ended_lines == ("MainLn2-3B",)
+    cols = o.observation_columns("MainLn2-3B", "line")
+    # Frozen v1 behaviour: the far slot repeats the only terminal (see docs/known_issues.md).
+    assert cols[:6] == cols[6:]
+    assert o.observation_columns("MainLn2-3B", "local") == cols[:6]
+
+
+def test_one_ended_warning_can_be_filtered_under_warnings_as_errors():
+    # Downstream CI that runs with warnings as errors must be able to silence exactly this class.
+    features = [
+        f"{k}_{q}_{ph}_{u}"
+        for k in _CUBICLES
+        if k != "Bus_2_Line_2-3B"
+        for q, u in (("Isec", "A"), ("Usec", "V"))
+        for ph in ("L1", "L2", "L3")
+    ]
+    with warnings.catch_warnings():
+        warnings.simplefilter("error")
+        warnings.filterwarnings("ignore", category=lv.OneEndedLineWarning)
+        o = lv.build_oracle(f"filtered_{uuid.uuid4().hex}", features)
+    assert o.one_ended_lines == ("MainLn2-3B",)
+    assert issubclass(lv.OneEndedLineWarning, UserWarning)

@@ -299,3 +299,25 @@ def test_resistance_bin_stratification_quartiles():
     md = pd.DataFrame({"resistance": list(range(20))})  # continuous -> quartile bins
     out = stratified_metrics(md, np.zeros(20, int), np.zeros(20, int), lambda a, b: {"acc": 1.0})
     assert "resistance_bin" in out and len(out["resistance_bin"]) == 4
+
+
+def test_fl_gate_admits_bus_targets_once_they_carry_a_location(fixture_root):
+    """The producer fills a location for bus-target fault episodes in ``adapt_grid``. The frozen
+    official gate then admits them; the opt-in line-target mask does not (docs/known_issues.md)."""
+    from evemtbench.tasks.labels.event_present import derive_fault_active_series
+    from evemtbench.tasks.valid_samples import line_target_fault_location_mask
+
+    ws = _ws(fixture_root)
+    td = get_task("fault_location_line")
+    clean = valid_sample_mask(ws.y, td)
+    y = ws.y.copy()
+    is_bus = y["y_fault_line"].astype(str).str.startswith("MainBus").to_numpy()
+    active = derive_fault_active_series(y).astype(bool)
+    assert (is_bus & active).any(), "fixture must contain fault-active bus-target windows"
+    y.loc[is_bus, "y_fault_location"] = 50.0  # what the producer writes in adapt_grid
+    official = valid_sample_mask(y, td)
+    line_only = line_target_fault_location_mask(y)
+    assert (official & is_bus).any(), "official gate admits bus targets with a location"
+    assert not (line_only & is_bus).any()
+    np.testing.assert_array_equal(line_only, clean)  # line-only == the gate on clean data
+    np.testing.assert_array_equal(line_target_fault_location_mask(ws.y), clean)

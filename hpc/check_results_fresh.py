@@ -18,11 +18,15 @@ Behaviour:
 * Exit 1 on drift (including a committed audit page a rebuild no longer produces), printing a
   short unified diff and how to fix.
 * ``--fix`` regenerates every view (via the normal builders) instead of failing.
+* ``--staged`` compares what is STAGED (the git index) instead of the working tree. The pre-commit
+  hook uses it: a check of the working tree passes after ``--fix`` even when only some of the
+  regenerated files were staged, and the commit would ship the stale rest.
 
 Run from anywhere; it operates at the repo root.
 
     python hpc/check_results_fresh.py          # verify
     python hpc/check_results_fresh.py --fix     # regenerate
+    python hpc/check_results_fresh.py --staged  # verify the staged views (pre-commit hook)
 """
 
 from __future__ import annotations
@@ -32,6 +36,7 @@ import difflib
 import json
 import os
 import re
+import subprocess
 import sys
 from pathlib import Path
 
@@ -54,6 +59,44 @@ _VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
 
 def _normalize(text: str) -> str:
     return _VOLATILE.sub("", text)
+
+
+class _Views:
+    """Reads the committed views from the working tree, or with ``staged`` from the git index."""
+
+    def __init__(self, repo: Path, staged: bool):
+        self.repo, self.staged = repo, staged
+        self._index: set[str] | None = None
+        if staged:
+            out = subprocess.run(
+                ["git", "ls-files", "-z"], cwd=repo, capture_output=True, text=True, check=True
+            ).stdout
+            self._index = {f for f in out.split("\0") if f}
+
+    def read(self, path: Path) -> str:
+        if not self.staged:
+            return path.read_text() if path.exists() else ""
+        rel = path.relative_to(self.repo).as_posix()
+        if rel not in (self._index or set()):
+            return ""
+        return subprocess.run(
+            ["git", "show", f":{rel}"], cwd=self.repo, capture_output=True, text=True, check=True
+        ).stdout
+
+    def files(self, base: Path, *, suffix: str = "", recursive: bool = False) -> list[Path]:
+        """Files under ``base`` ending in ``suffix`` -- directly in it, or at any depth with
+        ``recursive`` (from the git index when staged, else from disk)."""
+        if not self.staged:
+            found = base.rglob("*") if recursive else base.glob("*")
+            paths = [p for p in found if p.is_file()]
+        else:
+            prefix = base.relative_to(self.repo).as_posix() + "/"
+            paths = [
+                self.repo / f
+                for f in (self._index or set())
+                if f.startswith(prefix) and (recursive or "/" not in f[len(prefix) :])
+            ]
+        return sorted(p for p in paths if p.name.endswith(suffix))
 
 
 def _outputs_present() -> bool:
@@ -159,7 +202,11 @@ def _short_diff(name: str, committed: str, fresh: str, limit: int = 40) -> str:
 
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Verify committed results match a fresh rebuild.")
-    ap.add_argument("--fix", action="store_true", help="regenerate the files instead of failing")
+    mode = ap.add_mutually_exclusive_group()
+    mode.add_argument("--fix", action="store_true", help="regenerate the files instead of failing")
+    mode.add_argument(
+        "--staged", action="store_true", help="check the staged (git index) views, not the disk"
+    )
     args = ap.parse_args(argv)
     repo = _repo()
 
@@ -171,6 +218,7 @@ def main(argv: list[str] | None = None) -> int:
         return 0
 
     os.chdir(repo)  # the builders glob 'outputs/...' relative to cwd
+    views = _Views(repo, staged=args.staged)
 
     # The snapshot's embedded self-check gates here (the loops' --write-snapshot calls are
     # `|| true`-guarded, so THIS is where a failed invariant actually blocks publication).
@@ -191,10 +239,10 @@ def main(argv: list[str] | None = None) -> int:
     audit_fresh, prov_fresh = _fresh_audit_views()
     results_fresh = _fresh_results_bundle()
     audit_dir = repo / "audit"
-    if audit_dir.is_dir():
+    if audit_dir.is_dir() or args.staged:
         stray = sorted(
             p.name
-            for p in audit_dir.glob("*.html")
+            for p in views.files(audit_dir, suffix=".html")
             if p.name not in audit_fresh and p.name not in _UNGATED
         )
         # The provenance index (audit/provenance/<version>/index.json) is keyed by its
@@ -203,7 +251,9 @@ def main(argv: list[str] | None = None) -> int:
         # document a superseded revision's results) — never touched, never reported stale.
         stray += sorted(
             str(p.relative_to(audit_dir))
-            for p in audit_dir.glob(f"provenance/{BENCHMARK_VERSION}/**/*.json")
+            for p in views.files(
+                audit_dir / "provenance" / BENCHMARK_VERSION, suffix=".json", recursive=True
+            )
             if str(p.relative_to(audit_dir)) not in prov_fresh
         )
     else:
@@ -215,10 +265,10 @@ def main(argv: list[str] | None = None) -> int:
     results_stray = (
         sorted(
             str(p.relative_to(repo))
-            for p in results_root.rglob("*")
-            if p.is_file() and str(p.relative_to(repo)) not in results_fresh
+            for p in views.files(results_root, recursive=True)
+            if str(p.relative_to(repo)) not in results_fresh
         )
-        if results_root.is_dir()
+        if results_root.is_dir() or args.staged
         else []
     )
 
@@ -231,6 +281,10 @@ def main(argv: list[str] | None = None) -> int:
         (repo / "coverage_snapshot.json").write_text(_fresh_snapshot())
         lb_main(["--outputs", "outputs", "--out", "leaderboard.html"])  # writes WITH a timestamp
         audit_main(["--outputs", "outputs", "--out", str(audit_dir)])  # ditto (ts + git sha)
+        # paper fragments BEFORE the bundle: results/<version>/tables/ copies them from disk, so the
+        # reverse order left the bundle one regeneration behind (a second --fix was needed)
+        for _name, path, content in _paper_fragment_checks(repo):
+            path.write_text(content)  # post-freeze: fragments regenerate with the other views
         results_main(["--outputs", "outputs", "--out", str(repo)])  # results/<version>/ bundle
         for name in stray:  # a rebuild no longer produces these pages
             (audit_dir / name).unlink()
@@ -238,8 +292,6 @@ def main(argv: list[str] | None = None) -> int:
         for rel in results_stray:  # a rebuild no longer produces these results files
             (repo / rel).unlink()
             print(f"check_results_fresh: removed stray results file {rel}")
-        for _name, path, content in _paper_fragment_checks(repo):
-            path.write_text(content)  # post-freeze: fragments regenerate with the other views
         print(
             "check_results_fresh: regenerated RESULTS.md + coverage_snapshot.json + "
             "leaderboard.html + audit/ + results/."
@@ -264,7 +316,7 @@ def main(argv: list[str] | None = None) -> int:
     checks += _paper_fragment_checks(repo)  # the manuscript's live table view
     stale: list[str] = []
     for name, path, fresh in checks:
-        committed = path.read_text() if path.exists() else ""
+        committed = views.read(path)
         if _normalize(committed) != _normalize(fresh):
             stale.append(name)
             print(f"\n✗ {name} is STALE (committed != fresh rebuild):")
@@ -280,7 +332,8 @@ def main(argv: list[str] | None = None) -> int:
         print(
             f"\ncheck_results_fresh: {', '.join(stale)} disagree with a fresh build.\n"
             "Fix: `python hpc/check_results_fresh.py --fix` (or rerun make_results.py + "
-            "evemtbench-leaderboard + make_audit.py), then stage the regenerated files."
+            "evemtbench-leaderboard + make_audit.py), then stage the regenerated files"
+            + (" (this check reads what is STAGED)." if args.staged else ".")
         )
         return 1
     print(

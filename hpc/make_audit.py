@@ -989,6 +989,8 @@ def build_index(values: dict[str, str], cov: CoverageView) -> str:
     )
     cards = (
         "<div class=cardnav>"
+        f'<a href="{_esc(DOCS_BASE)}/docs/known_issues.md"><b>Known issues →</b><br>dataset '
+        "properties that affect some published numbers (flagged; behaviour unchanged)</a>"
         '<a href="ledger.html"><b>Claim ledger →</b><br>every paper claim resolved to script, '
         "command, artifact, runtime, hardware and verifying gate</a>"
         '<a href="paper_numbers.html"><b>Paper numbers →</b><br>every number the manuscript reports, '
@@ -1309,7 +1311,7 @@ def build_provenance() -> str:
     hooks = [
         (
             ".githooks/pre-commit",
-            "runs the freshness gate when rendered views are staged — a "
+            "runs the freshness gate when rendered views or their inputs (src/, hpc/, CITATION.cff, …) are staged — a "
             "stale RESULTS.md / leaderboard.html / audit page cannot be committed",
         ),
         (

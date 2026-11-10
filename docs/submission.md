@@ -35,7 +35,7 @@ on `(sample_id, window_idx)`).
 
 Programmatic: `from evemtbench import evaluate; evaluate(task, preds, test_set="test")`.
 Audit a saved predictions file: `evemtbench-evaluate --task ... --grid ... --protocol held_out
---predictions preds.parquet`. The reference runner (`evemtbench-run`) does fit→predict→evaluate over
+--predictions preds.parquet` (add `--test-set benchmark` for the benchmark-family predictions). The reference runner (`evemtbench-run`) does fit→predict→evaluate over
 seeds and writes the artifacts below.
 
 ## 3. `result.json` schema (one per task × protocol × grid × baseline × test_set)
@@ -88,7 +88,8 @@ seeds) and `n_seeds` counts the seeds that reported the group. Strata are `grid`
   — it is dataless (synthetic tasks through the real `evaluate()`), so it proves the scoring
   harness before you trust any number it emits.
 - **Splits:** use the committed `splits/v<SPLITS_VERSION>/held_out/<grid>/` (regenerate bit-for-bit
-  with `python -m evemtbench.splits.generator`). No training on `test`/`benchmark`.
+  with `python -m evemtbench.splits.generator`, whose defaults are the committed recipe; it refuses
+  to change a committed split unless given `--force`). No training on `test`/`benchmark`.
 - **Seeds:** report ≥3 seeds; submit `mean ± std` + the `ci95` half-width. (The reference
   baselines report **5**; rendered tables show mean ± 95% CI.)
 - **Environment:** record yours the way we record ours — as a capture, not an aspiration. Our

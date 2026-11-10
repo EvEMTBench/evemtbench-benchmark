@@ -38,6 +38,22 @@ def test_planted_account_and_cluster_path_refuse(tmp_path):
     assert _scan(tmp_path).returncode == 1
 
 
+def test_absolute_cluster_path_refuses_but_relative_segment_passes(tmp_path):
+    # The cluster-path pattern targets absolute roots; tests/cluster/ is the repo's own layout
+    # (the data_integrity suite) and is cited in the public docs.
+    for absolute in (
+        'cd "/clu' + 'ster/x/y"',
+        "root=/clu" + "ster/x",
+        "/clu" + "ster/x at line start",
+    ):
+        (tmp_path / "a.md").write_text(absolute + "\n")
+        assert _scan(tmp_path).returncode == 1, absolute
+    (tmp_path / "a.md").write_text(
+        "run `pytest -m data_integrity tests/" + "cluster/test_x.py` (see ./" + "cluster/)\n"
+    )
+    assert _scan(tmp_path).returncode == 0
+
+
 def test_planted_preview_token_refuses(tmp_path):
     (tmp_path / "a.md").write_text(
         "https://zenodo.org/records/1?preview=1&" + "token=ey" + "JhbGciOiJIUzUxMiJ9abcdef\n"

@@ -15,7 +15,8 @@
 # blobs such as Zenodo preview tokens), and the HPC account names.
 LEAK_COMMON_PATTERNS=(
   '/home/[a-z]'
-  '/cluster[/]'
+  # absolute only: a relative path segment such as tests/cluster/ is repo layout, not a leak
+  '(^|[^A-Za-z0-9_.-])/cluster[/]'
   'BEGIN [A-Z ]*PRIVATE KEY'
   'ssh-(rsa|ed25519) '
   'ghp_[A-Za-z0-9]{20,}'

@@ -10,6 +10,9 @@ from __future__ import annotations
 from dataclasses import dataclass, field
 from enum import Enum
 
+# Faulted-element label grammar of ``y_fault_line``: ``MainLn<lineid>`` / ``MainBus<bus>``.
+LINE_LABEL_PREFIX = "MainLn"
+
 
 class Function(str, Enum):
     """Protection / analysis objective. Fault triad FD/FC/FL + the event-scope & attribute suite.

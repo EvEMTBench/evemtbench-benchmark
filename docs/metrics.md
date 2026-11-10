@@ -16,6 +16,8 @@ protection-grade metrics. Frozen within a benchmark major version (see
 - `missed_fault_rate` = FN/(positives) — **dependability** (missed faults); `false_alarm_rate` =
   FP/(negatives) — **security** (false trips). On a single-class subset, undefined metrics are
   `NaN` (recorded as `n_defined < n_seeds`, never silently 0).
+  Binary `macro_f1` is the exception: it stays defined but unstable there (see
+  [known_issues.md](known_issues.md#3-binary-macro_f1-on-single-class-breakdown-subsets)).
 - `balanced_accuracy` = mean per-class recall → robust to the heavy class imbalance (negatives ≫
   positives for FD; SHC ≫ incipient/HIF for FC), which is why it's the headline classification metric.
 

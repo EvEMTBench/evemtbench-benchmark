@@ -125,22 +125,14 @@ def scan_results(outputs_dir: str | Path) -> list[Row]:
                 vals = [(r.get("metrics") or {}).get(k) for r in per_seed]
                 metrics[k] = {**v, "ci95": ci95_halfwidth(vals) if vals else None}
         # Per-class F1 (``f1_<class>``) is only defined for classes that occur in this eval set.
-        # A class absent here (e.g. HIF on a non-MV grid) has no support, so its F1 is n/a — not a
-        # genuine 0.0. The event_type breakdown lists exactly the classes present; flag the rest so
-        # the board shows "n/a" instead of a misleading "0.000". (Guard older artifacts that stored
-        # absent-class F1 as 0.0, as well as new ones that already store it as null.)
-        present = set((doc.get("breakdowns") or {}).get("event_type", {}).keys())
-        if present:
-            for k, v in metrics.items():
-                if k.startswith("f1_") and k[3:] not in present:
-                    metrics[k] = {
-                        **v,
-                        "mean": None,
-                        "std": None,
-                        "ci95": None,
-                        "n_defined": 0,
-                        "absent": True,
-                    }
+        # A class absent here (e.g. HIF on a non-MV grid) has no support: ``evaluate`` stores its
+        # F1 as NaN, which aggregates to ``n_defined=0`` (null mean). Flag exactly those so the
+        # board shows "n/a" instead of a blank or a misleading "0.000". (Presence is read from the
+        # stored value, not from the event_type breakdown: its keys are event types, which equal
+        # the class names only for fault_classification.)
+        for k, v in metrics.items():
+            if k.startswith("f1_") and v.get("mean") is None and not v.get("n_defined"):
+                metrics[k] = {**v, "std": None, "ci95": None, "n_defined": 0, "absent": True}
         rows.append(
             Row(
                 task=doc.get("task", "?"),
@@ -271,13 +263,14 @@ def _comparison_section(rows: list[Row]) -> str:
                 continue
             baselines = sorted({b for b, _ in idx})
 
-            def _best(b, *, headline=headline, idx=idx):
+            def _best(b, *, headline=headline, idx=idx, direction=direction):
                 vals = [
                     idx[(b, g)].mean(headline)
                     for g in grids
                     if (b, g) in idx and idx[(b, g)].mean(headline) is not None
                 ]
-                return max(vals) if vals else None
+                # the baseline's best grid: max for higher-is-better, min for lower-is-better
+                return (max(vals) if direction > 0 else min(vals)) if vals else None
 
             baselines.sort(key=lambda b: (_best(b) is None, -direction * (_best(b) or 0)))
             head = (
@@ -693,7 +686,8 @@ def render_html(
     )
     footer = (
         "<footer>EvEMTBench · MIT · "
-        f'<a href="{html.escape(docs_base)}/README.md">repository</a> · internal leaderboard'
+        f'<a href="{html.escape(docs_base)}/README.md">repository</a> · '
+        f'<a href="{html.escape(docs_base)}/docs/known_issues.md">known issues</a> · internal leaderboard'
         f"{cite}</footer>"
     )
     return (

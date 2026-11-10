@@ -5,9 +5,10 @@ difficulty varies with the swept fault parameters. This module derives, post-hoc
 per-cell ``predictions_seed{n}.parquet`` + the windows ``y`` (joined on sample_id/window_idx,
 never loading ``X`` — memory-safe on the big grids):
 
-* ``detection_latency`` — for binary detection tasks, the time from fault inception
-  (``dt_start`` = 0) to the first correctly-flagged active window, per fault episode; reports
-  detection rate + median/mean latency over detected episodes.
+* ``detection_latency`` — for the fault/event detection tasks (FD, ED), the time from fault
+  inception (``dt_start`` = 0) to the first correctly-flagged active window, per fault episode;
+  reports detection rate + median/mean latency over detected episodes. (Other binary tasks label
+  something other than "detected" as 1, so a latency would be meaningless there.)
 * ``location_mae_curve`` — for fault-location regression, MAE binned by distance-along-line
   (the benchmark systematically sweeps location), exposing where localization degrades.
 
@@ -25,10 +26,10 @@ from pathlib import Path
 import numpy as np
 import pandas as pd
 
+from .coverage import Cell, cell_dir
 from .data.windows import load_windows
 from .tasks.registry import get_task
-from .tasks.taxonomy import LabelKind
-from .version import results_version
+from .tasks.taxonomy import Function, LabelKind
 
 _FAMILY = {"test": "adapt_grid", "benchmark": "benchmark"}
 _TRUTH_COLS = [
@@ -41,9 +42,17 @@ _TRUTH_COLS = [
 ]
 
 
-def _cell_dir(out: Path, task: str, protocol: str, grid: str, baseline: str) -> Path:
-    # per-protocol current-results tree (held_out stays at its frozen version)
-    return Path(out) / results_version(protocol) / task / protocol / grid / baseline
+# Tasks whose positive class means "the fault/event was detected", so a time-to-first-positive is a
+# detection latency. Other binary tasks (grounded, origin, switching) label something else as 1.
+_LATENCY_FUNCTIONS = frozenset({Function.FAULT_DETECTION, Function.EVENT_DETECTION})
+
+
+def _cell_dir(
+    out: Path, task: str, protocol: str, grid: str, baseline: str, source: str | None = None
+) -> Path:
+    # the same layout as coverage.cell_dir: per-protocol results tree (held_out stays at its frozen
+    # version), and a pretrain-<src> subdir for a transfer cell from a non-default source
+    return cell_dir(Path(out), Cell(task, protocol, grid, baseline, source))
 
 
 def load_joined(
@@ -56,9 +65,10 @@ def load_joined(
     *,
     seed: int = 0,
     root=None,
+    source: str | None = None,
 ) -> pd.DataFrame:
     """Join one cell's predictions with the truth columns (dt_start, location, fault flags)."""
-    cell = _cell_dir(out, task, protocol, grid, baseline)
+    cell = _cell_dir(out, task, protocol, grid, baseline, source)
     preds = pd.read_parquet(cell / test_set / f"predictions_seed{seed}.parquet")
     y = load_windows(grid, _FAMILY[test_set], root=root).y
     cols = [c for c in _TRUTH_COLS if c in y.columns]
@@ -116,12 +126,15 @@ def analyze_cell(
     *,
     seed: int = 0,
     root=None,
+    source: str | None = None,
 ) -> dict:
     """Compute the protection-grade analysis appropriate to the task's label kind."""
     td = get_task(task)
-    joined = load_joined(out, task, protocol, grid, baseline, test_set, seed=seed, root=root)
+    joined = load_joined(
+        out, task, protocol, grid, baseline, test_set, seed=seed, root=root, source=source
+    )
     res: dict = {"task": task, "grid": grid, "baseline": baseline, "test_set": test_set}
-    if td.label_kind is LabelKind.BINARY:
+    if td.label_kind is LabelKind.BINARY and td.function in _LATENCY_FUNCTIONS:
         res["latency"] = detection_latency(joined)
     if td.label_kind is LabelKind.REGRESSION:
         res["location_mae_curve"] = location_mae_curve(joined)
@@ -138,6 +151,11 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--test-set", default="test", choices=["test", "benchmark"])
     p.add_argument("--seed", type=int, default=0)
     p.add_argument("--root", default=None)
+    p.add_argument(
+        "--pretrain-grid",
+        default=None,
+        help="transfer cells: the pre-training source grid (default: the default source)",
+    )
     args = p.parse_args(argv)
     res = analyze_cell(
         Path(args.out),
@@ -148,6 +166,7 @@ def main(argv: list[str] | None = None) -> None:
         args.test_set,
         seed=args.seed,
         root=args.root,
+        source=args.pretrain_grid,
     )
     print(json.dumps(res, indent=2))
 

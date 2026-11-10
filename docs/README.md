@@ -23,6 +23,7 @@ The benchmark in one line: **24 protection tasks in 3 difficulty tiers × 4 refe
 | [grids.md](grids.md) | the four reference grids (MV/HV/EHV) |
 | [datasheet.md](datasheet.md) | dataset provenance, families, auxiliary artifacts |
 | [determinism.md](determinism.md) | what "reproducible" means here; seed policy |
+| [known_issues.md](known_issues.md) | known v1.1.0 dataset and scoring issues that affect published numbers (flagged, not changed) |
 | [versioning.md](versioning.md) | benchmark/splits/contract semver; what a major bump retires |
 
 ## I want to contribute or extend

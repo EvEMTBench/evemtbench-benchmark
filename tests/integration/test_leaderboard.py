@@ -142,16 +142,17 @@ def test_topology_comparison_spans_all_grids(tmp_path):
 
 
 def test_absent_class_renders_na_not_zero(tmp_path):
-    # A per-class F1 whose class is absent here (not in the event_type breakdown) must render "n/a",
-    # not "0.000" (the original HIF bug). A genuine zero (a present class) stays "0.000".
-    d = tmp_path.joinpath(
-        "0.1.0-dev", "fault_classification_local", "held_out", "cigre_mv", "mlp", "test"
-    )
+    # evaluate() stores an absent class's F1 as NaN -> aggregates to a null mean with n_defined=0;
+    # that must render "n/a", not "0.000" (the original HIF bug). A genuine zero stays "0.000".
+    # The class names here are fault_phase classes, deliberately NOT event types: presence is read
+    # from the stored value, never from the event_type breakdown (whose keys only equal the class
+    # names for fault_classification -- keying on them blanked every phase/category/switch F1).
+    d = tmp_path.joinpath("0.1.0-dev", "fault_phase_local", "held_out", "cigre_mv", "mlp", "test")
     d.mkdir(parents=True)
     (d / "result.json").write_text(
         json.dumps(
             {
-                "task": "fault_classification_local",
+                "task": "fault_phase_local",
                 "protocol": "held_out",
                 "grid": "cigre_mv",
                 "baseline": "mlp",
@@ -160,22 +161,59 @@ def test_absent_class_renders_na_not_zero(tmp_path):
                 "seeds": [0, 1],
                 "aggregate": {
                     "balanced_accuracy": {"mean": 0.5, "std": 0.0},
-                    "f1_flt_present": {"mean": 0.0, "std": 0.0, "n_defined": 2, "n_seeds": 2},
-                    "f1_flt_absent": {"mean": 0.0, "std": 0.0, "n_defined": 2, "n_seeds": 2},
+                    "f1_A": {"mean": 0.987, "std": 0.001, "n_defined": 2, "n_seeds": 2},
+                    "f1_AB": {"mean": 0.0, "std": 0.0, "n_defined": 2, "n_seeds": 2},
+                    "f1_ABC": {
+                        "mean": None,
+                        "std": None,
+                        "ci95": None,
+                        "n_defined": 0,
+                        "n_seeds": 2,
+                    },
                 },
-                # only flt_present occurs in this eval set -> flt_absent has no support here
-                "breakdowns": {"event_type": {"flt_present": {"n": 10}}},
+                "breakdowns": {"event_type": {"flt_1phg": {"n": 6}, "flt_2ph": {"n": 4}}},
             }
         )
     )
     (row,) = scan_results(tmp_path)
-    assert row.metrics["f1_flt_absent"].get("absent") is True  # scan_results flagged it
-    assert row.metrics["f1_flt_absent"]["ci95"] is None  # no stale interval on an n/a cell
-    assert not row.metrics["f1_flt_present"].get("absent")
+    assert row.metrics["f1_ABC"].get("absent") is True  # no support -> flagged n/a
+    assert row.metrics["f1_ABC"]["ci95"] is None  # no stale interval on an n/a cell
+    assert not row.metrics["f1_A"].get("absent")  # present class keeps its score
+    assert row.metrics["f1_A"]["mean"] == 0.987
+    assert not row.metrics["f1_AB"].get("absent")  # genuine zero is not "absent"
 
     html = render_html(scan_results(tmp_path), version="0.1.0-dev")
     assert "class=na" in html and ">n/a<" in html  # absent class -> n/a
+    assert "0.987" in html  # present class rendered
     assert "0.000" in html  # genuine zero (present class) stays 0.000
+
+
+def test_topology_comparison_ranks_lower_is_better_by_best_grid(tmp_path):
+    # FL's headline is mae (lower is better): baselines must be ordered by their BEST (lowest)
+    # grid, not their worst. a: best 1.0 / worst 9.0; b: 2.0 on both -> a ranks first.
+    for grid, a_mae, b_mae in [("cigre_mv", 1.0, 2.0), ("double_line", 9.0, 2.0)]:
+        for base, mae in (("a_base", a_mae), ("b_base", b_mae)):
+            d = tmp_path / results_version("held_out") / "fault_location_local" / "held_out"
+            d = d / grid / base / "test"
+            d.mkdir(parents=True)
+            (d / "result.json").write_text(
+                json.dumps(
+                    {
+                        "task": "fault_location_local",
+                        "protocol": "held_out",
+                        "grid": grid,
+                        "baseline": base,
+                        "test_set": "test",
+                        "benchmark_version": results_version("held_out"),
+                        "n_test": 10,
+                        "seeds": [0, 1],
+                        "aggregate": {"mae": {"mean": mae, "std": 0.1}},
+                    }
+                )
+            )
+    html = render_html(scan_results(tmp_path), version="1.0.0-dev")
+    cmp = html[html.index("Topology comparison") :]
+    assert cmp.index(">a_base<") < cmp.index(">b_base<")
 
 
 def test_empty_outputs(tmp_path):

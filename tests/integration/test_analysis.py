@@ -65,6 +65,17 @@ def test_location_curve_on_fl(tmp_path, fixture_root, held_out_splits):
         root=fixture_root,
     )
     curve = res["location_mae_curve"]
-    assert isinstance(curve, list)
+    assert isinstance(curve, list) and curve  # an empty curve must not pass vacuously
     for row in curve:
         assert row["n"] > 0 and row["mae"] >= 0.0
+
+
+def test_no_latency_for_non_detection_binary_tasks(tmp_path, fixture_root, held_out_splits):
+    # fault_grounded's positive class is "grounded", not "detected": no latency is reported
+    out = tmp_path / "outputs"
+    _run_cell("fault_grounded_local", "majority", out, fixture_root, held_out_splits)
+    res = analysis.analyze_cell(
+        out, "fault_grounded_local", "held_out", "double_line", "majority", "test",
+        root=fixture_root,
+    )  # fmt: skip
+    assert "latency" not in res

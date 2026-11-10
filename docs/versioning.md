@@ -2,9 +2,10 @@
 
 How a release actually ships (freeze → tag → repro pack → DOI): [docs/release.md](release.md).
 
-The benchmark is versioned like an API. `BENCHMARK_VERSION` (in `evemtbench.version`) is
-stamped into every `EvalResult` and `result.json`, so every reported number is attributable to
-a frozen contract. This is distinct from the Python package version in `pyproject.toml`.
+The benchmark is versioned like an API. `BENCHMARK_VERSION` (in `evemtbench.version`) names the
+current contract. Every `EvalResult` and `result.json` is stamped with its protocol's results
+version (`results_version(protocol)`: `held_out` results keep `1.0.0`, whose inputs are unchanged
+under 1.1.0), so every reported number is attributable to a frozen contract. This is distinct from the Python package version in `pyproject.toml`.
 
 ## What each bump means
 
@@ -33,8 +34,9 @@ numbers without changing any input).
   `splits/v0.*` trees retained read-only for history).
 
 Tests under `tests/` pin the label derivations and split guarantees; changing one fails CI until
-the expectation and the version are bumped together. Leakage tests also verify the committed
-splits regenerate from the dataset (`leakage.verify_held_out_regenerates`).
+the expectation and the version are bumped together. The committed splits' seeds are pinned in
+CI; that they regenerate from the dataset is checked on the cluster
+(`tests/cluster/test_committed_splits_regenerate.py`, marker `data_integrity`).
 
 ## Why this matters
 

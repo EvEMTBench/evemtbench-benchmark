@@ -130,19 +130,14 @@ def test_runner_regression_task(fixture_root, held_out_splits, tmp_path):
     assert "mae" in result["aggregate"]
 
 
-def test_evaluate_cli_audits_predictions(fixture_root, held_out_splits, tmp_path):
+@pytest.mark.parametrize("test_set", ["test", "benchmark"])
+def test_evaluate_cli_audits_predictions(fixture_root, held_out_splits, tmp_path, test_set):
+    # The CLI must reproduce the runner's own metrics for BOTH held-out views (the benchmark
+    # column is half the leaderboard; it used to be unscoreable through the CLI).
     out = tmp_path / "out"
     _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
-    preds = (
-        out
-        / HO_VER
-        / "fault_detection_local"
-        / "held_out"
-        / "double_line"
-        / "majority"
-        / "test"
-        / "predictions_seed0.parquet"
-    )
+    cell = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
+    preds = cell / test_set / "predictions_seed0.parquet"
     audit = tmp_path / "audit.json"
     cli.main(
         [
@@ -154,6 +149,8 @@ def test_evaluate_cli_audits_predictions(fixture_root, held_out_splits, tmp_path
             "double_line",
             "--predictions",
             str(preds),
+            "--test-set",
+            test_set,
             "--root",
             str(fixture_root),
             "--splits-root",
@@ -165,7 +162,9 @@ def test_evaluate_cli_audits_predictions(fixture_root, held_out_splits, tmp_path
     audited = json.loads(audit.read_text())
     assert audited["task"] == "fault_detection_local"
     assert audited["benchmark_version"] == HO_VER
-    assert "balanced_accuracy" in audited["metrics"]
+    assert audited["test_set"] == test_set
+    stored = json.loads((cell / test_set / "result.json").read_text())["per_seed"][0]["metrics"]
+    assert audited["metrics"]["balanced_accuracy"] == stored["balanced_accuracy"]
 
 
 def test_broken_harness_aborts_the_cell(fixture_root, held_out_splits, tmp_path, monkeypatch):
@@ -231,3 +230,16 @@ def test_normalize_defaults_to_the_protocol_resolution(fixture_root, held_out_sp
     rec = json.loads((base / "run_record.json").read_text())
     assert rec["normalize"] == "none"
     assert rec["args"]["normalize"] == "auto"
+
+
+def test_zero_seq_is_rejected_for_classical_baselines(fixture_root, held_out_splits, tmp_path):
+    # classical baselines ignore zero_seq; a "+zero_seq" cell would duplicate the plain one
+    with pytest.raises(ValueError, match="no effect on the classical baseline"):
+        _run(
+            "majority",
+            "fault_detection_local",
+            fixture_root,
+            held_out_splits,
+            tmp_path / "out",
+            extra=("--zero-seq",),
+        )

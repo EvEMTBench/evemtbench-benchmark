@@ -10,4 +10,4 @@ chmod +x .githooks/* 2>/dev/null || true
 git config core.hooksPath .githooks
 echo "Installed git hooks: core.hooksPath -> .githooks"
 echo "Active hooks: $(ls .githooks | tr '\n' ' ')"
-echo "The pre-commit gate runs hpc/check_results_fresh.py when RESULTS.md/leaderboard.html/audit/*.html are staged."
+echo "The pre-commit gate runs hpc/check_results_fresh.py --staged when a rendered view or one of its inputs is staged."

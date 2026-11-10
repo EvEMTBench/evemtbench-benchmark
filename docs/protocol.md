@@ -21,7 +21,7 @@ specified in their [task cards](task_cards/).
 |---|---|---|---|---|
 | Fault **detection** (FD) | `fault_detection` | binary | 2 | all windows of fault episodes (`y_fault_line` defined): pre-fault negatives + fault-active positives |
 | Fault **classification** (FC) | `fault_classification` | multiclass | **9** | fault-active windows whose fault type is in the 9-class vocab |
-| Fault **location** (FL) | `fault_location` | regression | — | fault-active windows of **line**-fault episodes (`y_fault_location` defined; NaN on bus faults) |
+| Fault **location** (FL) | `fault_location` | regression | — | fault-active windows with a defined `y_fault_location` — meant as **line** faults, but `adapt_grid` bus-target episodes also carry a location and pass (see [known_issues.md](known_issues.md)) |
 
 > **The fault tasks are ORACLE tasks — read the "valid samples" column as part of the task
 > definition, not as a filtering detail.** Only fault episodes are scored, so FD's negatives are the

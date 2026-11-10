@@ -345,8 +345,10 @@ def main(argv: list[str] | None = None) -> None:
     )
     p.add_argument(
         "--pretrain-grid",
-        default="template_20kv",
-        help="grid whose multi_grid_pretrain checkpoint the transfer protocols initialise from",
+        default=None,
+        help="grid whose multi_grid_pretrain checkpoint the transfer protocols initialise from "
+        f"(default {PRETRAIN_GRID}; required with --pretrained-from, since it names the output "
+        "cell and the recorded source)",
     )
     p.add_argument(
         "--pretrained-from",
@@ -355,6 +357,12 @@ def main(argv: list[str] | None = None) -> None:
         "default resolves the multi_grid_pretrain cell for the same task/baseline/seed",
     )
     args = p.parse_args(argv)
+    if args.pretrain_grid is None:
+        if args.pretrained_from and args.protocol in TRANSFER_PROTOCOLS:
+            # the output cell and the recorded pretrain_grid both come from --pretrain-grid; a
+            # silent default would file a 110/345 kV-sourced run under the 20 kV cell
+            p.error("--pretrained-from requires --pretrain-grid (the grid it was pretrained on)")
+        args.pretrain_grid = PRETRAIN_GRID
     normalize = (
         default_input_normalize(args.protocol) if args.normalize == "auto" else args.normalize
     )
@@ -468,6 +476,12 @@ def main(argv: list[str] | None = None) -> None:
             zero_seq=args.zero_seq,
             normalize=normalize,
         )
+        if args.zero_seq and not hasattr(model, "_build_inner"):
+            # the classical factories ignore zero_seq: a "+zero_seq" cell would be a byte-identical
+            # duplicate of the plain one, published as a separate variant
+            raise ValueError(
+                f"--zero-seq has no effect on the classical baseline {args.baseline!r}"
+            )
         if is_transfer:
             import torch
 
@@ -479,7 +493,10 @@ def main(argv: list[str] | None = None) -> None:
                     f"weights; {args.baseline!r} has none."
                 )
             bundle_path = _pretrained_bundle_path(args, seed, baseline_tag)
-            pretrained_from_used = str(bundle_path)
+            # one value for all seeds: the explicit .pt file, else the checkpoints/ dir that each
+            # seed's seed<s>.pt is resolved from (the last seed's file would misstate the others)
+            explicit_file = Path(args.pretrained_from or "").suffix == ".pt"
+            pretrained_from_used = str(bundle_path if explicit_file else bundle_path.parent)
             if not bundle_path.is_file():
                 raise FileNotFoundError(
                     f"pretrained checkpoint not found: {bundle_path}. Run the "
@@ -488,6 +505,7 @@ def main(argv: list[str] | None = None) -> None:
             bundle = torch.load(
                 bundle_path, map_location=(args.device or "cpu"), weights_only=False
             )
+            _transfer.check_bundle_preprocessing(model, bundle, bundle_path)
             if is_zeroshot:
                 _transfer.restore_pretrained(model, bundle)  # rebuild + load weights; NO training
                 fit_seconds = 0.0

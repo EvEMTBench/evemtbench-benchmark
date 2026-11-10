@@ -3,6 +3,7 @@ fresh rebuild, fails on drift, and skips when outputs/ is absent. Driven against
 the EVEMTBENCH_REPO override so it never touches the real committed artifacts. Torch-free."""
 
 import json
+import subprocess
 from pathlib import Path
 
 import check_results_fresh as gate  # needs hpc/ on the path
@@ -102,3 +103,63 @@ def test_gate_pass_fail_skip(tmp_path, monkeypatch):
     for f in (tmp_path / "outputs").rglob("result.json"):
         f.unlink()
     assert gate.main([]) == 0
+
+
+def _git(root: Path, *args: str) -> None:
+    subprocess.run(["git", *args], cwd=root, check=True, capture_output=True)
+
+
+def test_staged_mode_checks_the_index_not_the_disk(tmp_path, monkeypatch):
+    # The hook runs --staged: after --fix, staging only SOME regenerated files must fail (a working
+    # tree check passes and the commit would ship the stale rest); staging all of them passes.
+    monkeypatch.setenv("EVEMTBENCH_REPO", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _seed_repo(tmp_path)
+    assert gate.main(["--fix"]) == 0
+    _git(tmp_path, "init", "-q")
+    _git(tmp_path, "add", "-A")
+    assert gate.main(["--staged"]) == 0
+
+    # stale RESULTS.md staged, a fresh one on disk: the disk check passes, the staged one must not
+    results = tmp_path / "RESULTS.md"
+    fresh = results.read_text()
+    results.write_text(fresh + "\nDRIFT\n")
+    _git(tmp_path, "add", "RESULTS.md")
+    results.write_text(fresh)
+    assert gate.main([]) == 0
+    assert gate.main(["--staged"]) == 1
+    _git(tmp_path, "add", "RESULTS.md")
+    assert gate.main(["--staged"]) == 0
+
+    # a regenerated page left unstaged (here: never added) is missing from the index -> fail
+    _git(tmp_path, "rm", "-q", "--cached", "audit/ledger.html")
+    assert gate.main(["--staged"]) == 1
+    _git(tmp_path, "add", "audit/ledger.html")
+
+    # a stray page staged but absent from disk is still stray for the commit
+    (tmp_path / "audit" / "zombie.html").write_text("<!doctype html>stray")
+    _git(tmp_path, "add", "audit/zombie.html")
+    (tmp_path / "audit" / "zombie.html").unlink()
+    assert gate.main([]) == 0
+    assert gate.main(["--staged"]) == 1
+
+
+def test_one_fix_pass_regenerates_fragments_before_the_bundle_copies_them(tmp_path, monkeypatch):
+    # results/<v>/tables/ copies the paper fragments from disk; --fix used to write the fragments
+    # AFTER building the bundle, so one --fix left the bundle stale and a second was needed.
+    import make_results_bundle
+
+    monkeypatch.setenv("EVEMTBENCH_REPO", str(tmp_path))
+    monkeypatch.chdir(tmp_path)
+    _seed_repo(tmp_path)
+    gen = tmp_path / "paper" / "manuscript" / "generated"
+    gen.mkdir(parents=True)
+    (gen / "tab_x.tex").write_text("old\n")
+    monkeypatch.setattr(make_results_bundle, "GEN_DIR", gen)
+    monkeypatch.setattr(
+        gate,
+        "_paper_fragment_checks",
+        lambda repo: [("paper/generated/tab_x.tex", gen / "tab_x.tex", "new\n")],
+    )
+    assert gate.main(["--fix"]) == 0
+    assert gate.main([]) == 0  # fresh after ONE pass

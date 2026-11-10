@@ -41,6 +41,20 @@ def transfer_bundle(baseline) -> dict:
     }
 
 
+def check_bundle_preprocessing(baseline, bundle: dict, source: object = "bundle") -> None:
+    """Refuse a pretrained bundle whose input preprocessing differs from this run's.
+
+    The weights were trained on inputs built with the bundle's ``normalize`` / ``zero_seq``; feeding
+    them differently-transformed inputs (e.g. per-window z-scored vs raw-standardised) still matches
+    in shape, so it would score silently wrong numbers. Bundles that predate these keys pass."""
+    for key in ("normalize", "zero_seq"):
+        if key in bundle and bundle[key] != getattr(baseline, key):
+            raise ValueError(
+                f"pretrained {source} was trained with {key}={bundle[key]!r}, but this run uses "
+                f"{key}={getattr(baseline, key)!r}; pass the matching flag"
+            )
+
+
 def restore_pretrained(baseline, bundle: dict) -> None:
     """Rebuild ``baseline.model`` from ``bundle`` and load its weights + preprocessing — NO training
     (zero-shot). Leaves the baseline ready for ``predict()``."""

@@ -97,7 +97,13 @@ fault_grounded_local fault_grounded_line fault_grounded_global \
 fault_phase_local fault_phase_line fault_phase_global \
 fault_category_local fault_category_line fault_category_global \
 fault_origin_global}"
-BASELINES="${BASELINES:-majority threshold random_forest mlp gru cnn resnet}"
+# --zero-seq only affects the deep baselines (the runner rejects it for the classical ones, whose
+# "+zero_seq" cells would duplicate the plain cells), so ZERO_SEQ=1 defaults to the deep set.
+if [ "$ZERO_SEQ" = 1 ]; then
+  BASELINES="${BASELINES:-mlp gru cnn resnet}"
+else
+  BASELINES="${BASELINES:-majority threshold random_forest mlp gru cnn resnet}"
+fi
 
 # --- Ask the manifest for pending cells BEFORE staging, so a fully-done chain link exits instantly
 #     without paying the stage copy. Coverage reads outputs/ + packaged splits (no staged data root).

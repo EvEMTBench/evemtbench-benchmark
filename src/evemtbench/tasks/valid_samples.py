@@ -11,8 +11,13 @@ defined for every scored window:
 * FAULT_DETECTION — all windows of fault episodes (positives = fault-active windows, negatives =
   the pre-fault windows of the same episode). Gate: ``y_fault_line`` not null.
 * FAULT_CLASS — fault-active windows only (a non-active window has no fault type to classify).
-* FAULT_LOCATION — fault-active windows of **line-fault** episodes only (location is NaN on bus
-  faults). Gate: fault-active AND ``y_fault_location`` not null.
+* FAULT_LOCATION — fault-active windows with a defined location. Gate: fault-active AND
+  ``y_fault_location`` not null. The intent is line faults only, but the producer also fills a
+  location for bus-target (``MainBus*``) fault episodes in the ``adapt_grid`` family, so those
+  windows pass the gate with a location that is not a position on any line (in ``benchmark``
+  they carry NaN; the ``multi_grid`` corpora have no bus-target windows in the gate). The gate
+  is frozen within the major version; :func:`line_target_fault_location_mask` gives the
+  line-targets-only subset for diagnostics. See docs/known_issues.md.
 
 EVENT_STATE breaks that within-fault-episode pattern: it scores **all** windows (every window has
 a defined normal/switching/fault state), which is why it is global-only — the local/line oracle
@@ -31,7 +36,7 @@ from .labels.fault_class import derive_fault_class_series
 from .labels.fault_phase import derive_fault_phase_series
 from .labels.switch_detection import derive_switch_present_series
 from .labels.switch_type import derive_switch_type_series
-from .taxonomy import Function, TaskDefinition
+from .taxonomy import LINE_LABEL_PREFIX, Function, TaskDefinition
 
 
 def valid_sample_mask(y: pd.DataFrame, td: TaskDefinition) -> np.ndarray:
@@ -44,7 +49,7 @@ def valid_sample_mask(y: pd.DataFrame, td: TaskDefinition) -> np.ndarray:
         # map to -1 and crash a CrossEntropy head; this guard keeps FC robust to taxonomy gaps).
         return derive_fault_active_series(y).astype(bool) & (derive_fault_class_series(y) != -1)
     if td.function is Function.FAULT_LOCATION:
-        return derive_fault_active_series(y).astype(bool) & y["y_fault_location"].notna().to_numpy()
+        return _fault_location_gate(y)
     if td.function is Function.EVENT_STATE:
         # Every window has a defined grid state (normal/switching/fault); all are scored. This is a
         # global-only task, so it needs no y_fault_line oracle (which is null on non-fault windows).
@@ -71,3 +76,17 @@ def valid_sample_mask(y: pd.DataFrame, td: TaskDefinition) -> np.ndarray:
         # Line-vs-bus origin on fault-active windows (global-only; y_fault_line defined here).
         return derive_fault_active_series(y).astype(bool)
     raise NotImplementedError(f"valid-sample rule for {td.function} not defined")
+
+
+def _fault_location_gate(y: pd.DataFrame) -> np.ndarray:
+    """The official FL gate: fault-active windows with a non-null ``y_fault_location``."""
+    return derive_fault_active_series(y).astype(bool) & y["y_fault_location"].notna().to_numpy()
+
+
+def line_target_fault_location_mask(y: pd.DataFrame) -> np.ndarray:
+    """Opt-in diagnostic: the FL valid samples restricted to line targets (``y_fault_line`` =
+    ``MainLn*``; the frame needs that column, which the official gate does not). It drops the
+    bus-target windows the official gate admits in ``adapt_grid``; it is not used for scoring (the
+    official gate is frozen within the major version)."""
+    is_line = y["y_fault_line"].astype(str).str.startswith(LINE_LABEL_PREFIX).to_numpy()
+    return _fault_location_gate(y) & is_line

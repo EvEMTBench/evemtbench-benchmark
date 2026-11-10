@@ -5,6 +5,8 @@ official metrics are recomputed here, independent of how the predictions were pr
 
     evemtbench-evaluate --task fault_detection_local --protocol held_out \\
         --grid double_line --predictions preds.parquet --out result.json
+
+Add ``--test-set benchmark`` to score predictions on the held-out benchmark family.
 """
 
 from __future__ import annotations
@@ -30,6 +32,12 @@ def main(argv: list[str] | None = None) -> None:
         help="verify the scoring harness itself (ceiling/floor/alignment controls; no data "
         "needed) and exit",
     )
+    p.add_argument(
+        "--test-set",
+        default="test",
+        choices=("test", "benchmark"),
+        help="held-out view the predictions are for (default: test)",
+    )
     p.add_argument("--out", default=None, help="write the EvalResult JSON here (else stdout)")
     p.add_argument("--root", default=None)
     p.add_argument("--splits-root", default=None)
@@ -53,7 +61,7 @@ def main(argv: list[str] | None = None) -> None:
         directory=args.directory,
     )
     preds = load_predictions(args.predictions)
-    result = evaluate(task, preds)
+    result = evaluate(task, preds, test_set=args.test_set)
 
     text = result.to_json()
     if args.out:

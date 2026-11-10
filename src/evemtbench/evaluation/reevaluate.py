@@ -46,7 +46,7 @@ import pandas as pd
 from ..coverage import Cell, cell_dir, iter_cells
 from ..splits.protocols import PRETRAIN_TRANSFER_PROTOCOLS, TRANSFER_PROTOCOLS
 from ..tasks.task import load_task
-from ..version import BENCHMARK_VERSION
+from ..version import results_version
 from .aggregate import (
     aggregate_seed_breakdowns,
     aggregate_seed_metrics,
@@ -178,7 +178,7 @@ def reevaluate_unit(
     cells: list[Cell],
     *,
     out: Path,
-    version: str,
+    version: str | None,
     report: Report,
     tol: float = 0.0,
     check_only: bool = False,
@@ -201,8 +201,10 @@ def reevaluate_unit(
     env = _dist_versions()
 
     for cell in cells:
-        cdir = cell_dir(out, cell, version=version)
-        root = out / version
+        # None = each protocol's own results tree (held_out stays in 1.0.0), as coverage resolves it
+        ver = version or results_version(protocol)
+        cdir = cell_dir(out, cell, version=ver)
+        root = out / ver
         label = str(cdir.relative_to(root)) if cdir.is_relative_to(root) else str(cdir)
         record = _load_json(cdir / "run_record.json")
         if record is None:
@@ -265,7 +267,7 @@ def reevaluate_unit(
                 continue
 
             doc = build_result_doc(
-                benchmark_version=version,
+                benchmark_version=ver,
                 task=task.definition.task_id,
                 protocol=task.protocol,
                 grid=task.grid,
@@ -307,7 +309,11 @@ def main(argv: list[str] | None = None) -> int:
         description="Rebuild result.json from stored per-seed predictions (no retraining)."
     )
     ap.add_argument("--out", default="outputs")
-    ap.add_argument("--version", default=BENCHMARK_VERSION)
+    ap.add_argument(
+        "--version",
+        default=None,
+        help="results tree to rebuild (default: each protocol's own, version.results_version)",
+    )
     ap.add_argument("--tasks", nargs="*", default=None)
     ap.add_argument("--protocols", nargs="*", default=list(ALL_PROTOCOLS))
     ap.add_argument("--grids", nargs="*", default=None)

@@ -6,7 +6,10 @@ Being honest about reproducibility is part of the benchmark's credibility (Bench
 
 - **Splits** — committed `.txt` files are the source of truth and regenerate identically from a
   seeded permutation of sorted episode ids (stable sha256-derived seeds, not salted `hash()`).
-  Leakage tests assert committed == regenerated (`leakage.verify_held_out_regenerates`).
+  CI pins every committed split's recorded seed to that derivation
+  (`tests/integration/test_split_cli.py`); regenerating from the dataset is checked on the cluster
+  (`pytest -m data_integrity tests/cluster/test_committed_splits_regenerate.py`, via
+  `leakage.verify_protocol_regenerates`), as it needs the mounted windows.
 - **Labels** — derivations are pure functions of the window's `y` row (`event_type` / overlap /
   `y_fault_*`), test-pinned.
 - **Metrics** — deterministic given `(y_true, y_pred)`.

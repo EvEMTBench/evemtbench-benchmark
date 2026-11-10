@@ -11,7 +11,7 @@ Given a train/val/test partition of episode ids and per-episode strata (e.g. ``e
 ``audit_partition`` is pure (unit-testable without data); ``audit_grid`` reads a committed split +
 strata from the mounted dataset for the CLI freeze gate.
 
-    python -m evemtbench.splits.audit                 # all registered grids
+    python -m evemtbench.splits.audit                 # every grid with a committed held_out split
     python -m evemtbench.splits.audit --grids double_line --stratify-by event_type
 """
 
@@ -23,7 +23,7 @@ import json
 from collections import Counter
 from pathlib import Path
 
-from ..data.roots import GRIDS, get_grid
+from ..data.roots import get_grid
 from ..data.windows import read_episode_labels
 from .loader import read_held_out_splits, read_meta, read_splits, split_dir
 from .protocols import HELD_OUT_FRACTIONS
@@ -325,12 +325,14 @@ def audit_grid(
     return report
 
 
-def main() -> None:
+def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(
         description="Audit committed splits (stratification/leakage; grouped for multi_grid)."
     )
     p.add_argument("--protocol", default="held_out", choices=["held_out", "multi_grid_pretrain"])
-    p.add_argument("--grids", nargs="*", default=None, help="grid keys (else all registered)")
+    p.add_argument(
+        "--grids", nargs="*", default=None, help="grid keys (else the protocol's default grids)"
+    )
     p.add_argument("--root", default=None)
     p.add_argument("--splits-root", default=None)
     p.add_argument("--splits-version", default=None, help="default: per-protocol resolution")
@@ -341,11 +343,13 @@ def main() -> None:
         action="store_true",
         help="multi_grid_pretrain only: write audit.json next to each committed split",
     )
-    a = p.parse_args()
+    a = p.parse_args(argv)
     all_ok = True
-    if a.protocol == "multi_grid_pretrain":
-        from .generator import _GENERATED_PROTOCOLS
+    # the grids that HAVE a committed split under this protocol (the template_* pre-training grids
+    # have no held_out split, so iterating every registered grid could only ever fail)
+    from .generator import _GENERATED_PROTOCOLS
 
+    if a.protocol == "multi_grid_pretrain":
         grids = a.grids or _GENERATED_PROTOCOLS["multi_grid_pretrain"][2]
         if a.write:
             reports = write_multi_grid_audits(
@@ -371,9 +375,15 @@ def main() -> None:
                 for issue in rep["issues"]:
                     print(f"    - {issue}")
         raise SystemExit(0 if all_ok else 1)
-    for gk in a.grids or list(GRIDS):
+    for gk in a.grids or _GENERATED_PROTOCOLS["held_out"][2]:
         try:
-            rep = audit_grid(gk, root=a.root, splits_root=a.splits_root, stratify_by=a.stratify_by)
+            rep = audit_grid(
+                gk,
+                root=a.root,
+                splits_root=a.splits_root,
+                version=a.splits_version,
+                stratify_by=a.stratify_by,
+            )
         except Exception as e:  # report per grid, keep going
             print(f"[{gk}] AUDIT ERROR: {e}")
             all_ok = False

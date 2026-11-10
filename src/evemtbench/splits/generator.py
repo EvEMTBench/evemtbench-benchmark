@@ -17,15 +17,16 @@ import argparse
 import hashlib
 import json
 import os
+import warnings
 from collections import Counter
 from dataclasses import dataclass
 from pathlib import Path
 
 import numpy as np
 
-from ..data.roots import GridSpec, get_grid
+from ..data.roots import GridSpec, get_grid, windows_dir
 from ..data.windows import read_episode_ids, read_episode_labels
-from ..version import SPLITS_VERSION
+from ..version import SPLITS_VERSION, splits_version
 from .protocols import HELD_OUT_FRACTIONS, HELD_OUT_SPLIT_NAMES
 
 # Packaged splits live next to this module: src/evemtbench/splits/v<version>/...
@@ -268,12 +269,25 @@ def generate_held_out(
 
     # The benchmark family may be absent (a not-yet-windowed grid, or a pre-training family that has
     # no separate held-out family); in that case the split carries an empty benchmark partition.
+    # Only a family with NO windows falls back to empty: a windowed directory that cannot be read
+    # (e.g. an ambiguous second X file) re-raises, since an empty benchmark.txt would silently drop
+    # the benchmark test set from the coverage matrix.
     bm_eps: list[int] = []
     if benchmark_family is not None:
         try:
             bm_eps = read_episode_ids(g, benchmark_family, root=root)
         except FileNotFoundError:
-            bm_eps = []
+            try:
+                bm_dir: Path | None = windows_dir(g, benchmark_family, root)
+            except FileNotFoundError:
+                bm_dir = None
+            if bm_dir is not None and any(bm_dir.glob("X_*.raw")):
+                raise
+            warnings.warn(
+                f"{g.key}: no {benchmark_family!r} windows found; writing an EMPTY benchmark "
+                "partition (expected only for a not-yet-windowed grid)",
+                stacklevel=2,
+            )
 
     splits = {
         "train": [_triple(train_family, g.key, i) for i in parts["train"]],
@@ -353,8 +367,36 @@ _GENERATED_PROTOCOLS: dict[str, tuple[str, str | None, list[str]]] = {
 }
 
 
-def main() -> None:
-    parser = argparse.ArgumentParser(description="Regenerate committed split files.")
+# protocol -> the recipe its COMMITTED splits were generated with (recorded in each meta.json), so a
+# bare ``evemtbench-splits --protocol <p>`` reproduces them instead of writing a different split:
+# held_out v1.0 is event_type-stratified; multi_grid_pretrain v1.1 is also topology-grouped.
+_COMMITTED_RECIPES: dict[str, dict[str, str | None]] = {
+    "held_out": {"stratify_by": "event_type", "grouping": None},
+    "multi_grid_pretrain": {"stratify_by": "event_type", "grouping": "topology"},
+}
+
+_NONE = "none"  # CLI spelling for "explicitly no stratification / no grouping"
+
+
+def _differs_from_existing(art: HeldOutArtifact, out: Path) -> list[str]:
+    """Partition names whose committed ``.txt`` under ``out`` differs from ``art`` ([] if none, or
+    if ``out`` holds no split yet)."""
+    if not out.is_dir():
+        return []
+    changed = []
+    for name in HELD_OUT_SPLIT_NAMES:
+        f = out / f"{name}.txt"
+        lines = "\n".join(art.splits[name])
+        if not f.is_file() or f.read_text() != lines + ("\n" if lines else ""):
+            changed.append(name)
+    return changed
+
+
+def main(argv: list[str] | None = None) -> None:
+    parser = argparse.ArgumentParser(
+        description="Regenerate committed split files. The defaults reproduce the committed splits "
+        "of --protocol bit-for-bit; a run that would change an existing split stops unless --force."
+    )
     parser.add_argument("--protocol", default="held_out", choices=sorted(_GENERATED_PROTOCOLS))
     parser.add_argument("--root", default=None, help="data root override (else env/default)")
     parser.add_argument(
@@ -366,23 +408,39 @@ def main() -> None:
     parser.add_argument(
         "--stratify-by",
         default=None,
-        help="episode-label column for a class-stratified train split (e.g. event_type); "
-        "recorded in meta.json so leakage.verify_held_out_regenerates reproduces it",
+        help="episode-label column for a class-stratified train split (default: the protocol's "
+        f"committed recipe, event_type; '{_NONE}' for a uniform split); recorded in meta.json so "
+        "leakage.verify_held_out_regenerates reproduces it",
     )
     parser.add_argument(
         "--grouping",
         default=None,
-        choices=sorted(GROUPING_COLUMNS),
+        choices=[*sorted(GROUPING_COLUMNS), _NONE],
         help="group-aware split level (multi_grid source corpora): 'simulation' keeps each "
         "result_id together, 'topology' keeps each graph_id (and thus all its simulations and "
-        "sibling lines) together; recorded in meta.json for regeneration verification",
+        "sibling lines) together (default: the protocol's committed recipe -- topology for "
+        f"multi_grid_pretrain, '{_NONE}' for held_out); recorded in meta.json for regeneration "
+        "verification",
     )
     parser.add_argument(
         "--splits-version",
-        default=SPLITS_VERSION,
-        help="version directory to write under the splits root (e.g. 1.1)",
+        default=None,
+        help="version directory to write under the splits root (default: the protocol's current "
+        "committed version, version.splits_version)",
     )
-    args = parser.parse_args()
+    parser.add_argument(
+        "--force",
+        action="store_true",
+        help="overwrite an existing split that the new generation would change",
+    )
+    args = parser.parse_args(argv)
+
+    recipe = _COMMITTED_RECIPES[args.protocol]
+    stratify_by = recipe["stratify_by"] if args.stratify_by is None else args.stratify_by
+    grouping = recipe["grouping"] if args.grouping is None else args.grouping
+    stratify_by = None if stratify_by == _NONE else stratify_by
+    grouping = None if grouping == _NONE else grouping
+    version = args.splits_version or splits_version(args.protocol)
 
     train_family, benchmark_family, default_grids = _GENERATED_PROTOCOLS[args.protocol]
     for grid_key in args.grids or default_grids:
@@ -392,14 +450,23 @@ def main() -> None:
             train_family=train_family,
             benchmark_family=benchmark_family,
             root=args.root,
-            stratify_by=args.stratify_by,
-            grouping=args.grouping,
+            stratify_by=stratify_by,
+            grouping=grouping,
         )
-        out = write_held_out_artifact(art, Path(args.out), version=args.splits_version)
+        target = Path(args.out) / f"v{version}" / art.protocol / art.grid
+        changed = _differs_from_existing(art, target)
+        if changed and not args.force:
+            raise SystemExit(
+                f"[{args.protocol}/{grid_key}] refusing to overwrite {target}: the new generation "
+                f"changes {changed} (stratify_by={stratify_by}, grouping={grouping}). Committed "
+                "splits are frozen; pass --force to replace them deliberately."
+            )
+        out = write_held_out_artifact(art, Path(args.out), version=version)
         counts = {n: len(art.splits[n]) for n in HELD_OUT_SPLIT_NAMES}
+        state = "CHANGED" if changed else "identical to the committed split"
         print(
             f"[{args.protocol}/{grid_key}] seed={art.seed} stratify_by={art.stratify_by} "
-            f"grouping={art.grouping} counts={counts} -> {out}"
+            f"grouping={art.grouping} counts={counts} -> {out} ({state})"
         )
 
 

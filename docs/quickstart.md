@@ -57,8 +57,8 @@ evemtbench-evaluate --task fault_detection_local --protocol held_out --grid doub
     --predictions preds.parquet --out result.json
 ```
 
-Anyone can recompute the official metrics from a predictions file, independent of how it was
-produced — this is what makes third-party results comparable.
+Anyone can recompute the official metrics from a predictions file (`--test-set benchmark` for the
+benchmark family), independent of how it was produced — this is what makes third-party results comparable.
 
 ## Protocol
 

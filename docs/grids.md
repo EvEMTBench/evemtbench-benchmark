@@ -32,6 +32,9 @@ motivates topology-agnostic models (GNNs) over fixed-input models.
 | `testgrid_110kv` | 9 | 6 | 18 | **108** ch | 12 ch | 6 ch |
 | `ieee39` | 35 | 28 | 70 | **420** ch | 12 ch | 6 ch |
 
+`cigre_mv` has 29 line cubicles for 15 lines: line **8-14** is exported from Bus 14 only, so its
+`line` view repeats that terminal (`GridOracle.one_ended_lines`; see [known_issues.md](known_issues.md)).
+
 The three observability settings form a nested oracle centred on the faulted element
 (`y_fault_line`, episode-constant). Naming the conventional-protection analogs:
 

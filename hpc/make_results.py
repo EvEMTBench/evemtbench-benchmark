@@ -50,6 +50,9 @@ Tasks are grouped by **difficulty tier** (see `docs/task_suite_roadmap.md`):
 
 > **Status**: tables are accumulated as jobs complete; `—` marks a pending cell. This file is
 > auto-generated from `outputs/` by `hpc/make_results.py` — do not hand-edit.
+
+> **Known issues**: dataset properties that affect some of these numbers are listed, with scope,
+> in [`docs/known_issues.md`](docs/known_issues.md) (flagged; the published behaviour is unchanged).
 """
 
 BASELINES = ["majority", "threshold", "random_forest", "mlp", "gru", "cnn", "resnet"]

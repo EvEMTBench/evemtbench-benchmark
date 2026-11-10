@@ -62,7 +62,7 @@ jobs:
         # pyproject [tool.coverage.report].fail_under (ratchet rule: CONTRIBUTING.md).
         run: uv run pytest -v --cov=evemtbench --cov-report=term-missing
 
-      - name: Leakage audit — committed v0.2 splits + fixture regeneration
+      - name: Leakage audit — committed splits + fixture regeneration
         # Already inside the pytest step above; re-run named so a leakage failure is legible in
         # the CI UI (seconds). Data-bound audits (splits.audit CLI, real-grid regeneration) stay
         # srun-only — no dataset is mounted here.

@@ -55,7 +55,9 @@ A user must be able to evaluate their own model using only `data/`, `tasks/`, `s
 ```bash
 uv venv && uv pip install -e ".[dev]"
 uv run pytest          # unit, golden, schema, leakage, smoke
-uv run ruff check src tests
+uv run ruff check src tests hpc
+uv run ruff format --check src tests hpc
+uv run mypy src        # the same gates CI runs
 ```
 
 Use lowercase config keys, log seeds, never use benchmark data for normalization/tuning,

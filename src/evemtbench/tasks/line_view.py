@@ -25,11 +25,21 @@ Projected ("proj") indices number the kept main-line cubicles 0..K-1 in on-disk 
 from __future__ import annotations
 
 import re
+import warnings
 from dataclasses import dataclass
 
 import numpy as np
 
+from .taxonomy import LINE_LABEL_PREFIX
+
 CHANNELS_PER_CUBICLE = 6  # [Isec L1,L2,L3, Usec L1,L2,L3]
+
+
+class OneEndedLineWarning(UserWarning):
+    """A main line has a single measured terminal, so its LINE view repeats it (see
+    ``GridOracle.one_ended_lines`` and docs/known_issues.md). A dedicated class so callers that run
+    with warnings as errors can filter exactly this one."""
+
 
 # The portable multi-grid pre-training view: a fixed 12-channel EndA/EndB layout
 # ``[EndA: Isec L1,L2,L3, Usec L1,L2,L3][EndB: ...]`` (contract ``extra.view``). Line/grid
@@ -80,6 +90,9 @@ class GridOracle:
     n_line_cubicles: int
     # faulted element label -> (near_proj, far_proj) cubicle pair in projected space
     _pairs: dict[str, tuple[int, int]]
+    # ``MainLn*`` labels with a single measured terminal in the export. Their LINE view repeats
+    # that terminal as the far end (frozen v1 behaviour; see docs/known_issues.md).
+    one_ended_lines: tuple[str, ...] = ()
 
     def observation_columns(self, fault_line: str, observability: str) -> list[int]:
         """Projected-space column indices to select for one row.
@@ -181,11 +194,29 @@ def _assemble_oracle(grid: str, specs: list[tuple[int, str, str]]) -> GridOracle
         bus, proj = t
         return (int(bus) if str(bus).isdigit() else 0, proj)
 
+    one_ended_labels: list[str] = []
     for lineid, terms in line_terminals.items():
         ordered = [p for _, p in sorted(terms, key=_termkey)]
         near = ordered[0]
-        far = ordered[1] if len(ordered) > 1 else ordered[0]
-        pairs[f"MainLn{lineid}"] = (near, far)
+        label = f"{LINE_LABEL_PREFIX}{lineid}"
+        if len(ordered) > 1:
+            far = ordered[1]
+        else:
+            # A one-ended line pads its far slot with the near terminal. Changing that would change
+            # LINE-view inputs, which are frozen within the major version, so it is flagged instead.
+            far = near
+            one_ended_labels.append(label)
+        pairs[label] = (near, far)
+    one_ended = tuple(sorted(one_ended_labels))
+    if one_ended:
+        verb = "has" if len(one_ended) == 1 else "have"
+        warnings.warn(
+            f"grid {grid!r}: {', '.join(one_ended)} {verb} a single measured terminal; the LINE "
+            "view repeats it as the far end (see GridOracle.one_ended_lines and "
+            "docs/known_issues.md)",
+            OneEndedLineWarning,
+            stacklevel=3,
+        )
     for bus, projs in bus_lines.items():
         near = projs[0]
         far = projs[1] if len(projs) > 1 else projs[0]
@@ -196,6 +227,7 @@ def _assemble_oracle(grid: str, specs: list[tuple[int, str, str]]) -> GridOracle
         line_channels=tuple(line_channels),
         n_line_cubicles=len(specs),
         _pairs=pairs,
+        one_ended_lines=one_ended,
     )
 
 

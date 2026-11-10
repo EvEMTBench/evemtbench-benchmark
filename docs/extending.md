@@ -73,8 +73,8 @@ existing `held_out` results stay comparable).
   resubmission via `submit.sh` with a no-progress halt) and profiling wrappers around the same
   entrypoints.
 - **`hpc/make_results.py`** regenerates `RESULTS.md`; `evemtbench-leaderboard` regenerates the HTML.
-- **`hpc/make_results_bundle.py`** regenerates the public `results/<version>/` bundle (aggregated
-  `results.{csv,json}` + the LaTeX `tables/`); **`hpc/make_audit.py`** the audit site + provenance index.
+- **`hpc/make_results_bundle.py`** regenerates the public `results/<version>/` bundle
+  (`aggregated_results.{csv,json}` + the LaTeX `tables/`); **`hpc/make_audit.py`** the audit site + provenance index.
 
 ### Add a committed derived view (the pattern)
 Every committed artifact derived from `outputs/` follows one contract: a **deterministic, pure
