@@ -35,7 +35,13 @@ Implement `fit(task)` / `predict(view) -> predictions_frame` (mirror `baselines/
 its factory in `runner.py::BASELINE_FACTORIES` (in-tree) or via `runner.register_baseline()`
 (third-party, before `runner.main()`; see `examples/byo_model.py`) — `_make_baseline` and the
 `--baseline` choices both read that registry, so nothing else in the runner changes — and add it to
-`coverage.py::ALL_BASELINES` (+ `baseline_applies` if it's restricted, like `threshold`). See [baselines.md](baselines.md).
+`coverage.py::ALL_BASELINES` (+ `baseline_applies` if it's restricted, like `threshold` and
+`impedance`). A baseline that calibrates anything on `train` exposes it as a JSON-serialisable
+`calibration_` attribute after `fit`; the runner copies it to `run_record.json["calibration"]`.
+The builders that enumerate baselines are `hpc/make_results.py::BASELINES` (RESULTS.md),
+`hpc/completed_overview.py`, `hpc/audit_manifest.py::BASELINE_ABOUT`/`NA_REASONS` (audit site) and
+`hpc/paper_artifacts/paper_lib.py` (manuscript tables; labels, n/a rule and the table set). See
+[baselines.md](baselines.md).
 
 ## Add a protocol
 
@@ -54,7 +60,12 @@ existing `held_out` results stay comparable).
 - **Coverage manifest** — [`coverage.py`](../src/evemtbench/coverage.py): the expected matrix
   (tasks × grids × protocols × applicable baselines × test_sets) vs. produced `result.json` →
   `done / pending / failed`. The single source of truth for skip-existing + progress.
-  `python -m evemtbench.coverage --summary | --emit-pending`.
+  `python -m evemtbench.coverage --summary | --emit-pending | --failures`. Each run keeps a
+  `failure.json` in its cell directory while it runs, which records the stage, exception and
+  traceback tail of a crash and is deleted on success (`evemtbench.failures`). `--emit-pending`
+  skips cells at the retry cap (`--max-attempts`, default 3; `0` disables it; deleting the file
+  resets it). Staging failures in `sweep.sh` happen before the runner starts and are deliberately
+  not counted: they are node or disk problems, not properties of the cell.
 - **`hpc/sweep.sh`** — grid-parametric worker (Alex): runs only the manifest-pending cells for one
   grid. With prebuilt projection caches it stages **lazily per cell** (the current cell's ≤4 view
   files, atomic copy, one-task-ahead background prefetch); without a complete cache it falls back to

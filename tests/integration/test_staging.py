@@ -12,7 +12,7 @@ import pytest
 
 from evemtbench.data import staging
 from evemtbench.tasks.task import TaskView, load_task
-from evemtbench.version import BENCHMARK_VERSION, results_version
+from evemtbench.version import DATA_CACHE_VERSION, results_version
 
 
 def _task(fixture_root, held_out_splits, task_id):
@@ -126,7 +126,7 @@ def test_missing_sidecar_is_tolerated(fixture_root, held_out_splits, tmp_path):
 
 def test_persistent_cache_root_env_and_version_scoped(tmp_path, monkeypatch):
     monkeypatch.setenv("EVEMTBENCH_PROJECTION_CACHE_ROOT", str(tmp_path))
-    assert staging.persistent_cache_root() == tmp_path / BENCHMARK_VERSION
+    assert staging.persistent_cache_root() == tmp_path / DATA_CACHE_VERSION
 
 
 def test_view_cache_files_dedup_and_absent(fixture_root, held_out_splits, tmp_path, monkeypatch):
@@ -216,7 +216,7 @@ def test_cache_status_counts(fixture_root, held_out_splits, tmp_path, monkeypatc
 
 def test_prune_stale_versions_only_touches_caches(tmp_path, monkeypatch):
     monkeypatch.setenv("EVEMTBENCH_PROJECTION_CACHE_ROOT", str(tmp_path))
-    cur = staging.persistent_cache_root()  # tmp_path/<BENCHMARK_VERSION>
+    cur = staging.persistent_cache_root()  # tmp_path/<DATA_CACHE_VERSION>
     cur.mkdir(parents=True)
     (cur / "proj_x.f32").write_bytes(b"0")
     old = tmp_path / "0.0.1-old"
@@ -234,7 +234,7 @@ def test_prune_stale_versions_only_touches_caches(tmp_path, monkeypatch):
 def test_cli_files_and_status(fixture_root, held_out_splits, tmp_path, monkeypatch, capsys):
     monkeypatch.setenv("EVEMTBENCH_PROJECTION_CACHE_ROOT", str(tmp_path))  # empty -> all missing
     assert staging._main(["cache-root"]) == 0
-    assert str(BENCHMARK_VERSION) in capsys.readouterr().out
+    assert str(DATA_CACHE_VERSION) in capsys.readouterr().out
     args = [
         "--grid",
         "double_line",

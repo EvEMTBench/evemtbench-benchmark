@@ -73,7 +73,7 @@ frozen, the architecture is identical across grids, so the `state_dict` loads wi
 runner resolves it (`--pretrained-from` / `--pretrain-grid`, default `template_20kv`; each transfer
 cell's reproduce line pins its source via `--pretrain-grid <source>`) and either
 `restore_pretrained` (zero-shot, no training) or attaches it as `_pretrained_state` for `fit()` to
-continue from (fine-tune). Only the deep baselines (`mlp/gru/cnn/resnet`) participate; the
+continue from (fine-tune). Only the deep baselines (`mlp/gru/cnn/resnet/tst`) participate; the
 `run_record.json` attestation records `fit_on` / `pretrained_from` per protocol.
 
 ## Coverage & reporting

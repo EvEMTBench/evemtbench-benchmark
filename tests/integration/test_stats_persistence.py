@@ -11,7 +11,7 @@ import pandas as pd
 import pytest
 
 from evemtbench.tasks.task import TaskView, add_zero_sequence, build_input_transform, load_task
-from evemtbench.version import BENCHMARK_VERSION
+from evemtbench.version import DATA_CACHE_VERSION
 
 
 def _task(fixture_root, held_out_splits, task_id="fault_detection_local"):
@@ -32,7 +32,7 @@ def test_roundtrip_and_no_recompute(fixture_root, held_out_splits, tmp_path, mon
     monkeypatch.setenv("EVEMTBENCH_PROJECTION_CACHE_ROOT", str(tmp_path))
     v1 = _task(fixture_root, held_out_splits).view("train")
     mean1, std1 = v1.channel_stats(transform=None)
-    files = list((tmp_path / BENCHMARK_VERSION).glob("stats_*.npz"))
+    files = list((tmp_path / DATA_CACHE_VERSION).glob("stats_*.npz"))
     assert len(files) == 1 and files[0].name == v1.stats_filename("none")
 
     v2 = _task(fixture_root, held_out_splits).view("train")  # fresh Task, empty memo
@@ -71,7 +71,7 @@ def test_readonly_does_not_block_stats_write(fixture_root, held_out_splits, tmp_
     monkeypatch.setenv("EVEMTBENCH_CACHE_READONLY", "1")
     v = _task(fixture_root, held_out_splits).view("train")
     v.channel_stats(transform=None)
-    assert list((tmp_path / BENCHMARK_VERSION).glob("stats_*.npz"))
+    assert list((tmp_path / DATA_CACHE_VERSION).glob("stats_*.npz"))
 
 
 def test_two_level_probe_order(fixture_root, held_out_splits, tmp_path, monkeypatch):
@@ -81,7 +81,7 @@ def test_two_level_probe_order(fixture_root, held_out_splits, tmp_path, monkeypa
     v1 = _task(fixture_root, held_out_splits).view("train")
     mean1, _ = v1.channel_stats(transform=None)
     fname = v1.stats_filename("none")
-    assert (local / fname).exists() and (root / BENCHMARK_VERSION / fname).exists()
+    assert (local / fname).exists() and (root / DATA_CACHE_VERSION / fname).exists()
 
     # corrupt the node-local copy -> loader falls through to the persistent root, then heals local
     (local / fname).write_bytes(b"garbage")
@@ -96,7 +96,7 @@ def test_corrupt_everywhere_recomputes_and_rewrites(
     monkeypatch.setenv("EVEMTBENCH_PROJECTION_CACHE_ROOT", str(tmp_path))
     v1 = _task(fixture_root, held_out_splits).view("train")
     mean1, _ = v1.channel_stats(transform=None)
-    path = tmp_path / BENCHMARK_VERSION / v1.stats_filename("none")
+    path = tmp_path / DATA_CACHE_VERSION / v1.stats_filename("none")
     path.write_bytes(b"\x00" * 16)
 
     v2 = _task(fixture_root, held_out_splits).view("train")

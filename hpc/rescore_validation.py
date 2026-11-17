@@ -14,7 +14,7 @@ VALIDATION metrics so the paper can select the reported baseline on ``val`` inst
 
 For each cell:
 
-  * deep baselines (mlp/gru/cnn/resnet) are rebuilt from the saved best-val checkpoint via
+  * deep baselines (mlp/gru/cnn/resnet/tst) are rebuilt from the saved best-val checkpoint via
     ``_transfer.reload_held_out`` (recomputes transform/stats/dims from ``task.train``; NO
     training);
   * ``random_forest`` is refit on ``task.train`` (deterministic, ``random_state=seed``) because it
@@ -39,6 +39,7 @@ from __future__ import annotations
 import argparse
 import glob
 import json
+import os
 import sys
 from pathlib import Path
 
@@ -52,9 +53,9 @@ from evemtbench.coverage import LEARNED_BASELINES
 from evemtbench.evaluation.evaluate import _nan_to_none, evaluate
 from evemtbench.evaluation.significance import ci95_halfwidth
 from evemtbench.tasks.task import load_task
-from evemtbench.version import results_version
+from evemtbench.version import CURRENT_RESULTS_VERSIONS, results_version
 
-_DEEP = {"mlp", "gru", "cnn", "resnet"}
+_DEEP = {"mlp", "gru", "cnn", "resnet", "tst"}
 
 
 def _device() -> str:
@@ -110,8 +111,34 @@ def _aggregate(per_seed: list[dict]) -> dict:
     return agg
 
 
+def attach_projection_cache(task) -> None:
+    """Read the task's views from the projection cache when one is configured.
+
+    The runner materialises the cache for every view before it trains (``runner.py``), but this
+    script used to call ``load_task`` only, so the random-forest refit and the deep predictions
+    read the raw windows from the shared file system: on the wide ieee39 views that is hundreds of
+    GB at a few MB/s on one core (seen 2026-11-12). Attaching the cache changes only where the
+    bytes come from, not the values: it is the projection the sweep trained and evaluated on, and
+    the positive control in :func:`rescore_cell` still requires every seed to reproduce its
+    committed test metric. ``EVEMTBENCH_CACHE_READONLY=1`` (set by the job scripts) makes a missing
+    cache file an error instead of a silent build on a GPU node."""
+    cdir = os.environ.get("EVEMTBENCH_PROJECTION_CACHE")
+    if not cdir:
+        return
+    for view in (task.train, task.val, task.test):
+        if len(view):
+            view.materialize_cache(cdir)
+
+
 def rescore_cell(
-    cell: Path, task_id: str, grid: str, baseline: str, *, tol: float, protocol: str = "held_out"
+    cell: Path,
+    task_id: str,
+    grid: str,
+    baseline: str,
+    *,
+    tol: float,
+    protocol: str = "held_out",
+    source: str | None = None,
 ) -> str:
     """Re-score one (task, grid, baseline) cell on validation. Returns a status string.
 
@@ -120,11 +147,14 @@ def rescore_cell(
     (the pre-training-corpus val on which the grid-independent zero-shot winner is chosen). All
     three have a non-empty ``train`` split, so ``reload_held_out`` can recompute stats;
     ``transfer_zeroshot`` itself has NO target train/val and is never re-scored here — its winner
-    is selected on the pretrain val."""
+    is selected on the pretrain val. ``source`` is the transfer pre-training source (``None`` =
+    the default source); it takes part in the per-cell results version (v1.3.0 fault_phase) and
+    with it in whether the committed label patches apply to the reloaded labels."""
     if baseline not in LEARNED_BASELINES:
         return "skip (not a learned baseline)"
     # load task once; headline metric from its definition
-    task = load_task(task_id, protocol, grid=grid)
+    task = load_task(task_id, protocol, grid=grid, pretrain_grid=source)
+    attach_projection_cache(task)
     headline = task.definition.metrics[0]
     committed = _committed_test_headline(cell, headline)
     if not committed:
@@ -181,9 +211,9 @@ def rescore_cell(
     out_dir = cell / "val"
     out_dir.mkdir(parents=True, exist_ok=True)
     doc = {
-        # Stamped with the CELL TREE's version (outputs/<results_version(protocol)>/...), so the
+        # Stamped with the CELL TREE's version (outputs/<the cell's results_version>/...), so the
         # val row stays version-consistent with the committed test/benchmark rows beside it.
-        "benchmark_version": results_version(protocol),
+        "benchmark_version": task.results_version,
         "task": task_id,
         "protocol": protocol,
         "grid": grid,
@@ -228,11 +258,18 @@ def main(argv=None):
     )
     args = p.parse_args(argv)
 
-    base = f"outputs/{results_version(args.protocol)}"  # the protocol's CURRENT results tree
-    pats = [f"{base}/*/{args.protocol}/*/*/test/result.json"]  # legacy source-less path
-    if args.protocol == "transfer_finetune":
-        # non-default transfer sources live under a pretrain-<src> subdir (see coverage.cell_dir)
-        pats.append(f"{base}/*/{args.protocol}/*/*/pretrain-*/test/result.json")
+    # Every current results tree is globbed; a cell is kept only when its tree is the CURRENT one
+    # for the cell (protocol, task, grid, source) — the fault-location cells of held_out /
+    # transfer_finetune live in the 1.2.0 tree (corrected valid-sample gate) and the LP-1-patched
+    # fault_phase cells in the 1.3.0 tree; their superseded older copies must not be re-scored
+    # (their checkpoints were trained on the old samples).
+    pats = []
+    for ver in CURRENT_RESULTS_VERSIONS:
+        base = f"outputs/{ver}"
+        pats.append(f"{base}/*/{args.protocol}/*/*/test/result.json")  # legacy source-less path
+        if args.protocol == "transfer_finetune":
+            # non-default transfer sources live under a pretrain-<src> subdir (coverage.cell_dir)
+            pats.append(f"{base}/*/{args.protocol}/*/*/pretrain-*/test/result.json")
     cells = []
     for f in sorted({g for p in pats for g in glob.glob(p)}):
         parts = Path(f).parts
@@ -244,6 +281,9 @@ def main(argv=None):
             # .../<task>/<protocol>/<grid>/<baseline>/test/result.json
             source = None
             baseline, grid, task_id = parts[-3], parts[-4], parts[-6]
+        cell_src = (source or None) if args.protocol == "transfer_finetune" else None
+        if parts[1] != results_version(args.protocol, task_id, grid=grid, source=cell_src):
+            continue  # a superseded copy of the cell in an older tree
         if args.task and task_id != args.task:
             continue
         if args.grid and grid != args.grid:
@@ -254,16 +294,22 @@ def main(argv=None):
             continue
         if baseline not in LEARNED_BASELINES:
             continue
-        cells.append((Path(f).parents[1], task_id, grid, baseline))
+        cells.append((Path(f).parents[1], task_id, grid, baseline, cell_src))
 
     done = fails = 0
-    for cell, task_id, grid, baseline in cells:
+    for cell, task_id, grid, baseline, cell_src in cells:
         if not args.force and (cell / "val" / "result.json").is_file():
             print(f"[skip existing] {task_id}/{grid}/{baseline}")
             continue
         try:
             status = rescore_cell(
-                cell, task_id, grid, baseline, tol=args.tol, protocol=args.protocol
+                cell,
+                task_id,
+                grid,
+                baseline,
+                tol=args.tol,
+                protocol=args.protocol,
+                source=cell_src,
             )
         except Exception as e:
             status = f"ERROR {type(e).__name__}: {e}"

@@ -57,6 +57,12 @@ def test_real_result_populates_its_cell(tmp_path, monkeypatch):
             }
         )
     )
+    # the cell's validation re-score: selection needs it (a model is never selected on the set it
+    # reports), so a populated cell without one fails the build instead of rendering a number
+    (d.parent / "val").mkdir()
+    (d.parent / "val" / "result.json").write_text(
+        (d / "result.json").read_text().replace('"test_set": "test"', '"test_set": "val"')
+    )
     monkeypatch.chdir(tmp_path)
     fd = mpt.build_paper_tables()["tab_res_fd.tex"]
     assert (

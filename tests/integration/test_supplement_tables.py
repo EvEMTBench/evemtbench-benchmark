@@ -7,7 +7,7 @@ from pathlib import Path
 
 REPO = Path(__file__).resolve().parents[2]
 
-N_BODY_CELLS = 7 * 12  # 7 baselines × (4 grids × 3 observability views)
+N_BODY_CELLS = 8 * 12  # 8 baselines × (4 grids × 3 observability views)
 
 # the 10 standard per-baseline tables (each with N_BODY_CELLS cells); Package C adds further SI
 # tables (protection rates, per-class F1, FC support, split counts, diagnostics) of other shapes.
@@ -106,6 +106,7 @@ def test_committed_supplement_fragments_present():
             "ec_support",
             "ed_negative_support",
             "current_shift",
+            "fl_locator_breakdown",
         )
     }
     assert {f.name for f in frags} == expected

@@ -63,6 +63,12 @@ def test_paper_fragments_are_a_live_gated_view(tmp_path, monkeypatch):
             }
         )
     )
+    # the cell's validation re-score: selection needs it (a model is never selected on the set it
+    # reports), so a populated cell without one fails the build instead of rendering a number
+    (d.parent / "val").mkdir()
+    (d.parent / "val" / "result.json").write_text(
+        (d / "result.json").read_text().replace('"test_set": "test"', '"test_set": "val"')
+    )
     gen = _gen_dir(tmp_path)  # NO FROZEN_TAG — fragments are gated regardless
 
     # committed fragments missing -> the gate flags them stale; --fix regenerates all views

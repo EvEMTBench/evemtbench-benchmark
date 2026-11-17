@@ -301,23 +301,29 @@ def test_resistance_bin_stratification_quartiles():
     assert "resistance_bin" in out and len(out["resistance_bin"]) == 4
 
 
-def test_fl_gate_admits_bus_targets_once_they_carry_a_location(fixture_root):
-    """The producer fills a location for bus-target fault episodes in ``adapt_grid``. The frozen
-    official gate then admits them; the opt-in line-target mask does not (docs/known_issues.md)."""
+def test_fl_gate_excludes_bus_targets_even_when_they_carry_a_location(fixture_root):
+    """The producer fills a location for bus-target fault episodes in ``adapt_grid``. The v1.0/v1.1
+    gate admitted those windows; since benchmark v1.2.0 the gate requires a line target, so they
+    stay out whether or not they carry a location (docs/known_issues.md §2)."""
     from evemtbench.tasks.labels.event_present import derive_fault_active_series
     from evemtbench.tasks.valid_samples import line_target_fault_location_mask
 
     ws = _ws(fixture_root)
     td = get_task("fault_location_line")
     clean = valid_sample_mask(ws.y, td)
+    assert clean.any()
     y = ws.y.copy()
     is_bus = y["y_fault_line"].astype(str).str.startswith("MainBus").to_numpy()
     active = derive_fault_active_series(y).astype(bool)
     assert (is_bus & active).any(), "fixture must contain fault-active bus-target windows"
     y.loc[is_bus, "y_fault_location"] = 50.0  # what the producer writes in adapt_grid
+    # the pre-1.2.0 gate (fault-active AND located) would admit them: the regression guarded here
+    old_gate = active & y["y_fault_location"].notna().to_numpy()
+    assert (old_gate & is_bus).any()
     official = valid_sample_mask(y, td)
-    line_only = line_target_fault_location_mask(y)
-    assert (official & is_bus).any(), "official gate admits bus targets with a location"
-    assert not (line_only & is_bus).any()
-    np.testing.assert_array_equal(line_only, clean)  # line-only == the gate on clean data
+    assert not (official & is_bus).any(), "bus-target windows must not be FL valid samples"
+    np.testing.assert_array_equal(official, old_gate & ~is_bus)
+    np.testing.assert_array_equal(official, clean)  # filling bus locations changes nothing
+    # the former opt-in diagnostic is now an alias of the gate
+    np.testing.assert_array_equal(line_target_fault_location_mask(y), official)
     np.testing.assert_array_equal(line_target_fault_location_mask(ws.y), clean)

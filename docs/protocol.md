@@ -21,7 +21,7 @@ specified in their [task cards](task_cards/).
 |---|---|---|---|---|
 | Fault **detection** (FD) | `fault_detection` | binary | 2 | all windows of fault episodes (`y_fault_line` defined): pre-fault negatives + fault-active positives |
 | Fault **classification** (FC) | `fault_classification` | multiclass | **9** | fault-active windows whose fault type is in the 9-class vocab |
-| Fault **location** (FL) | `fault_location` | regression | — | fault-active windows with a defined `y_fault_location` — meant as **line** faults, but `adapt_grid` bus-target episodes also carry a location and pass (see [known_issues.md](known_issues.md)) |
+| Fault **location** (FL) | `fault_location` | regression | — | fault-active windows of **line** faults (`y_fault_line` = `MainLn*`) with a defined `y_fault_location`. Bus-target episodes are excluded since v1.2.0; the v1.0/v1.1 rule admitted them in `adapt_grid` (see [known_issues.md](known_issues.md) §2) |
 
 > **The fault tasks are ORACLE tasks — read the "valid samples" column as part of the task
 > definition, not as a filtering detail.** Only fault episodes are scored, so FD's negatives are the
@@ -117,7 +117,7 @@ Design: [design/pretrain_transfer.md](design/pretrain_transfer.md).
 - **Normalization:** these default to **per-window z-score** (each window standardized by its own
   per-channel mean/std over time) — leakage-free and voltage-invariant, so a 20 kV-pretrained model
   transfers across voltage levels. `held_out` keeps `none`. Recorded in `run_record.json`.
-- **Baselines:** the deep baselines only (`mlp/gru/cnn/resnet` — transferable weights). The target's
+- **Baselines:** the deep baselines only (`mlp/gru/cnn/resnet/tst` — transferable weights). The target's
   in-distribution `held_out` majority is the reference floor.
 - **Sources:** every transfer cell is scored once per pre-training source grid
   (`template_20kv`, `template_110kv`, `template_345kv`; `coverage.PRETRAIN_GRIDS`). Reporting

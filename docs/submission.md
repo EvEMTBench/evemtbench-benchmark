@@ -41,6 +41,13 @@ seeds and writes the artifacts below.
 ## 3. `result.json` schema (one per task × protocol × grid × baseline × test_set)
 
 Path: `outputs/<benchmark_version>/<task>/<protocol>/<grid>/<baseline>/<test_set>/result.json`.
+`<benchmark_version>` is the results version of the cell, not always the contract version:
+`evemtbench.version.results_version(protocol, task, grid=..., source=...)` gives `1.0.0` for
+`held_out`, `1.1.0` for the pre-training and transfer protocols, `1.2.0` for the fault-location
+tasks under `held_out` and both transfer protocols, and `1.3.0` for the faulted-phase cells that read
+a label repaired by label patch LP-1 (see [versioning.md](versioning.md)). The validator checks the
+stamp against that mapping, with the result's grid and `pretrain_grid`. The validator checks the stamp
+against that mapping.
 
 ```json
 {
@@ -110,3 +117,72 @@ multi_grid_pretrain transfer_zeroshot transfer_finetune` to widen it) and reads 
 tree, which is not part of the repository — in a fresh clone every cell reads as pending. The
 recorded state is the committed `coverage_snapshot.json`. `evemtbench-leaderboard --outputs ./outputs --out leaderboard.html`
 renders the sortable, filterable board (topology / test-set / model / version).
+
+## 6. Submitting to the leaderboard
+
+Outside results enter the leaderboard through a pull request that adds one directory per model
+under [`submissions/`](../submissions/):
+
+```
+submissions/<model>/
+    metadata.json
+    results/<task>/<protocol>/<grid>/[pretrain-<source>/]<test_set>/result.json
+    results/<task>/<protocol>/<grid>/[pretrain-<source>/]run_record.json   (optional)
+```
+
+Each `result.json` uses the schema in §3, with `baseline` set to your `model` name. The runner
+writes exactly this format, so registering your model with `runner.register_baseline()`
+([examples/byo_model.py](../examples/byo_model.py)) and copying its cell directories is the
+shortest path. `metadata.json` describes the model:
+
+| field | required | meaning |
+|---|---|---|
+| `schema_version` | yes | integer, currently 1 |
+| `model` | yes | model id; also the `baseline` field of every result.json and the directory name; lowercase `[a-z0-9._+-]`, not an in-house baseline name |
+| `display_name` | no | human-readable name for the leaderboard |
+| `org` | yes | organisation or team |
+| `model_type` | yes | one of classical, deep, pretrained, fine-tuned, zero-shot |
+| `code_link` | yes | public URL of the code that produced the results |
+| `paper_link` | no | URL of a paper or report, or null |
+| `benchmark_version` | yes | the EvEMTBench contract version evaluated against |
+| `track` | yes | one of full, partial; `full` = every held_out cell |
+| `trained_on` | yes | list of training data: `adapt_grid:train`, `multi_grid:train`, or `external:<description>` for outside (pre)training data |
+| `tuned_on` | yes | must be `val` — model selection and hyperparameters on validation only |
+| `test_data_leakage` | yes | must be false — no test/benchmark data, and no simulation of them, in any training or pretraining data |
+| `reproduced` | yes | false on submission; set to true only by a maintainer after re-running `code_link` |
+| `reproduced_by` | no | maintainer who re-ran it (set with `reproduced`) |
+| `reproduced_commit` | no | commit of `code_link` that was re-run (set with `reproduced`) |
+| `notes` | no | free text |
+
+**Rules.** These are the same rules the reference baselines follow:
+- Fit on `train` only.
+- Select models and hyperparameters on `val` only.
+- Report at least 3 seeds.
+- Never use `test` or `benchmark` data, or simulations of them, in training or pretraining.
+
+A `full` submission covers every `held_out` cell (every task × reference grid × scored test set).
+A `partial` one may cover any subset. Transfer-protocol cells are optional extras in both.
+
+**Validation.** Run `evemtbench-validate-submission submissions/<model>` before opening the pull
+request; CI runs the same check on every directory under `submissions/`. It needs no dataset. It
+checks:
+- the metadata;
+- that every cell exists and its protocol applies to its grid;
+- the seed count and the official metric set;
+- that `aggregate` recomputes from `per_seed`, so a hand-edited aggregate fails;
+- value ranges;
+- `n_test` against the committed reference bundle, which catches scoring on the wrong
+  evaluation set;
+- `full`-track completeness;
+- the no-tuning attestation in any included `run_record.json`.
+
+The `n_test` check uses the committed `results/<version>/aggregated_results.csv`, which the
+validator finds only when it runs from a repository checkout. From a pip-installed package it
+warns `no reference results bundle: n_test was not checked` and skips that check. Pass the bundle
+explicitly in that case:
+`evemtbench-validate-submission submissions/<model> --reference <checkout>/results/<version>/aggregated_results.csv`.
+
+**Tiers.** The validator cannot see how numbers were produced, so a valid submission is listed as
+**self-reported**. When a maintainer has re-run `code_link` and obtained the submitted results, they
+set `reproduced: true` (with `reproduced_by` and `reproduced_commit`), and the entry is listed as
+**reproduced**.

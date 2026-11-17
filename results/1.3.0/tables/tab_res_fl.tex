@@ -1,0 +1,24 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_tab_res_fl.py
+% Benchmark: EvEMTBench v1.3.0
+% Inputs:
+%   outputs/1.2.0/fault_location_{local,line,global}/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4.1pt}
+\caption{Fault localisation (\ac{fl}) --- reference baseline (best of RF/MLP/GRU/CNN/ResNet/TST, selected on the validation split; a beatable reference, full per-baseline breakdown in the Supplementary), headline metric (\acs{mae}\,\% $\downarrow$) per grid and observability view, for the two \texttt{held\_out} test sets (in-distribution vs.\ never-trained \texttt{eval\_grid} family). Cells are mean\,$\pm$\,95\% CI (Student's $t$); \notapp{}~= not defined for this view. Full per-baseline tables in the Supplementary.}
+\label{tab:res_fl}
+\begin{tabular}{l ccc ccc}
+\toprule
+ & \multicolumn{3}{c}{\textbf{In-distribution (test)}} & \multicolumn{3}{c}{\textbf{Eval-Grid (never trained)}} \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Grid} & \textbf{local} & \textbf{line} & \textbf{global} & \textbf{local} & \textbf{line} & \textbf{global} \\
+\midrule
+CIGR\'E MV (20\,kV)        & 24.759 $\pm$ 0.180 & 20.922 $\pm$ 1.081 & 17.619 $\pm$ 0.663 & 30.897 $\pm$ 0.170 & 20.139 $\pm$ 1.827 & 11.754 $\pm$ 1.103 \\
+Double Line (110\,kV)      & 11.510 $\pm$ 0.845 & 7.647 $\pm$ 0.895 & 6.537 $\pm$ 1.335 & 7.314 $\pm$ 0.875 & 3.270 $\pm$ 0.228 & 1.761 $\pm$ 0.466 \\
+Prot.\ Ref.\ (110\,kV)     & 12.867 $\pm$ 0.165 & 6.990 $\pm$ 1.313 & 6.455 $\pm$ 1.007 & 9.814 $\pm$ 0.466 & 2.939 $\pm$ 1.017 & 2.020 $\pm$ 0.598 \\
+IEEE 39-Bus (345\,kV)      & 19.820 $\pm$ 0.210 & 9.885 $\pm$ 1.133 & 13.470 $\pm$ 0.712 & 19.881 $\pm$ 0.357 & 6.603 $\pm$ 0.589 & 12.167 $\pm$ 1.664 \\
+\bottomrule
+\end{tabular}
+\end{table*}

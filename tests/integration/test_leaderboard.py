@@ -193,7 +193,12 @@ def test_topology_comparison_ranks_lower_is_better_by_best_grid(tmp_path):
     # grid, not their worst. a: best 1.0 / worst 9.0; b: 2.0 on both -> a ranks first.
     for grid, a_mae, b_mae in [("cigre_mv", 1.0, 2.0), ("double_line", 9.0, 2.0)]:
         for base, mae in (("a_base", a_mae), ("b_base", b_mae)):
-            d = tmp_path / results_version("held_out") / "fault_location_local" / "held_out"
+            d = (
+                tmp_path
+                / results_version("held_out", "fault_location_local")
+                / "fault_location_local"
+                / "held_out"
+            )
             d = d / grid / base / "test"
             d.mkdir(parents=True)
             (d / "result.json").write_text(
@@ -204,7 +209,7 @@ def test_topology_comparison_ranks_lower_is_better_by_best_grid(tmp_path):
                         "grid": grid,
                         "baseline": base,
                         "test_set": "test",
-                        "benchmark_version": results_version("held_out"),
+                        "benchmark_version": results_version("held_out", "fault_location_local"),
                         "n_test": 10,
                         "seeds": [0, 1],
                         "aggregate": {"mae": {"mean": mae, "std": 0.1}},
@@ -280,3 +285,74 @@ def test_ci95_stored_derived_and_legacy(tmp_path):
     assert "0.900 ± 0.025" in page  # stored CI rendered, mean is the leading token
     assert "0.900 ± 0.248" in page  # derived from per_seed
     assert "0.700 ± 0.050" in page  # legacy falls back to mean ± std
+
+
+def _transfer_html(tmp_path) -> str:
+    from evemtbench.leaderboard import _transfer_section
+
+    return _transfer_section(scan_results(tmp_path))
+
+
+def test_transfer_zeroshot_cell_is_selected_on_the_source_pretrain_val(tmp_path):
+    """Zero-shot: the reported baseline is the argbest on the SOURCE corpus's multi_grid_pretrain
+    val — not the one that happens to score best on the benchmark set the cell reports."""
+    task = "fault_detection_line"
+    _write_result(
+        tmp_path, task, "multi_grid_pretrain", "template_20kv", "mlp", 0.90, test_set="val"
+    )
+    _write_result(
+        tmp_path, task, "multi_grid_pretrain", "template_20kv", "gru", 0.80, test_set="val"
+    )
+    _write_result(
+        tmp_path, task, "transfer_zeroshot", "cigre_mv", "mlp", 0.613, test_set="benchmark"
+    )
+    _write_result(
+        tmp_path, task, "transfer_zeroshot", "cigre_mv", "gru", 0.987, test_set="benchmark"
+    )
+    section = _transfer_html(tmp_path)
+    assert "0.613" in section and "0.987" not in section
+    assert "validation-selected baseline" in section and "best baseline" not in section
+
+
+def test_transfer_finetune_cell_is_selected_on_the_target_finetune_val(tmp_path):
+    task = "fault_detection_line"
+    _write_result(tmp_path, task, "transfer_finetune", "cigre_mv", "gru", 0.95, test_set="val")
+    _write_result(tmp_path, task, "transfer_finetune", "cigre_mv", "mlp", 0.70, test_set="val")
+    _write_result(
+        tmp_path, task, "transfer_finetune", "cigre_mv", "gru", 0.555, test_set="benchmark"
+    )
+    _write_result(
+        tmp_path, task, "transfer_finetune", "cigre_mv", "mlp", 0.944, test_set="benchmark"
+    )
+    section = _transfer_html(tmp_path)
+    assert "0.555" in section and "0.944" not in section
+
+
+def test_transfer_cell_without_val_signal_never_selects_on_benchmark(tmp_path):
+    """No validation re-score -> the cell renders "—"; there is no select-on-benchmark fallback."""
+    task = "fault_detection_line"
+    _write_result(
+        tmp_path, task, "transfer_zeroshot", "cigre_mv", "mlp", 0.613, test_set="benchmark"
+    )
+    _write_result(
+        tmp_path, task, "transfer_zeroshot", "cigre_mv", "gru", 0.987, test_set="benchmark"
+    )
+    section = _transfer_html(tmp_path)
+    assert "0.613" not in section and "0.987" not in section
+    assert "<td>—</td>" in section
+
+
+def test_transfer_cell_with_an_unscored_candidate_selects_nothing(tmp_path):
+    """A reported candidate without a validation score may not drop out of the pool silently
+    (as the paper's _validated_candidates): the cell renders "—"."""
+    task = "fault_detection_line"
+    _write_result(tmp_path, task, "transfer_finetune", "cigre_mv", "gru", 0.95, test_set="val")
+    _write_result(
+        tmp_path, task, "transfer_finetune", "cigre_mv", "gru", 0.555, test_set="benchmark"
+    )
+    _write_result(
+        tmp_path, task, "transfer_finetune", "cigre_mv", "tst", 0.944, test_set="benchmark"
+    )
+    section = _transfer_html(tmp_path)
+    assert "0.555" not in section and "0.944" not in section
+    assert "<td>—</td>" in section

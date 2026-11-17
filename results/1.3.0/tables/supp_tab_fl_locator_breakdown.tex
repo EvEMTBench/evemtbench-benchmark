@@ -1,0 +1,48 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_fl_locator_breakdown.py
+% Benchmark: EvEMTBench v1.3.0
+% Inputs:
+%   outputs/<fl version>/fault_location_{line,local}/held_out/<grid>/<impedance|selected>/{test,benchmark}/{result.json,predictions_seed*.parquet}
+%   outputs/<fl version>/fault_location_{line,local}/held_out/<grid>/<baseline>/val/result.json  (selection)
+%   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/y_*.parquet  (released dataset: overlap_ratio, y_fault_line)
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\caption{Fault-location error of the impedance-based locator and of the validation-selected learned reference by window position. \ac{mae} in \% of line length, five-seed mean for the learned reference (the locator is deterministic). \emph{Full} windows lie entirely inside the fault interval; \emph{partial} windows also contain samples before fault inception or after clearing, which can enter the one-cycle phasor estimate. \emph{Partial \%} is the share of partial windows in the evaluated set. The lower block splits the CIGR\'E \ac{mv} line view into line 8--14, whose line view repeats its single measured terminal so that the locator falls back to the one-terminal method, and all other lines. Computed from the stored per-seed predictions of the reported cells; the per-seed totals reproduce the reported values.}
+\label{tab:supp_fl_locator_breakdown}
+\begin{tabular}{ll r rr rr l}
+\toprule
+ & & & \multicolumn{2}{c}{\textbf{full}} & \multicolumn{2}{c}{\textbf{partial}} & \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\textbf{Grid} & \textbf{Set} & \textbf{partial \%} & \textbf{locator} & \textbf{learned} & \textbf{locator} & \textbf{learned} & \textbf{selected} \\
+\midrule
+\multicolumn{8}{l}{\textit{line view}} \\
+CIGR\'E MV (20\,kV) & \texttt{adapt\_grid} test & 66 & 15.2 & 19.5 & 25.4 & 21.6 & \acs{resnet} \\
+ & \texttt{eval\_grid} & 57 & 4.0 & 18.8 & 7.2 & 21.2 & \acs{resnet} \\
+Double Line (110\,kV) & \texttt{adapt\_grid} test & 67 & 1.6 & 4.1 & 9.1 & 9.4 & \acs{tst} \\
+ & \texttt{eval\_grid} & 57 & 0.0 & 3.6 & 1.1 & 3.0 & \acs{tst} \\
+Prot.\ Ref.\ (110\,kV) & \texttt{adapt\_grid} test & 68 & 0.9 & 3.2 & 9.3 & 8.8 & \acs{tst} \\
+ & \texttt{eval\_grid} & 57 & 0.1 & 2.8 & 1.6 & 3.0 & \acs{tst} \\
+IEEE 39-Bus (345\,kV) & \texttt{adapt\_grid} test & 68 & 0.6 & 5.2 & 10.6 & 12.1 & \acs{tst} \\
+ & \texttt{eval\_grid} & 57 & 0.3 & 6.4 & 2.0 & 6.7 & \acs{tst} \\
+\midrule
+\multicolumn{8}{l}{\textit{local view}} \\
+CIGR\'E MV (20\,kV) & \texttt{adapt\_grid} test & 66 & 44.5 & 24.5 & 47.3 & 24.9 & \acs{cnn} \\
+ & \texttt{eval\_grid} & 57 & 28.3 & 31.5 & 35.9 & 30.4 & \acs{cnn} \\
+Double Line (110\,kV) & \texttt{adapt\_grid} test & 67 & 22.4 & 7.5 & 36.4 & 13.5 & \acs{tst} \\
+ & \texttt{eval\_grid} & 57 & 14.7 & 7.0 & 25.0 & 7.6 & \acs{tst} \\
+Prot.\ Ref.\ (110\,kV) & \texttt{adapt\_grid} test & 68 & 15.4 & 7.5 & 33.8 & 15.4 & \acs{gru} \\
+ & \texttt{eval\_grid} & 57 & 8.4 & 7.9 & 19.3 & 11.3 & \acs{gru} \\
+IEEE 39-Bus (345\,kV) & \texttt{adapt\_grid} test & 68 & 16.7 & 16.3 & 34.9 & 21.5 & \acs{gru} \\
+ & \texttt{eval\_grid} & 57 & 10.2 & 19.0 & 20.5 & 20.5 & \acs{gru} \\
+\midrule
+ & & & \multicolumn{2}{c}{\textbf{line 8--14}} & \multicolumn{2}{c}{\textbf{other lines}} & \\
+\cmidrule(lr){4-5}\cmidrule(lr){6-7}
+\textbf{CIGR\'E \ac{mv}, line view} & \textbf{Set} & \textbf{8--14 \%} & \textbf{locator} & \textbf{learned} & \textbf{locator} & \textbf{learned} & \\
+\midrule
+ & \texttt{adapt\_grid} test & 7 & 49.0 & 28.9 & 19.9 & 20.3 & \acs{resnet} \\
+ & \texttt{eval\_grid} & 7 & 23.2 & 35.1 & 4.6 & 19.1 & \acs{resnet} \\
+\bottomrule
+\end{tabular}
+\end{table*}

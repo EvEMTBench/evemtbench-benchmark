@@ -10,7 +10,7 @@
 | **Valid samples** | All windows of **fault episodes** (`y_fault_line` not null), so the local/line/global oracle is defined for every scored window. |
 | **Protocol** | `held_out` (all variants); the `local`/`line` variants also run `multi_grid_pretrain`, `transfer_zeroshot` and `transfer_finetune` (deep baselines only — see [protocol.md](../protocol.md)) |
 | **Metrics** | balanced accuracy, macro F1, **missed-fault rate**, **false-alarm rate**, accuracy |
-| **Baselines** | majority, threshold (overcurrent; `local` only), random_forest, mlp, gru, cnn, resnet |
+| **Baselines** | majority, threshold (overcurrent; `local` only), random_forest, mlp, gru, cnn, resnet, tst |
 
 ## Notes / claims
 

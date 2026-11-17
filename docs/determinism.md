@@ -38,16 +38,17 @@ section exists to prevent.
 | `requirements.lock` | *legacy.* The CI pin as it stood during the v1.0.0 sweep | nobody |
 
 - **Results pin.** There is one results lock per results tree — `env/results-v1.0.0.lock` for
-  `outputs/1.0.0` (the `held_out` results, which stay current under the v1.1.0 contract, plus the
-  superseded v1.0 pre-training/transfer results) and `env/results-v1.1.0.lock` for `outputs/1.1.0`
-  (the re-scored pre-training/transfer results). Each is *captured, not authored*
+  `outputs/1.0.0` (the `held_out` results that stay current, plus the superseded v1.0
+  pre-training/transfer results), `env/results-v1.1.0.lock` for `outputs/1.1.0` (the re-scored
+  pre-training/transfer results) and `env/results-v1.2.0.lock` for `outputs/1.2.0` (the
+  fault-location re-runs; captured when that sweep runs). Each is *captured, not authored*
   (`hpc/capture_results_env.sh`, run under SLURM): a `pip list --format=freeze` of the conda prefix that produced that tree. Because that prefix is
   mutable, the file is a faithful record rather than a byte-reconstructable specification. The
   guarantee that matters is the independent cross-check: every `run_record.json` separately captured
   `numpy`/`pandas`/`scikit-learn`/`scipy` plus `python`/`torch` at run time, and
   `hpc/verify_results_env.py` compares each record against the lock and reports per-cell agreement
-  (exit 1 on any disagreement). It defaults to `--version` = `BENCHMARK_VERSION` (`1.1.0`), i.e.
-  `env/results-v1.1.0.lock` against `outputs/1.1.0`; pass `--version 1.0.0` for `outputs/1.0.0`
+  (exit 1 on any disagreement). It defaults to `--version` = `BENCHMARK_VERSION`, i.e. the newest
+  tree and its lock; pass `--version 1.1.0` / `--version 1.0.0` for the older trees
   (`PYTHONPATH=src python hpc/verify_results_env.py --version 1.0.0`; `--write` saves the
   sidecar `outputs/<version>/results_env_verification.json`). It needs a local `outputs/` tree,
   which is not part of the repository. Agreement of two independently captured records is stronger

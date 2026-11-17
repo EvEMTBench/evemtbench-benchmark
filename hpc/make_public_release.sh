@@ -27,6 +27,7 @@ PRUNE=(
   paper
   docs/internal
   docs/design/cross_cluster.md
+  docs/EXTERNAL_REPOSITORY_REVIEW.md
   docs/results_audit/02-understandingvcs-case-study.md
   docs/results_audit/03-evemtbench-design.md
   CLAUDE.md

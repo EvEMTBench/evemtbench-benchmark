@@ -13,35 +13,54 @@ import collections
 import glob
 import json
 import sys
+from pathlib import Path
 
+from evemtbench.coverage import ALL_BASELINES
 from evemtbench.data.roots import GRIDS
 from evemtbench.evaluation.significance import ci95_halfwidth
 from evemtbench.tasks.registry import get_task, tasks_by_tier
 from evemtbench.tasks.taxonomy import Function
-from evemtbench.version import BENCHMARK_VERSION, results_version
+from evemtbench.version import (
+    BENCHMARK_VERSION,
+    CURRENT_RESULTS_VERSIONS,
+    FL_RESULTS_VERSION,
+    FP_RESULTS_VERSION,
+    results_version,
+)
 
 # Short "vMAJOR.MINOR" tag for the title, derived from the contract version so it never goes stale.
 SHORT_VERSION = "v" + ".".join(BENCHMARK_VERSION.split(".")[:2])
 
-# RESULTS.md renders the held_out matrix; its current results live in the per-protocol tree
-# (1.0.0 — the v1.1.0 revision changed only the multi_grid source splits, see version.py).
+# RESULTS.md renders the held_out matrix. Its current results live in the per-(protocol, task)
+# tree: 1.0.0 for every task but fault location (the v1.1.0 revision changed only the multi_grid
+# source splits), 1.2.0 for the fault-location tasks (corrected valid-sample gate) and 1.3.0 for
+# the fault_phase tasks on cigre_mv (LP-1 label patch) — see version.py. HELD_OUT_VERSION is the
+# former and is used for wording only; rows are resolved per task and grid in load_rows().
 HELD_OUT_VERSION = results_version("held_out")
 
 NARRATIVE = """\
 # EvEMTBench {short} — results ({ver})
 
 The `held_out` results below were produced under contract v{ho_ver} and remain current under
-v{ver}: the v1.1 revision regenerated only the `multi_grid` source-corpus splits (pre-training /
-transfer protocols — see the leaderboard and `results/{ver}/`), leaving every `held_out` artifact
-byte-identical.
+v{ver}, **except the fault-location (`fault_location_*`) rows, which are v{fl_ver} results**: the
+v1.2 revision restricts the fault-location valid samples to line faults (bus-target windows were
+wrongly admitted before — [`docs/known_issues.md`](docs/known_issues.md) §2), so those tasks are
+re-run and are not comparable to their v{ho_ver} numbers (kept in `results/{ho_ver}/`). On CIGRE MV
+the faulted-phase (`fault_phase_*`) rows are v{fp_ver} results: the v1.3 revision restores the
+faulted phase of the high-impedance-with-arc faults, which the 1.x windows labelled with no phase
+(label patch LP-1, [`docs/known_issues.md`](docs/known_issues.md) §4). The v1.1
+revision regenerated only the `multi_grid` source-corpus splits (pre-training / transfer protocols
+— see the leaderboard and `results/{ver}/`). Every other `held_out` artifact is byte-identical.
 
 Protocol `held_out`: train/val/test on the `adapt_grid` family; **benchmark** = the held-out
 `benchmark` family (never trained on). 5 seeds — cells show **mean ± 95% CI half-width** (Student
 t across seeds; single-seed cells show the mean alone). Deep baselines trained to a 60-epoch
-cap with validation early-stopping. Baselines: majority, threshold (FD-local only), random_forest,
-mlp, gru, cnn, resnet (1D-ResNet). Deep baselines share one training regime (only the architecture
-differs); `params` = trainable-parameter count (capacity is reported, **not** equalized). Grids are
-reported **per grid** (never pooled — class spaces differ, e.g. HIF is MV-only).
+cap with validation early-stopping. Baselines: majority, threshold (FD-local only), impedance
+(conventional fault locator; FL `local`/`line` only), random_forest, mlp, gru, cnn, resnet
+(1D-ResNet), tst (patch Transformer). Deep baselines share one training regime (only the
+architecture differs); `params` = trainable-parameter count (capacity is reported, **not**
+equalized). Grids are reported **per grid** (never pooled — class spaces differ, e.g. HIF is
+MV-only).
 
 Tasks are grouped by **difficulty tier** (see `docs/task_suite_roadmap.md`):
 - **Tier 1 — easy anchors:** near-solved on ideal data; the community frontier is added realism.
@@ -52,10 +71,11 @@ Tasks are grouped by **difficulty tier** (see `docs/task_suite_roadmap.md`):
 > auto-generated from `outputs/` by `hpc/make_results.py` — do not hand-edit.
 
 > **Known issues**: dataset properties that affect some of these numbers are listed, with scope,
-> in [`docs/known_issues.md`](docs/known_issues.md) (flagged; the published behaviour is unchanged).
+> in [`docs/known_issues.md`](docs/known_issues.md) (§1 and §3 are flagged, the published
+> behaviour unchanged; §2 is corrected for the fault-location rows as of v1.2.0).
 """
 
-BASELINES = ["majority", "threshold", "random_forest", "mlp", "gru", "cnn", "resnet"]
+BASELINES = list(ALL_BASELINES)
 
 GRID_LABEL = {
     "double_line": "DoubleLine (110 kV HV)",
@@ -115,9 +135,22 @@ def warn_once(msg: str) -> None:
 
 
 def load_rows(grid: str) -> dict:
-    """(task_id, baseline) -> {test_set: doc} for one grid, from outputs/<version>/..."""
+    """(task_id, baseline) -> {test_set: doc} for one grid: the CURRENT held_out rows.
+
+    Every current results tree is globbed and a file is kept only if its tree is the current one
+    for its task and grid (``results_version("held_out", task, grid=grid)``, task = the path's task
+    directory) — so the
+    fault-location rows come from ``outputs/1.2.0/`` and the superseded fault-location rows still
+    on disk in ``outputs/1.0.0/`` are never returned (they would otherwise fill a pending cell
+    with a number computed under the old valid-sample gate)."""
     rows: dict = collections.defaultdict(dict)
-    for f in glob.glob(f"outputs/{HELD_OUT_VERSION}/*/held_out/{grid}/*/*/result.json"):
+    files = [
+        f
+        for ver in CURRENT_RESULTS_VERSIONS
+        for f in glob.glob(f"outputs/{ver}/*/held_out/{grid}/*/*/result.json")
+        if results_version("held_out", Path(f).parts[2], grid=grid) == ver
+    ]
+    for f in files:
         try:
             d = json.load(open(f))
             rows[(d["task"], d["baseline"])][d["test_set"]] = d
@@ -245,7 +278,13 @@ def build_results() -> str:
     Single source of truth for RESULTS.md; side-effect-free so the freshness gate
     (hpc/check_results_fresh.py) can compare it byte-for-byte against the committed file."""
     out = [
-        NARRATIVE.format(short=SHORT_VERSION, ver=BENCHMARK_VERSION, ho_ver=HELD_OUT_VERSION),
+        NARRATIVE.format(
+            short=SHORT_VERSION,
+            ver=BENCHMARK_VERSION,
+            ho_ver=HELD_OUT_VERSION,
+            fl_ver=FL_RESULTS_VERSION,
+            fp_ver=FP_RESULTS_VERSION,
+        ),
         "\n## Results by grid\n",
     ]
     for grid in GRIDS:

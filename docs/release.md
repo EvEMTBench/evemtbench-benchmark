@@ -81,8 +81,16 @@ is enforced by `tests/unit/test_version_consistency.py`, so drift fails CI long 
 11. **Tell the audit**: the ledger's coverage/headline rows flip to `measured` automatically;
     walk `audit/index.html` once end-to-end (the professor test: any paper number → its
     `result.json` → its command → its gate → its run record, in ≤ 2 clicks).
+12. **PyPI (owner decision; irreversible per version).**
+    - CI already proves the package: the *Package* step builds the wheel, installs it clean with
+      its declared dependencies, and runs `--self-test` outside the checkout. Re-check locally
+      with `bash hpc/check_wheel.sh` (via `srun`).
+    - From the tagged commit, on a machine with internet: `python -m build`, then
+      `python -m twine check dist/*`, then `python -m twine upload dist/*`.
+    - A version number can never be re-uploaded on PyPI. Upload to TestPyPI first
+      (`--repository testpypi`) if anything about the metadata changed.
 
 ## After
 
-12. Reopen development: bump `pyproject`/`BENCHMARK_VERSION` to the next `-dev`, resume the
+13. Reopen development: bump `pyproject`/`BENCHMARK_VERSION` to the next `-dev`, resume the
     autocommit publisher if you paused it for the tag, and start the next `CHANGELOG` section.

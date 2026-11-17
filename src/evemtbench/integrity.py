@@ -30,6 +30,8 @@ from .coverage import (
     iter_cells,
 )
 from .data.input_digests import load_table as _load_digest_table
+from .data.label_patches import LabelPatchError, expected_provenance, load_index, load_patch_table
+from .version import label_patches_enabled
 
 # per-protocol version resolution lives in cell_dir/cell_status (evemtbench.version.results_version)
 
@@ -117,6 +119,8 @@ def check_cell(
                     f"match the committed digest pin (dataset swapped under the version?)"
                 )
 
+    problems += _check_label_patches(cell, record, prefix)
+
     checkpoints = record.get("checkpoints") or {}
     if (
         cell.baseline in DEEP_BASELINES
@@ -159,6 +163,52 @@ def check_cell(
     return problems
 
 
+def _lp_key(p: dict) -> tuple:
+    return (
+        p.get("id"),
+        p.get("sha256"),
+        p.get("grid"),
+        p.get("family"),
+        p.get("manifest_sha256"),
+        p.get("rows_patched"),
+    )
+
+
+def _check_label_patches(cell: Cell, record: dict, prefix: str) -> list[str]:
+    """The committed label patches a run applied must be exactly the ones its version and inputs
+    call for (``data/label_patches/index.json``): every loaded partition a patch was built for
+    (same ``manifest_sha256``) carries that patch on a v1.3.0+ fault_phase record, and nothing
+    else does. A record stamped before v1.3.0 must carry none."""
+    data = record.get("data") or {}
+    version = record.get("benchmark_version") or ""
+    try:
+        enabled = label_patches_enabled(cell.task, version)
+    except ValueError:  # unparsable stamp: the schema check reports it
+        return []
+    expected: list[dict] = []
+    if enabled:
+        for part in data.get("partitions") or []:
+            expected += expected_provenance(
+                part.get("grid"), part.get("family"), part.get("manifest_sha256"), "fault_phase"
+            )
+    got = sorted(_lp_key(p) for p in data.get("label_patches") or [])
+    want = sorted(_lp_key(p) for p in expected)
+    if got != want:
+        return [f"{prefix}: label patches applied {got} != expected for v{version} {want}"]
+    return []
+
+
+def check_label_patch_files() -> list[str]:
+    """Every committed label patch must match the sha256 its index pins."""
+    problems = []
+    for entry in load_index()["patches"]:
+        try:
+            load_patch_table(entry["id"])
+        except (LabelPatchError, OSError) as exc:
+            problems.append(f"label patch {entry['id']}: {exc}")
+    return problems
+
+
 def check_outputs(
     out: str | Path = "outputs",
     *,
@@ -174,7 +224,7 @@ def check_outputs(
     out = Path(out)
     validator = _validator()
     digests = _load_digest_table()
-    problems: list[str] = []
+    problems: list[str] = check_label_patch_files()
     pairs: set[tuple[str, str]] = set()
     n_done = n_skipped = 0
     for cell in iter_cells(protocols=tuple(protocols)):

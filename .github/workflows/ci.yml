@@ -68,6 +68,13 @@ jobs:
         # srun-only — no dataset is mounted here.
         run: uv run pytest tests/integration/test_leakage.py tests/integration/test_splits_audit.py tests/unit/test_grouped_splits.py -q
 
+      - name: Package — build the wheel, install it clean, run it outside the checkout
+        # Roadmap W3: a fresh venv installs the wheel WITH its declared dependencies from PyPI, then
+        # runs the evaluation layer from an empty directory (package data present, no repo-only
+        # files, committed splits readable, --self-test green).
+        # uv-managed CPython ships venv + ensurepip (the runner's system python3 may not)
+        run: PY="$(uv python find ${{ matrix.python-version }})" bash hpc/check_wheel.sh --clean
+
       - name: Publish rendered views (reviewers download without cloning)
         # The committed, freshness-gated views: the results-audit site, leaderboard, RESULTS
         # and the coverage snapshot. One matrix leg only (identical content on both).

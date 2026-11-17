@@ -40,7 +40,11 @@ import paper_lib as pl
 import supplement_lib as sl
 
 from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRIDS
-from make_results import BASELINES, load_rows, mean_val
+from make_results import load_rows, mean_val
+
+#: The baselines the supplement's S2 matrix enumerates: the manuscript set (see paper_lib.BASELINES;
+#: the impedance fault locator joins it once its place in the manuscript is decided).
+BASELINES = pl.BASELINES
 
 _REPO = Path(__file__).resolve().parents[1]
 
@@ -52,8 +56,8 @@ PRIMARY = {
     "event_classification": ("balanced_accuracy", ("global",)),
 }
 GRIDS = [g for g, _ in pl.GRID_ROWS]
-#: Baselines whose results are seed-averaged (majority and threshold are deterministic).
-STOCHASTIC = ("random_forest", "mlp", "gru", "cnn", "resnet")
+#: Baselines whose results are seed-averaged (majority, threshold and impedance are deterministic).
+STOCHASTIC = ("random_forest", "mlp", "gru", "cnn", "resnet", "tst")
 N_SEEDS = 5
 
 

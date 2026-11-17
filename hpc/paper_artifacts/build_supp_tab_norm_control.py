@@ -57,6 +57,7 @@ sys.path.insert(0, str(Path(__file__).resolve().parent))
 import paper_lib as pl
 
 from evemtbench.coverage import DEEP_BASELINES, PRETRAIN_GRIDS
+from evemtbench.version import results_version
 from make_results import load_rows
 
 NAME = "supp_tab_norm_control.tex"
@@ -70,6 +71,7 @@ FUNCS = [
     ("fc", r"\ac{fc}", "fault_classification", "balanced_accuracy", r"bal.\ acc.\ $\uparrow$"),
     ("fl", r"\ac{fl}", "fault_location", "mae", r"\acs{mae}\,\% $\downarrow$"),
 ]
+_HELD_OUT_TAIL = "<grid>/<baseline>/{val,benchmark}/result.json"
 _SRC_SHORT = {"template_20kv": "20", "template_110kv": "110", "template_345kv": "345"}
 
 
@@ -85,12 +87,36 @@ def _signed(v, metric):
     return f"{v:+.3f}" if metric == "balanced_accuracy" else f"{v:+.2f}"
 
 
+def _input_globs(root: str, protocol: str, tail: str) -> list[str]:
+    """The provenance input globs of one arm: one per results tree its cells resolve to.
+
+    The tree is resolved per task through :func:`evemtbench.version.results_version` — never a
+    literal — so the fault-location cells name ``1.2.0`` (corrected valid-sample gate) and every
+    other function its unchanged ``1.0.0`` (held_out) / ``1.1.0`` (transfer) tree."""
+    by_ver: dict[str, list[str]] = {}
+    for _key, _flabel, stem, _metric, _arrow in FUNCS:
+        vers = {results_version(protocol, f"{stem}_{view}") for view in VIEWS}
+        assert len(vers) == 1, (stem, protocol, vers)  # the version depends on the function only
+        by_ver.setdefault(vers.pop(), []).append(stem)
+    out = []
+    for ver, stems in by_ver.items():
+        task = stems[0] if len(stems) == 1 else "{" + ",".join(stems) + "}"
+        out.append(f"{root}/{ver}/{task}_{{{','.join(VIEWS)}}}/{protocol}/{tail}")
+    return out
+
+
 def rows(abl: Path) -> list[dict]:
-    """One record per (function, grid, view) with the three arms and the two contrasts."""
+    """One record per (function, grid, view) with the three arms and the two contrasts.
+
+    Arms A and C go through :func:`make_results.load_rows`, which keeps a result only if it sits in
+    the current tree of its task (``results_version("held_out", task)``): ``outputs/1.2.0/`` for
+    fault location, ``outputs/1.0.0/`` otherwise — in the repository for A and in the control tree
+    for C. The superseded fault-location control cells still in ``<abl>/outputs/1.0.0/`` are never
+    read."""
     repo = Path.cwd()
     per_grid_a = {g: load_rows(g) for g, _ in pl.GRID_ROWS}
     idx, val_idx = pl._transfer_index("outputs"), pl._transfer_val_index("outputs")
-    os.chdir(abl)  # rescore/load_rows resolve outputs/<version> relative to cwd
+    os.chdir(abl)  # load_rows resolves outputs/<results_version(...)> relative to cwd
     try:
         per_grid_c = {g: load_rows(g) for g, _ in pl.GRID_ROWS}
     finally:
@@ -158,13 +184,18 @@ def table(abl: Path) -> str:
     return (
         pl.provenance_header(
             "hpc/paper_artifacts/build_supp_tab_norm_control.py",
-            [
-                "outputs/1.0.0/{fault_detection,fault_classification,fault_location}_{local,line}"
-                "/held_out/<grid>/<baseline>/{val,benchmark}/result.json  (arm A)",
-                "<control tree>/1.0.0/.../held_out/<grid>/<baseline>/{val,benchmark}/result.json"
-                "  (arm C: --normalize per_window; ANALYSIS-ONLY, not in outputs/)",
-                "outputs/1.1.0/.../transfer_finetune/<grid>/<baseline>/[pretrain-<src>/]"
-                "{val,benchmark}/result.json  (arm B)",
+            [f"{g}  (arm A)" for g in _input_globs("outputs", "held_out", _HELD_OUT_TAIL)]
+            + [
+                f"{g}  (arm C: --normalize per_window; ANALYSIS-ONLY, not in outputs/)"
+                for g in _input_globs("<control tree>/outputs", "held_out", _HELD_OUT_TAIL)
+            ]
+            + [
+                f"{g}  (arm B)"
+                for g in _input_globs(
+                    "outputs",
+                    "transfer_finetune",
+                    "<grid>/<baseline>/[pretrain-<src>/]{val,benchmark}/result.json",
+                )
             ],
         )
         + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{3pt}\n"

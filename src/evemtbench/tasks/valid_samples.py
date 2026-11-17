@@ -11,13 +11,14 @@ defined for every scored window:
 * FAULT_DETECTION — all windows of fault episodes (positives = fault-active windows, negatives =
   the pre-fault windows of the same episode). Gate: ``y_fault_line`` not null.
 * FAULT_CLASS — fault-active windows only (a non-active window has no fault type to classify).
-* FAULT_LOCATION — fault-active windows with a defined location. Gate: fault-active AND
-  ``y_fault_location`` not null. The intent is line faults only, but the producer also fills a
-  location for bus-target (``MainBus*``) fault episodes in the ``adapt_grid`` family, so those
-  windows pass the gate with a location that is not a position on any line (in ``benchmark``
-  they carry NaN; the ``multi_grid`` corpora have no bus-target windows in the gate). The gate
-  is frozen within the major version; :func:`line_target_fault_location_mask` gives the
-  line-targets-only subset for diagnostics. See docs/known_issues.md.
+* FAULT_LOCATION — fault-active windows of a line fault with a defined location. Gate:
+  fault-active AND ``y_fault_location`` not null AND ``y_fault_line`` names a line (``MainLn*``).
+  The third condition is the benchmark v1.2.0 correction: the producer also fills a location for
+  bus-target (``MainBus*``) fault episodes in the ``adapt_grid`` family, a value that is not a
+  position on any line, and the v1.0/v1.1 gate admitted those windows (in ``benchmark`` they
+  carry NaN; the ``multi_grid`` corpora have no bus-target windows in the gate, so the rule
+  selects the same samples there). :func:`line_target_fault_location_mask` is kept as an alias
+  of the gate. See docs/known_issues.md §2 and docs/versioning.md.
 
 EVENT_STATE breaks that within-fault-episode pattern: it scores **all** windows (every window has
 a defined normal/switching/fault state), which is why it is global-only — the local/line oracle
@@ -79,14 +80,17 @@ def valid_sample_mask(y: pd.DataFrame, td: TaskDefinition) -> np.ndarray:
 
 
 def _fault_location_gate(y: pd.DataFrame) -> np.ndarray:
-    """The official FL gate: fault-active windows with a non-null ``y_fault_location``."""
-    return derive_fault_active_series(y).astype(bool) & y["y_fault_location"].notna().to_numpy()
+    """The official FL gate (benchmark v1.2.0): fault-active windows of a **line** fault with a
+    non-null ``y_fault_location``. The frame needs ``y_fault_line`` (present in every label
+    table; the line/bus grammar is ``MainLn*`` / ``MainBus*``, see ``taxonomy``). A null or
+    unrecognised ``y_fault_line`` is not a line target and is excluded."""
+    is_line = y["y_fault_line"].astype(str).str.startswith(LINE_LABEL_PREFIX).to_numpy()
+    located = y["y_fault_location"].notna().to_numpy()
+    return derive_fault_active_series(y).astype(bool) & located & is_line
 
 
 def line_target_fault_location_mask(y: pd.DataFrame) -> np.ndarray:
-    """Opt-in diagnostic: the FL valid samples restricted to line targets (``y_fault_line`` =
-    ``MainLn*``; the frame needs that column, which the official gate does not). It drops the
-    bus-target windows the official gate admits in ``adapt_grid``; it is not used for scoring (the
-    official gate is frozen within the major version)."""
-    is_line = y["y_fault_line"].astype(str).str.startswith(LINE_LABEL_PREFIX).to_numpy()
-    return _fault_location_gate(y) & is_line
+    """Alias of the official FL gate, kept for callers written against v1.0/v1.1, where the gate
+    also admitted bus-target windows and this function was the opt-in line-targets-only subset.
+    Since v1.2.0 the two are the same mask."""
+    return _fault_location_gate(y)

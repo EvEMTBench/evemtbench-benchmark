@@ -477,9 +477,14 @@ NA_REASONS: dict[str, str] = {
         "threshold is a single-terminal overcurrent relay rule — it applies only to the binary "
         "local fault-detection task (coverage.baseline_applies)"
     ),
+    "impedance_scope": (
+        "impedance is a conventional impedance-based fault locator — it applies only to the "
+        "fault-location tasks at the local view (one-terminal reactance method) and the line "
+        "view (two-terminal method) (coverage.baseline_applies)"
+    ),
     "transfer_deep_only": (
         "transfer protocols need transferable weights, so they apply only to the deep baselines "
-        "mlp/gru/cnn/resnet (coverage.baseline_applies)"
+        "mlp/gru/cnn/resnet/tst (coverage.baseline_applies)"
     ),
     "pretrain_grid_only": (
         "multi_grid_pretrain runs only on the template_20kv/template_110kv corpora; held_out and "
@@ -496,7 +501,7 @@ ENVIRONMENT: dict = {
         (
             "GPU sweeps",
             "NHR@FAU Alex — 1× NVIDIA A40 per job (SLURM a40 partition)",
-            "deep baselines (mlp/gru/cnn/resnet), 24 h wall per grid sweep (hpc/sweep.sh)",
+            "deep baselines (mlp/gru/cnn/resnet/tst), 24 h wall per grid sweep (hpc/sweep.sh)",
         ),
         (
             "Classical baselines",
@@ -697,11 +702,12 @@ CLAIMS: list[Claim] = [
     ),
     Claim(
         claim="Transparent, beatable baseline suite from trivial floor to deep learning",
-        value="{n_baselines} baselines: majority · threshold · random_forest · mlp · gru · cnn "
-        "· resnet",
+        value="{n_baselines} baselines: majority · threshold · impedance · random_forest · mlp "
+        "· gru · cnn · resnet · tst",
         detail=(
             "The majority floor anchors chance level analytically; the overcurrent threshold "
-            "represents conventional protection practice; RF and four deep architectures span "
+            "(fault detection) and the impedance-based fault locator (fault location) "
+            "represent conventional protection practice; RF and five deep architectures span "
             "the learned spectrum. Splits, leakage checks and evaluation scripts are released "
             "with the repo."
         ),
@@ -1083,6 +1089,19 @@ BASELINE_ABOUT: dict[str, tuple[str, str]] = {
         "device it mimics.",
         "conventional protection practice (ANSI 50/51 style)",
     ),
+    "impedance": (
+        "A conventional impedance-based fault locator: full-cycle DFT phasors from the last "
+        "cycle of the window, then the one-terminal reactance method (local view, with a "
+        "current-magnitude phase selector and zero-sequence compensation) or the two-terminal "
+        "positive-sequence method (line view), using the line's series impedance from the grid "
+        "topology graph. Deterministic and not fitted: the channels carry primary-level values, "
+        "so the secondary-to-primary impedance scale is 1 (checked against the nominal voltage "
+        "on the training split, no labels used, and stored in the run record). It is the "
+        "physical reference for the fault-location tasks and is not part of the "
+        "learned-baseline selection pool.",
+        "conventional fault-location practice (reactance and two-terminal methods; "
+        "cf. IEEE Std C37.114)",
+    ),
     "random_forest": (
         "A random forest on flattened window features — the strong classical-ML reference: "
         "no architecture tuning, no GPU, surprisingly hard to beat on tabularised waveform "
@@ -1111,5 +1130,13 @@ BASELINE_ABOUT: dict[str, tuple[str, str]] = {
         "convolutional blocks with skip connections, the standard strong time-series "
         "classification architecture.",
         "He et al., CVPR 2016; Wang et al., IJCNN 2017 (time-series 1-D form)",
+    ),
+    "tst": (
+        "A Time Series Transformer encoder, the attention-based reference: the window is cut "
+        "into overlapping 16-sample patches that span all channels (59 tokens), and three "
+        "self-attention blocks relate every patch to every other. It differs from the "
+        "published model in the strided patch embedding (one token per time step there) and in "
+        "using 8 attention heads (16 there); the configuration is fixed, not tuned.",
+        "Zerveas et al., KDD 2021 (encoder); Nie et al., ICLR 2023 (patch embedding)",
     ),
 }

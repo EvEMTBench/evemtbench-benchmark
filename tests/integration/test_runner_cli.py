@@ -119,7 +119,7 @@ def test_runner_regression_task(fixture_root, held_out_splits, tmp_path):
     _run("random_forest", "fault_location_local", fixture_root, held_out_splits, out)
     base = (
         out
-        / HO_VER
+        / results_version("held_out", "fault_location_local")  # the FL (v1.2.0) tree
         / "fault_location_local"
         / "held_out"
         / "double_line"
@@ -128,6 +128,9 @@ def test_runner_regression_task(fixture_root, held_out_splits, tmp_path):
     )
     result = json.loads((base / "result.json").read_text())
     assert "mae" in result["aggregate"]
+    # stamped with the tree it was written to, and not also written into the held_out tree
+    assert result["benchmark_version"] == "1.2.0"
+    assert not (out / HO_VER / "fault_location_local").exists()
 
 
 @pytest.mark.parametrize("test_set", ["test", "benchmark"])
@@ -243,3 +246,13 @@ def test_zero_seq_is_rejected_for_classical_baselines(fixture_root, held_out_spl
             tmp_path / "out",
             extra=("--zero-seq",),
         )
+
+
+def test_rerun_drops_the_stale_validation_rescore(fixture_root, held_out_splits, tmp_path):
+    out = tmp_path / "out"
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "random_forest"
+    (base / "val").mkdir(parents=True)
+    (base / "val" / "result.json").write_text("{}")  # scored the previous checkpoints
+    _run("random_forest", "fault_detection_local", fixture_root, held_out_splits, out)
+    assert not (base / "val" / "result.json").exists()
+    assert (base / "test" / "result.json").is_file()

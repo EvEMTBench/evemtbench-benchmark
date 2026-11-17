@@ -30,6 +30,8 @@ from pathlib import Path
 
 import numpy as np
 
+from .. import failures
+from .._io import atomic_replace, atomic_write_text, tmp_path_for
 from ..coverage import PRETRAIN_GRID
 from ..evaluation.aggregate import (
     aggregate_seed_breakdowns,
@@ -96,6 +98,13 @@ def _threshold_factory(*, seed, **_) -> Baseline:
     return ThresholdBaseline(seed=seed)
 
 
+def _impedance_factory(**_) -> Baseline:
+    # deterministic: no seed. Line parameters come from the grid's topology graph (aux overlay).
+    from .impedance import ImpedanceBaseline
+
+    return ImpedanceBaseline()
+
+
 def _random_forest_factory(*, seed, **_) -> Baseline:
     from .random_forest import RandomForestBaseline
 
@@ -106,11 +115,13 @@ BASELINE_FACTORIES.update(
     {
         "majority": _majority_factory,
         "threshold": _threshold_factory,
+        "impedance": _impedance_factory,
         "random_forest": _random_forest_factory,
         "mlp": _deep_factory("mlp", "MLPBaseline"),
         "gru": _deep_factory("gru", "GRUBaseline"),
         "cnn": _deep_factory("cnn", "CNNBaseline"),
         "resnet": _deep_factory("resnet", "ResNetBaseline"),
+        "tst": _deep_factory("tst", "TSTBaseline"),
     }
 )
 
@@ -151,6 +162,25 @@ def _git_sha() -> str | None:
         return None
 
 
+def _git_worktree_state() -> dict:
+    """Whether the executing checkout had uncommitted changes to tracked files, plus a SHA-256 of
+    that diff (``git diff HEAD``), so a result produced from a dirty tree is distinguishable from
+    one produced at a clean ``git_sha`` (the cheap form of Agent4CT's per-iteration source
+    snapshot). Untracked files are ignored; outputs and logs are untracked by design. ``None``
+    values when git is unavailable (never fails the run)."""
+    try:
+        diff = subprocess.check_output(
+            ["git", "diff", "HEAD", "--no-color", "--no-ext-diff"],
+            cwd=_repo_root(),
+            stderr=subprocess.DEVNULL,
+        )
+    except Exception:
+        return {"git_dirty": None, "git_diff_sha256": None}
+    if not diff:
+        return {"git_dirty": False, "git_diff_sha256": None}
+    return {"git_dirty": True, "git_diff_sha256": hashlib.sha256(diff).hexdigest()}
+
+
 def _repo_root() -> Path:
     return Path(__file__).resolve().parents[3]
 
@@ -170,7 +200,12 @@ def _lockfile_hash() -> str | None:
 
 
 def cell_identity(
-    task_id: str, protocol: str, grid: str, baseline_tag: str, pretrain_grid: str | None
+    task_id: str,
+    protocol: str,
+    grid: str,
+    baseline_tag: str,
+    pretrain_grid: str | None,
+    normalize: str | None = None,
 ) -> tuple[str, str]:
     """``(display_name, cell_key)`` identifying one cell for the ONLINE tracking channel.
 
@@ -180,14 +215,21 @@ def cell_identity(
     Transfer cells therefore carry the same ``pretrain-<source>`` qualification that ``base_dir``
     and ``coverage.cell_dir`` use, under the same condition, so the default (20 kV) source keeps its
     legacy source-less key and already-logged runs keep their ids.
+
+    A non-default input normalization (the per-window normalization control, which writes to its
+    own output root) is qualified with ``/norm-<mode>`` for the same reason; the protocol default
+    keeps the unqualified key.
     """
     suffix = (
         f"/pretrain-{pretrain_grid}"
         if protocol in TRANSFER_PROTOCOLS and pretrain_grid != PRETRAIN_GRID
         else ""
     )
+    if normalize is not None and normalize != default_input_normalize(protocol):
+        suffix += f"/norm-{normalize}"
     name = f"{task_id}/{protocol}/{grid}/{baseline_tag}{suffix}"
-    return name, f"{results_version(protocol)}/{name}"
+    source = pretrain_grid if protocol in TRANSFER_PROTOCOLS else None
+    return name, f"{results_version(protocol, task_id, grid=grid, source=source)}/{name}"
 
 
 def _results_env_hash(version: str) -> str | None:
@@ -262,7 +304,7 @@ def _pretrained_bundle_path(args, seed: int, baseline_tag: str) -> Path:
         return base if base.suffix == ".pt" else base / f"seed{seed}.pt"
     return (
         Path(args.out)
-        / results_version("multi_grid_pretrain")
+        / results_version("multi_grid_pretrain", args.task, grid=args.pretrain_grid)
         / args.task
         / "multi_grid_pretrain"
         / args.pretrain_grid
@@ -367,6 +409,48 @@ def main(argv: list[str] | None = None) -> None:
         default_input_normalize(args.protocol) if args.normalize == "auto" else args.normalize
     )
 
+    cell_dir = _cell_dir_from_args(args)
+    stage = {"name": "load"}
+    attempt = failures.open_attempt(cell_dir) if cell_dir is not None else None
+    try:
+        with failures.sigterm_as_exception():
+            _run_cell(args, normalize, stage)
+    except BaseException as exc:
+        if cell_dir is not None and attempt is not None:
+            failures.close_attempt(cell_dir, attempt, stage=stage["name"], exc=exc)
+        raise
+    if cell_dir is not None:
+        failures.clear(cell_dir)
+
+
+def _cell_dir_from_args(args) -> Path | None:
+    """The cell directory the run will write to — known before the task loads, so a failure in
+    loading is recorded too. Mirrors ``base_dir`` in :func:`_run_cell` (and ``coverage.cell_dir``,
+    plus the ``+zero_seq`` variant tag). ``None`` without an explicit ``--grid`` (ad-hoc runs)."""
+    if not args.grid:
+        return None
+    tag = args.baseline + ("+zero_seq" if args.zero_seq else "")
+    d = (
+        Path(args.out)
+        / results_version(
+            args.protocol,
+            args.task,
+            grid=args.grid,
+            source=(args.pretrain_grid if args.protocol in TRANSFER_PROTOCOLS else None),
+        )
+        / args.task
+        / args.protocol
+        / args.grid
+        / tag
+    )
+    if args.protocol in TRANSFER_PROTOCOLS and args.pretrain_grid != PRETRAIN_GRID:
+        d = d / f"pretrain-{args.pretrain_grid}"
+    return d
+
+
+def _run_cell(args, normalize: str, stage: dict) -> None:
+    """Load → fit/predict/evaluate per seed → positive control → write. ``stage["name"]`` is kept
+    current so a failure is recorded with where it happened (:mod:`evemtbench.failures`)."""
     task = load_task(
         args.task,
         args.protocol,
@@ -374,6 +458,9 @@ def main(argv: list[str] | None = None) -> None:
         root=args.root,
         splits_root=args.splits_root,
         directory=args.directory,
+        # the transfer source takes part in the per-cell results version (v1.3.0 fault_phase), and
+        # the version decides whether the committed label patches apply (task.provenance records it)
+        pretrain_grid=args.pretrain_grid,
     )
     # Projection cache (if enabled): materialize ALL views — including the eval views (test,
     # benchmark) — so the per-seed predict passes read the small cached projection instead of
@@ -390,7 +477,7 @@ def main(argv: list[str] | None = None) -> None:
     baseline_tag = args.baseline + ("+zero_seq" if args.zero_seq else "")
     base_dir = (
         Path(args.out)
-        / results_version(task.protocol)
+        / task.results_version
         / task.definition.task_id
         / task.protocol
         / task.grid
@@ -402,6 +489,7 @@ def main(argv: list[str] | None = None) -> None:
     if args.protocol in TRANSFER_PROTOCOLS and args.pretrain_grid != PRETRAIN_GRID:
         base_dir = base_dir / f"pretrain-{args.pretrain_grid}"
 
+    stage["name"] = "setup"
     # --- Logging redundancy (v1.0): a per-cell durable train.log (OFFLINE, cell-addressable — the
     # SLURM .out is job-named and interleaves many cells) plus an optional W&B run (ONLINE). The run
     # maps 1:1 to this cell; its deterministic id/url is recorded in run_record.json below for the
@@ -412,7 +500,12 @@ def main(argv: list[str] | None = None) -> None:
 
     set_log_file(base_dir / "train.log")
     _cell_name, cell_key = cell_identity(
-        task.definition.task_id, task.protocol, task.grid, baseline_tag, args.pretrain_grid
+        task.definition.task_id,
+        task.protocol,
+        task.grid,
+        baseline_tag,
+        args.pretrain_grid,
+        normalize=normalize,
     )
     _cluster = os.environ.get("SLURM_CLUSTER_NAME") or os.environ.get("CLUSTER")
     wandb_info = _tracking.start_run(
@@ -420,11 +513,11 @@ def main(argv: list[str] | None = None) -> None:
         name=_cell_name,
         config={
             **vars(args),
-            "benchmark_version": results_version(task.protocol),
+            "benchmark_version": task.results_version,
             "splits_version": splits_version(task.protocol),
             "git_sha": _git_sha(),
             "lockfile_sha256": _lockfile_hash(),
-            "results_env_sha256": _results_env_hash(results_version(task.protocol)),
+            "results_env_sha256": _results_env_hash(task.results_version),
             "normalize": normalize,
             "cluster": _cluster,
             "slurm_job_id": os.environ.get("SLURM_JOB_ID"),
@@ -436,7 +529,7 @@ def main(argv: list[str] | None = None) -> None:
             task.protocol,
             task.grid,
             baseline_tag,
-            f"v{results_version(task.protocol)}",
+            f"v{task.results_version}",
             _cluster,
             (_git_sha() or "")[:8],
             *(
@@ -465,7 +558,11 @@ def main(argv: list[str] | None = None) -> None:
     per_seed_compute: list[dict] = []
     checkpoints: dict[str, dict] = {}
     n_params: int | None = None
+    # What a non-learned baseline calibrated on train (e.g. the impedance locator's scale factor
+    # and the line parameters it read); None for baselines that expose no ``calibration_``.
+    calibration: dict | None = None
     for seed in args.seeds:
+        stage["name"] = f"fit (seed {seed})"
         model = _make_baseline(
             args.baseline,
             seed=seed,
@@ -523,6 +620,7 @@ def main(argv: list[str] | None = None) -> None:
             fit_seconds = time.perf_counter() - t_fit
             stats = getattr(model, "train_stats_", {}) or {}
         n_params = getattr(model, "n_params_", None)  # constant across seeds (fixed architecture)
+        calibration = getattr(model, "calibration_", None)  # deterministic: same for every seed
         per_seed_compute.append(
             {
                 "seed": seed,
@@ -543,10 +641,15 @@ def main(argv: list[str] | None = None) -> None:
         if ckpt is not None:
             checkpoints[str(seed)] = ckpt
         for ts in test_sets:
+            stage["name"] = f"predict (seed {seed}, {ts})"
             out_dir = base_dir / ts
             out_dir.mkdir(parents=True, exist_ok=True)
             preds = model.predict(task.view(ts))
-            preds.to_parquet(out_dir / f"predictions_seed{seed}.parquet", index=False)
+            pred_path = out_dir / f"predictions_seed{seed}.parquet"
+            pred_tmp = tmp_path_for(pred_path)
+            preds.to_parquet(pred_tmp, index=False)
+            atomic_replace(pred_tmp, pred_path)
+            stage["name"] = f"evaluate (seed {seed}, {ts})"
             result = evaluate(task, preds, test_set=ts)
             per_seed_metrics[ts].append(result.metrics)
             per_seed_results[ts].append({"seed": seed, "metrics": result.metrics})
@@ -558,18 +661,19 @@ def main(argv: list[str] | None = None) -> None:
                 f" [{ts}]: {result.metrics}"
             )
 
+    stage["name"] = "positive control"
     compute_summary = _agg_compute(per_seed_compute, n_params)
     # Positive control BEFORE persisting anything: the true labels must score the ceiling
     # through the same evaluate() path the models were scored with (raises on failure).
     harness_control = {ts: _harness_control(task, ts) for ts in test_sets}
     aggs: dict[str, dict] = {}
+    result_docs: dict[str, dict] = {}
     for ts in test_sets:
-        out_dir = base_dir / ts
         agg = aggregate_seed_metrics(per_seed_metrics[ts])
         aggs[ts] = agg
         lr_ = last_result[ts]
         result_doc = build_result_doc(
-            benchmark_version=results_version(task.protocol),
+            benchmark_version=task.results_version,
             task=task.definition.task_id,
             protocol=task.protocol,
             grid=task.grid,
@@ -588,7 +692,7 @@ def main(argv: list[str] | None = None) -> None:
             # Previously this was the LAST seed's breakdowns sitting next to a 5-seed aggregate.
             breakdowns=aggregate_seed_breakdowns(per_seed_breakdowns[ts]),
         )
-        (out_dir / "result.json").write_text(render_result_json(result_doc))
+        result_docs[ts] = result_doc
 
     # No-tuning attestation (the benchmark rule the paper cites): the held-out target views are
     # always predict-only. Zero-shot never trains on the target at all; fine-tune trains only on the
@@ -627,14 +731,15 @@ def main(argv: list[str] | None = None) -> None:
         }
 
     run_record = {
-        "benchmark_version": results_version(task.protocol),
+        "benchmark_version": task.results_version,
         # the split-artifact version of the splits THIS run reads (multi_grid_pretrain -> the
         # corrected v1.1 grouped splits; held_out/transfer read the frozen held_out v1.0 tree —
         # per-file hashes incl. the pretrain lineage are in data.splits / attestation)
         "splits_version": splits_version(task.protocol),
         "git_sha": _git_sha(),
+        **_git_worktree_state(),
         "lockfile_sha256": _lockfile_hash(),
-        "results_env_sha256": _results_env_hash(results_version(task.protocol)),
+        "results_env_sha256": _results_env_hash(task.results_version),
         "seeds": args.seeds,
         "args": vars(args),
         "normalize": normalize,  # resolved input normalization (per_window for transfer/pretrain)
@@ -682,7 +787,20 @@ def main(argv: list[str] | None = None) -> None:
             run_record["cuda_device"] = torch.cuda.get_device_name(0)
     except Exception:
         run_record["torch"] = None
-    (base_dir / "run_record.json").write_text(json.dumps(run_record, indent=2, sort_keys=True))
+    if calibration is not None:
+        # additive field: only baselines that calibrate on train carry it (older records lack it)
+        run_record["calibration"] = calibration
+    stage["name"] = "write"
+    # A validation re-score belongs to the checkpoints it scored: drop it when the cell is re-run.
+    (base_dir / "val" / "result.json").unlink(missing_ok=True)
+    # Provenance first, result.json last: a valid result.json is what marks the cell ``done``
+    # (coverage.cell_status), so a job that dies in between leaves a cell that re-runs instead of
+    # a "done" cell without its run record. Both writes are atomic (temporary sibling + rename).
+    atomic_write_text(
+        base_dir / "run_record.json", json.dumps(run_record, indent=2, sort_keys=True)
+    )
+    for ts, result_doc in result_docs.items():
+        atomic_write_text(base_dir / ts / "result.json", render_result_json(result_doc))
 
     for ts in test_sets:
         print(f"\nAggregate over seeds {args.seeds} [{ts}]:")

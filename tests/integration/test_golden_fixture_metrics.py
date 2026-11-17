@@ -20,8 +20,6 @@ import pytest
 from evemtbench import results_version
 from evemtbench.baselines import runner
 
-HO_VER = results_version("held_out")
-
 GOLDEN = Path(__file__).resolve().parents[1] / "golden" / "fixture_metrics.json"
 
 # (baseline, task) — analytic/deterministic pairs only, covering binary + regression paths.
@@ -45,7 +43,8 @@ def _aggregates(baseline, task, fixture_root, held_out_splits, out) -> dict:
             "--out", str(out),
         ]
     )  # fmt: skip
-    base = out / HO_VER / task / "held_out" / "double_line" / baseline
+    # fault location lives in its own (v1.2.0) tree; the other pinned tasks in the held_out one
+    base = out / results_version("held_out", task) / task / "held_out" / "double_line" / baseline
     return {
         ts: json.loads((base / ts / "result.json").read_text())["aggregate"]
         for ts in ("test", "benchmark")

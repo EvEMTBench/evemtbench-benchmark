@@ -18,7 +18,8 @@ bundle against a fresh rebuild. The LaTeX is **copied** from the manuscript's co
 ``hpc/paper_artifacts/`` — so ``results/tables/*.tex`` is byte-identical to the manuscript's
 fragments and this module is a packager, never a second renderer of a scientific artifact. The
 aggregated CSV/JSON is derived from the same ``leaderboard.scan_results`` rows the leaderboard/audit
-read, scoped to each protocol's CURRENT results version (``evemtbench.version.results_version``).
+read, scoped to each (protocol, task)'s CURRENT results version
+(``evemtbench.version.results_version``).
 
     PYTHONPATH=src python hpc/make_results_bundle.py            # outputs/ -> results/<version>/
 """
@@ -39,7 +40,13 @@ sys.path.insert(0, str(Path(__file__).resolve().parent / "paper_artifacts"))
 from paper_lib import GEN_DIR
 
 from evemtbench.leaderboard import Row, scan_results
-from evemtbench.version import BENCHMARK_VERSION, results_version
+from evemtbench.version import (
+    BENCHMARK_VERSION,
+    FL_RESULTS_VERSION,
+    FP_RESULTS_VERSION,
+    TRANSFER_RESULTS_VERSION,
+    results_version,
+)
 
 _REPO = Path(__file__).resolve().parents[1]
 
@@ -66,16 +73,19 @@ COLUMNS = (
 def aggregated_records(rows: list[Row], *, version: str | None = None) -> list[dict]:
     """Flatten scanned Rows to one record per (cell × test_set × metric), version-scoped.
 
-    ``version=None`` (default) keeps each protocol's CURRENT rows (``r.version ==
-    results_version(r.protocol)`` — held_out at its frozen version, pretrain/transfer at
-    ``BENCHMARK_VERSION``); an explicit ``version`` keeps that single version only.
+    ``version=None`` (default) keeps each cell's CURRENT rows (``r.version ==
+    results_version(r.protocol, r.task)`` — held_out at 1.0.0, pretrain/transfer at 1.1.0, the
+    fault-location held_out/transfer rows at 1.2.0, the LP-1-patched fault_phase cells at 1.3.0;
+    resolved per cell with the row's grid and transfer source); an explicit ``version`` keeps
+    that single version only.
 
     Exact values (no rounding): ``scan_results`` carries ``metrics[m] = {mean, std, ci95}`` and
     ``seeds``. Absent-class metrics keep ``None`` mean/std/ci95 (null in JSON / empty in CSV), so
     the file honestly states the class had no support rather than hiding it as a 0."""
     recs: list[dict] = []
     for r in rows:
-        if r.version != (results_version(r.protocol) if version is None else version):
+        current = results_version(r.protocol, r.task, grid=r.grid, source=r.source)
+        if r.version != (current if version is None else version):
             continue
         for metric, m in r.metrics.items():
             recs.append(
@@ -164,10 +174,19 @@ def _readme(version: str, n_records: int, n_cells: int) -> str:
         f"One record per (task × protocol × grid × baseline × test_set × metric) — {n_records}\n"
         f"records across {n_cells} cells for this version. Columns / keys:\n\n"
         f"{cols}\n"
-        f"Rows are each protocol's **current** results: `held_out` rows carry `version`\n"
-        f"{results_version('held_out')} (their artifacts are unchanged by the v{version} scoped\n"
-        "revision, so they were not re-run; see `docs/versioning.md`), while the\n"
-        f"pretrain/transfer rows carry {version}.\n\n"
+        "Rows are each cell's **current** results, so the `version` column is not constant:\n"
+        f"`held_out` rows carry {results_version('held_out')} and pretrain/transfer rows carry\n"
+        f"{TRANSFER_RESULTS_VERSION} (their artifacts are unchanged by the later scoped\n"
+        "revisions, so they were not re-run; see `docs/versioning.md`), except the fault-location\n"
+        "(`fault_location_*`) `held_out` / `transfer_zeroshot` / `transfer_finetune` rows, which\n"
+        f"carry {FL_RESULTS_VERSION}: they were re-run under the corrected fault-location\n"
+        "valid-sample rule (line faults only) and are not comparable to the same cells in the\n"
+        "older bundles. The faulted-phase (`fault_phase_*`) rows of the cells that read a\n"
+        "label repaired by label patch LP-1 carry "
+        f"{FP_RESULTS_VERSION}: `held_out` on cigre_mv, `multi_grid_pretrain`\n"
+        "on template_20kv, and the transfer cells that target cigre_mv or start from the\n"
+        "template_20kv source (the high-impedance-with-arc faults regained their faulted phase;\n"
+        "`docs/known_issues.md` §4).\n\n"
         "`mean`/`std`/`ci95` are aggregated over the `n_seeds` random seeds; a null (JSON) /\n"
         "empty (CSV) value marks a metric with no support on that eval set (e.g. an absent\n"
         "per-class F1), reported honestly rather than as a misleading 0. The CSV shows 6\n"

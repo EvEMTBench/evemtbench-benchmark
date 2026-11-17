@@ -44,10 +44,13 @@ def _run(baseline, task, fixture_root, held_out_splits, out, epochs="1"):
     )
 
 
-def test_deep_baseline_writes_checkpoint_and_telemetry(fixture_root, held_out_splits, tmp_path):
+@pytest.mark.parametrize("baseline", ["resnet", "tst"])
+def test_deep_baseline_writes_checkpoint_and_telemetry(
+    fixture_root, held_out_splits, tmp_path, baseline
+):
     out = tmp_path / "out"
-    _run("resnet", "fault_detection_local", fixture_root, held_out_splits, out)
-    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "resnet"
+    _run(baseline, "fault_detection_local", fixture_root, held_out_splits, out)
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / baseline
 
     # best-val checkpoint saved for the seed, and reloadable as a real torch state_dict
     ckpt = base / "checkpoints" / "seed0.pt"

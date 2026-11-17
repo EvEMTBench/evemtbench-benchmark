@@ -61,6 +61,10 @@ Windows-style provenance metadata only — never resolved by the loader (files a
 Window labels are derived deterministically by the windowing pipeline from `settings.csv` event
 fields; the benchmark's label derivers (`tasks/labels/`) then read the resulting per-window `y`
 columns.
+One correction is applied on top of the windows since benchmark v1.3.0: the 1.x windows carry no
+faulted-phase bit for `flt_1phg_hif_w_arc` (CIGRE MV, Template20kV), and the committed label patch
+LP-1 (`src/evemtbench/data/label_patches/`) restores it from `event_phase_select_1ph` for the
+`fault_phase` tasks; the window files are unchanged ([known_issues.md](known_issues.md) §4).
 Fault resistance is selected by `event_type` (HIF vs SHC), not by null-check (both columns are
 populated on fault rows). Splits are at the episode level so no window leaks across partitions.
 

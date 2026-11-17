@@ -27,6 +27,8 @@ from ..data.roots import GridSpec, get_grid
 from ..data.windows import WindowSet, load_windows
 from ..splits.loader import read_held_out_splits, read_splits, split_dir
 from ..splits.protocols import HELD_OUT_SPLIT_NAMES, get_protocol
+from ..version import label_patches_enabled as _label_patches_enabled
+from ..version import results_version as _results_version_for
 from ..version import splits_version as _splits_version_for
 from . import line_view
 from .labels.event_detection import derive_event_present_series
@@ -203,6 +205,12 @@ class TaskView:
     @property
     def sample_ids(self) -> np.ndarray:
         return self.metadata["sample_id"].to_numpy()
+
+    def feature_axes(self) -> list[tuple[str, list[str], list[dict] | None]]:
+        """``(grid, feature_names, channels)`` of each on-disk partition behind this view: the
+        feature-axis description the observability oracle is built from (read-only; lets a
+        physics-based baseline ask which terminals are measured). Empty for a dense view."""
+        return [(s.grid, list(s.ws.feature_names), s.ws.channels) for s in self._sources]
 
     @property
     def feature_shape(self) -> tuple[int, int, int]:
@@ -505,8 +513,20 @@ class Task:
     test: TaskView  # in-distribution held-out (adapt_grid family)
     benchmark: TaskView  # cross-distribution held-out (benchmark family)
     # Input-data provenance for the run record: sha256 of the split files actually read plus the
-    # manifest fingerprints of the windowed partitions actually loaded (see load_task).
+    # manifest fingerprints of the windowed partitions actually loaded (see load_task), plus the
+    # committed label patches applied (``label_patches``, v1.3.0+ fault_phase cells only).
     provenance: dict = field(default_factory=dict)
+    # Transfer pre-training source grid (None = not a transfer load, or the default source). It
+    # takes part in the per-cell results version of the fault_phase transfer cells.
+    pretrain_grid: str | None = None
+
+    @property
+    def results_version(self) -> str:
+        """The results tree / ``benchmark_version`` stamp of this cell
+        (:func:`evemtbench.version.results_version` with this load's grid and source)."""
+        return _results_version_for(
+            self.protocol, self.definition.task_id, grid=self.grid, source=self.pretrain_grid
+        )
 
     def view(self, name: str) -> TaskView:
         return {
@@ -715,20 +735,50 @@ class _WindowsCache:
     not in the global registry). ``directory`` is only meaningful for a single-grid load.
     """
 
-    def __init__(self, root, directory, resolver: dict[str, GridSpec]):
+    def __init__(
+        self,
+        root,
+        directory,
+        resolver: dict[str, GridSpec],
+        *,
+        patch_function: str | None = None,
+    ):
         self._root = root
         self._directory = directory
         self._resolver = resolver
         self._cache: dict[tuple[str, str], WindowSet] = {}
+        # When set (a v1.3.0+ fault_phase load), each partition's y gets the committed label
+        # patches for that function before any valid-sample mask or label is derived from it.
+        self._patch_function = patch_function
+        self.label_patches: list[dict] = []
 
     def get(self, grid: str, family: str) -> WindowSet:
         key = (grid, family)
         if key not in self._cache:
             gspec = self._resolver.get(grid) or get_grid(grid)
-            self._cache[key] = load_windows(
-                gspec, family, root=self._root, directory=self._directory
-            )
+            ws = load_windows(gspec, family, root=self._root, directory=self._directory)
+            if self._patch_function is not None:
+                ws = self._patched(ws, gspec.key, family, self._patch_function)
+            self._cache[key] = ws
         return self._cache[key]
+
+    def _patched(self, ws: WindowSet, grid: str, family: str, function: str) -> WindowSet:
+        from dataclasses import replace
+
+        from ..data.label_patches import apply_label_patches
+
+        y, applied = apply_label_patches(
+            ws.y,
+            grid=grid,
+            family=family,
+            manifest_sha256=(ws.provenance or {}).get("manifest_sha256"),
+            function=function,
+            fault_active=derive_fault_active_series(ws.y).astype(bool),
+        )
+        if not applied:
+            return ws
+        self.label_patches.extend(applied)
+        return replace(ws, y=y)
 
 
 def _double_line_near_end(y: pd.DataFrame, rows: np.ndarray) -> np.ndarray | None:
@@ -889,13 +939,23 @@ def load_task(
     directory: str | os.PathLike | None = None,
     extra_grids: dict[str, GridSpec] | None = None,
     attach_aux: tuple[str, ...] = (),
+    pretrain_grid: str | None = None,
+    label_patches: bool | None = None,
 ) -> Task:
     """Load a benchmark task under a protocol. ``grid`` is the target grid (defaults to the
     task's ``default_grid``). ``root``/``splits_root``/``directory`` are test/layout overrides.
     ``extra_grids`` seeds the grid resolver with non-registry grids (custom grids / fixtures).
     ``attach_aux`` optionally joins aux settings columns into each view's *metadata* (e.g.
     ``("resistance",)`` for resistance-binned stratification) when the aux overlay exists; it never
-    affects features and silently no-ops if the overlay is absent."""
+    affects features and silently no-ops if the overlay is absent.
+
+    ``pretrain_grid`` is the transfer source (transfer protocols only; ``None`` = the default
+    source). ``label_patches`` switches the committed label patches (``data/label_patches/``):
+    ``None`` (default) resolves it from this cell's results version
+    (``version.label_patches_enabled``: on for the v1.3.0 ``fault_phase`` cells), ``True`` /
+    ``False`` force it (re-evaluation of a stored record passes the record's own version). A patch
+    only ever applies on the exact partition it was built for, and what was applied is recorded in
+    ``task.provenance["label_patches"]``."""
     td = get_task(task_id)
     get_protocol(protocol)
     if protocol not in td.protocols:
@@ -903,6 +963,12 @@ def load_task(
     if grid is None and protocol == "multi_grid_pretrain":
         grid = _DEFAULT_PRETRAIN_GRID
     gspec = get_grid(grid if grid is not None else td.default_grid)
+    if protocol not in ("transfer_zeroshot", "transfer_finetune"):
+        pretrain_grid = None
+    if label_patches is None:
+        label_patches = _label_patches_enabled(
+            task_id, _results_version_for(protocol, task_id, grid=gspec.key, source=pretrain_grid)
+        )
 
     if version is None:  # per-protocol split-artifact version (mirrors _splits_provenance)
         split_proto = (
@@ -917,7 +983,9 @@ def load_task(
     resolver = {gspec.key: gspec}  # lets fixtures use toy grids absent from the registry
     if extra_grids:
         resolver.update(extra_grids)
-    cache = _WindowsCache(root, directory, resolver)
+    cache = _WindowsCache(
+        root, directory, resolver, patch_function=(td.function.value if label_patches else None)
+    )
     views = {name: _build_view(name, triples[name], td, cache) for name in HELD_OUT_SPLIT_NAMES}
     if attach_aux:
         for name, view in views.items():
@@ -934,6 +1002,10 @@ def load_task(
             key=lambda pr: (pr["grid"], pr["family"]),
         ),
     }
+    if cache.label_patches:  # absent (not empty) when nothing applied: older records match as-is
+        provenance["label_patches"] = sorted(
+            cache.label_patches, key=lambda pr: (pr["id"], pr["grid"], pr["family"])
+        )
     return Task(
         definition=td,
         protocol=protocol,
@@ -944,4 +1016,5 @@ def load_task(
         test=views["test"],
         benchmark=views["benchmark"],
         provenance=provenance,
+        pretrain_grid=pretrain_grid,
     )

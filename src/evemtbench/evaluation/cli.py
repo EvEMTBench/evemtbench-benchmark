@@ -13,7 +13,9 @@ from __future__ import annotations
 
 import argparse
 
+from ..splits.protocols import TRANSFER_PROTOCOLS
 from ..tasks.task import load_task
+from ..version import is_fault_phase_task
 from .evaluate import evaluate
 from .predictions_io import load_predictions
 
@@ -42,6 +44,12 @@ def main(argv: list[str] | None = None) -> None:
     p.add_argument("--root", default=None)
     p.add_argument("--splits-root", default=None)
     p.add_argument("--directory", default=None)
+    p.add_argument(
+        "--pretrain-grid",
+        default=None,
+        help="transfer protocols: the pre-training source grid (default: template_20kv; required "
+        "for fault_phase tasks, where it decides the per-cell results version)",
+    )
     args = p.parse_args(argv)
 
     if args.self_test:
@@ -51,6 +59,9 @@ def main(argv: list[str] | None = None) -> None:
     for req in ("task", "protocol", "predictions"):
         if getattr(args, req) is None:
             p.error(f"--{req} is required (unless --self-test)")
+    if args.protocol in TRANSFER_PROTOCOLS and is_fault_phase_task(args.task):
+        if args.pretrain_grid is None:  # the source decides the cell's results version
+            p.error("--pretrain-grid is required for a fault_phase transfer task")
 
     task = load_task(
         args.task,
@@ -59,6 +70,7 @@ def main(argv: list[str] | None = None) -> None:
         root=args.root,
         splits_root=args.splits_root,
         directory=args.directory,
+        pretrain_grid=args.pretrain_grid,
     )
     preds = load_predictions(args.predictions)
     result = evaluate(task, preds, test_set=args.test_set)

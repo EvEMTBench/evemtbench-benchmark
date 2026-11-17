@@ -9,7 +9,7 @@ import re
 from pathlib import Path
 
 import make_audit
-from evemtbench.coverage import expected_test_sets, iter_cells
+from evemtbench.coverage import LEARNED_BASELINES, expected_test_sets, iter_cells
 from evemtbench.version import results_version
 
 REPO = Path(__file__).resolve().parents[2]
@@ -18,10 +18,12 @@ _VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
 
 
 def _write_cell(root: Path, task: str, protocol: str, grid: str, baseline: str) -> None:
-    """A minimal-but-valid done cell: one result.json per expected test set + a run record."""
+    """A minimal-but-valid done cell: one result.json per expected test set + a run record. A
+    learned baseline also gets its validation re-score, which model selection requires."""
     # per-protocol current-results tree (held_out resolves to 1.0.0 under the scoped revision)
     cell = root / "outputs" / results_version(protocol) / task / protocol / grid / baseline
-    for ts in expected_test_sets(grid, protocol):
+    val = ("val",) if baseline in LEARNED_BASELINES else ()
+    for ts in (*expected_test_sets(grid, protocol), *val):
         d = cell / ts
         d.mkdir(parents=True, exist_ok=True)
         (d / "result.json").write_text(

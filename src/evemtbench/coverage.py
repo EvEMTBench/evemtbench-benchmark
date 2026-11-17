@@ -19,16 +19,18 @@ from __future__ import annotations
 
 import argparse
 import json
+import sys
 from dataclasses import dataclass
 from functools import cache
 from pathlib import Path
 
+from . import failures
 from .data.roots import GRIDS
 from .splits.loader import read_held_out_splits
 from .splits.protocols import PRETRAIN_TRANSFER_PROTOCOLS, TRANSFER_PROTOCOLS
 from .tasks.registry import get_task, list_tasks
 from .tasks.taxonomy import Function, LabelKind, Observability, TaskDefinition
-from .version import BENCHMARK_VERSION, results_version
+from .version import BENCHMARK_VERSION, is_fault_phase_task, results_version
 
 TEST_SETS = ("test", "benchmark")
 
@@ -54,14 +56,33 @@ def expected_test_sets(grid: str, protocol: str = "held_out") -> tuple[str, ...]
 
 # gnn is added with the cross_topology protocol; threshold is the conventional overcurrent anchor.
 # resnet is the modern learned reference (1D ResNet) added in v0.2 alongside mlp/gru/cnn.
-ALL_BASELINES = ("majority", "threshold", "random_forest", "mlp", "gru", "cnn", "resnet")
-# The floor gate checks only the learned five: majority IS the floor, and threshold is a
-# conventional rule whose failures are findings about the rule, not plumbing bugs.
-LEARNED_BASELINES = ("random_forest", "mlp", "gru", "cnn", "resnet")
+# tst is the transformer reference (Time Series Transformer encoder with a patch embedding). It is
+# appended LAST in every tuple: the validation selection keeps the earlier entry on a tie, so the
+# order of the existing baselines, and with it every existing tie-break, is unchanged.
+# impedance is the conventional impedance-based fault locator: the fault-location counterpart of
+# threshold, a deterministic physical reference outside the learned-baseline selection pool (so its
+# position here touches no tie-break).
+ALL_BASELINES = (
+    "majority",
+    "threshold",
+    "impedance",
+    "random_forest",
+    "mlp",
+    "gru",
+    "cnn",
+    "resnet",
+    "tst",
+)
+# The conventional (non-learned, physics-based) references and where each is defined; see
+# ``baseline_applies``. They are reported next to the learned baselines, never selected among.
+CONVENTIONAL_BASELINES = ("threshold", "impedance")
+# The floor gate checks only the learned baselines: majority IS the floor, and threshold/impedance
+# are conventional rules whose failures are findings about the rule, not plumbing bugs.
+LEARNED_BASELINES = ("random_forest", "mlp", "gru", "cnn", "resnet", "tst")
 # Deep baselines carry transferable weights — the only baselines the pre-training/transfer
 # protocols apply to (classical baselines have no pretrained state to transfer; the target's
 # in-distribution held_out majority provides the reference floor).
-DEEP_BASELINES = ("mlp", "gru", "cnn", "resnet")
+DEEP_BASELINES = ("mlp", "gru", "cnn", "resnet", "tst")
 FAULT_TRIAD = ("fault_detection", "fault_classification", "fault_location")
 
 
@@ -78,11 +99,19 @@ def baseline_applies(baseline: str, td: TaskDefinition, protocol: str = "held_ou
     """Whether a baseline is meaningful for a task under a protocol.
 
     ``threshold`` is a single-end overcurrent rule: only binary detection at LOCAL observability.
+    ``impedance`` is an impedance-based fault locator: only fault location, at LOCAL (one-terminal
+    reactance method) and LINE (two-terminal method) observability; GLOBAL adds no physical
+    information for a per-line locator.
     The pre-training/transfer protocols apply only to the deep baselines (transferable weights).
     All learned baselines apply to every task (they branch on label_kind internally).
     """
     if protocol in PRETRAIN_TRANSFER_PROTOCOLS:
         return baseline in DEEP_BASELINES
+    if baseline == "impedance":
+        return td.function is Function.FAULT_LOCATION and td.observability in (
+            Observability.LOCAL,
+            Observability.LINE,
+        )
     if baseline == "threshold":
         return (
             td.label_kind is LabelKind.BINARY
@@ -135,13 +164,40 @@ def iter_cells(
     return cells
 
 
+def cell_results_version(cell: Cell) -> str:
+    """The current results tree of one cell: :func:`evemtbench.version.results_version` with the
+    cell's grid and (transfer) source, which the v1.3.0 fault_phase scoping depends on."""
+    return results_version(cell.protocol, cell.task, grid=cell.grid, source=cell.source)
+
+
+def cell_from_key(key: str | Path) -> Cell | None:
+    """The :class:`Cell` a cell path names, relative to its results tree:
+    ``<task>/<protocol>/<grid>/<baseline>[/pretrain-<source>]`` (the layout :func:`cell_dir`
+    writes; a transfer cell without the token is from the default source). ``None`` for anything
+    shorter. Tree walkers use it to resolve a path's current version per cell
+    (``cell_results_version(cell_from_key(...))``) instead of re-parsing the layout themselves."""
+    parts = Path(key).parts
+    if len(parts) < 4:
+        return None
+    task, protocol, grid, baseline = parts[:4]
+    source = None
+    if len(parts) > 4 and parts[4].startswith("pretrain-"):
+        source = parts[4][len("pretrain-") :]
+    elif protocol in TRANSFER_PROTOCOLS:
+        source = PRETRAIN_GRID
+    return Cell(task, protocol, grid, baseline, source=source)
+
+
 def cell_dir(out: Path, cell: Cell, *, version: str | None = None) -> Path:
-    """A cell's output directory. ``version=None`` (default) resolves per protocol
-    (:func:`evemtbench.version.results_version`): held_out results live in — and stay in — the
-    1.0.0 tree; the pretrain/transfer protocols re-scored under the corrected v1.1 source splits
-    live in the current tree. An explicit ``version`` always wins (historical inspection)."""
+    """A cell's output directory. ``version=None`` (default) resolves per protocol, task, grid and
+    source (:func:`cell_results_version`): held_out results live in — and stay in — the 1.0.0
+    tree and the pretrain/transfer protocols re-scored under the corrected v1.1 source splits in
+    the 1.1.0 tree, except the fault-location cells re-run under the corrected v1.2 valid-sample
+    gate, which live in the 1.2.0 tree, and the fault_phase cells that read an LP-1-repaired
+    label, which live in the 1.3.0 tree. An explicit ``version`` always wins (historical
+    inspection)."""
     if version is None:
-        version = results_version(cell.protocol)
+        version = cell_results_version(cell)
     d = Path(out) / version / cell.task / cell.protocol / cell.grid / cell.baseline
     # A transfer cell from a NON-default source gets a source-qualified subdir so it never collides
     # with the default (PRETRAIN_GRID) source, which keeps the legacy source-less path — so the
@@ -183,6 +239,26 @@ def scan(out: Path, cells: list[Cell], *, version: str | None = None) -> dict[st
     for c in cells:
         groups[cell_status(out, c, version=version)].append(c)
     return groups
+
+
+def failure_records(
+    out: Path, cells: list[Cell], *, version: str | None = None
+) -> dict[Cell, dict]:
+    """``{cell: failure record}`` for the given (non-done) cells that have one
+    (:mod:`evemtbench.failures`)."""
+    recs: dict[Cell, dict] = {}
+    for c in cells:
+        doc = failures.load(cell_dir(out, c, version=version))
+        if doc and doc["attempts"]:
+            recs[c] = doc
+    return recs
+
+
+def exhausted_cells(recs: dict[Cell, dict], max_attempts: int) -> set[Cell]:
+    """Cells whose failed attempts reached the retry cap (``max_attempts <= 0`` = no cap)."""
+    if max_attempts <= 0:
+        return set()
+    return {c for c, doc in recs.items() if failures.n_attempts(doc) >= max_attempts}
 
 
 def _arg_line(cell: Cell) -> str:
@@ -232,6 +308,9 @@ def build_snapshot(
                         "grid": c.grid,
                         "baseline": c.baseline,
                         "source": c.source,
+                        "results_version": (
+                            cell_results_version(c) if version is None else version
+                        ),
                         "status": status,
                         "expected_test_sets": list(expected_test_sets(c.grid, c.protocol)),
                         "arg_line": _arg_line(c),
@@ -247,9 +326,20 @@ def build_snapshot(
     return {
         "benchmark_version": BENCHMARK_VERSION if version is None else version,
         # which outputs/<v>/ tree each protocol's CURRENT results live in (None = the per-protocol
-        # default: held_out stays at its published 1.0.0 tree, pretrain/transfer at the current one)
+        # default: held_out stays at its published 1.0.0 tree, pretrain/transfer at 1.1.0) ...
         "results_versions": {
             p: (results_version(p) if version is None else version) for p in protocols
+        },
+        # ... and the "<task>/<protocol>" pairs that deviate from that default as a whole (the
+        # fault-location cells re-run under the corrected v1.2.0 valid-sample gate). Empty for an
+        # explicit version. The fault_phase tasks are scoped per CELL since v1.3.0 (grid and
+        # source), so they are not listed here: each cell row carries its own "results_version".
+        "results_versions_by_task": {
+            f"{r['task']}/{r['protocol']}": results_version(r["protocol"], r["task"])
+            for r in cell_rows
+            if version is None
+            and not is_fault_phase_task(r["task"])
+            and results_version(r["protocol"], r["task"]) != results_version(r["protocol"])
         },
         "protocols": list(protocols),
         "self_check": snapshot_self_check(out, cell_rows, counts, version=version),
@@ -508,7 +598,19 @@ def main(argv: list[str] | None = None) -> None:
         metavar="PATH",
         help="write the persistent coverage manifest (all protocols) and exit",
     )
+    mode.add_argument(
+        "--failures",
+        action="store_true",
+        help="list not-done cells that have a failure record: attempts, last stage, error",
+    )
     p.add_argument("--floor-tol", type=float, default=0.02, help="tolerance for --check-floor")
+    p.add_argument(
+        "--max-attempts",
+        type=int,
+        default=failures.MAX_ATTEMPTS,
+        help="retry cap: --emit-pending/--emit-failed skip a cell after this many recorded failed "
+        "attempts (0 = no cap; deleting a cell's failure.json also resets it)",
+    )
     args = p.parse_args(argv)
 
     if args.check_snapshot:
@@ -550,25 +652,70 @@ def main(argv: list[str] | None = None) -> None:
         raise SystemExit(0 if report["ok"] else 1)
 
     groups = scan(Path(args.out), cells, version=args.version)
+    recs = failure_records(
+        Path(args.out), groups["pending"] + groups["failed"], version=args.version
+    )
+    exhausted = exhausted_cells(recs, args.max_attempts)
 
     if args.emit_pending or args.emit_failed:
         # pending mode re-runs both not-yet-started and failed cells (idempotent skip);
-        # failed mode targets only cells that produced no/invalid result.
+        # failed mode targets only cells that produced no/invalid result. Cells at the retry cap
+        # are left out (stdout carries only arg-lines; the note goes to stderr).
         want = groups["failed"] if args.emit_failed else groups["pending"] + groups["failed"]
+        skipped = [c for c in want if c in exhausted]
         for c in want:
-            print(_arg_line(c))
+            if c not in exhausted:
+                print(_arg_line(c))
+        if skipped:
+            print(
+                f"coverage: skipped {len(skipped)} cell(s) at the retry cap "
+                f"({args.max_attempts} failed attempts) — see `coverage --failures`",
+                file=sys.stderr,
+            )
+        return
+
+    if args.failures:
+        for c, doc in sorted(recs.items(), key=lambda kv: _arg_line(kv[0])):
+            last = doc["attempts"][-1]
+            cap = "  [retry cap reached]" if c in exhausted else ""
+            print(f"{_arg_line(c)}{cap}")
+            print(f"    attempts={failures.n_attempts(doc)}  last: {failures.reason(last)}")
+            if last.get("message"):
+                print(f"    message: {last['message'].splitlines()[0][:200]}")
+            rec_path = failures.failure_path(cell_dir(Path(args.out), c, version=args.version))
+            print(f"    record: {rec_path}")
+        print(f"{len(recs)} cell(s) with a failure record, {len(exhausted)} at the retry cap")
         return
 
     total = len(cells)
     ver = (
         args.version
-        or "per-protocol ("
-        + ", ".join(f"{p}={results_version(p)}" for p in sorted({c.protocol for c in cells}))
+        or "per-cell ("
+        + ", ".join(
+            f"{p}=" + "/".join(sorted({cell_results_version(c) for c in cells if c.protocol == p}))
+            for p in sorted({c.protocol for c in cells})
+        )
         + ")"
     )
     print(f"version={ver}  matrix={total} cells")
     for k in ("done", "pending", "failed"):
         print(f"  {k:8s} {len(groups[k]):4d}")
+    # NB: hpc/autonomous_loop.sh reads the count from the line whose first field is the status
+    # word — keep the lines below free of it.
+    if recs:
+        cap_note = (
+            f"cells with ≥{args.max_attempts} failed attempts; not resubmitted"
+            if args.max_attempts > 0
+            else "no retry cap set"
+        )
+        print(f"  {'retry-cap':8s} {len(exhausted):4d}  ({cap_note})")
+        by_reason: dict[str, int] = {}
+        for doc in recs.values():
+            r = failures.last_reason(doc) or "?"
+            by_reason[r] = by_reason.get(r, 0) + 1
+        print("failure reasons (last attempt per cell):")
+        for r, n in sorted(by_reason.items(), key=lambda kv: (-kv[1], kv[0])):
+            print(f"  {n:4d}  {r}")
     if groups["failed"]:
         print("failed cells:")
         for c in groups["failed"]:

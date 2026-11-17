@@ -45,6 +45,12 @@ def _seed_repo(root: Path) -> None:
             }
         )
     )
+    # the cell's validation re-score: selection needs it (a model is never selected on the set it
+    # reports), so a populated cell without one fails the build instead of rendering a number
+    (d.parent / "val").mkdir()
+    (d.parent / "val" / "result.json").write_text(
+        (d / "result.json").read_text().replace('"test_set": "test"', '"test_set": "val"')
+    )
 
 
 def test_gate_pass_fail_skip(tmp_path, monkeypatch):
@@ -83,7 +89,7 @@ def test_gate_pass_fail_skip(tmp_path, monkeypatch):
     assert gate.main([]) == 0
 
     # a physically impossible aggregate must trip the snapshot's embedded self-check
-    bad = next((tmp_path / "outputs").rglob("result.json"))
+    bad = next(p for p in (tmp_path / "outputs").rglob("result.json") if p.parent.name == "test")
     orig = bad.read_text()
     doc = json.loads(orig)
     doc["aggregate"]["balanced_accuracy"]["mean"] = 1.7

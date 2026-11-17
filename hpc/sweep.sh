@@ -51,6 +51,10 @@ conda activate "${CONDA_ENV:-py_dl}" 2>/dev/null \
 : "${EVEMT_ROOT:?set EVEMT_ROOT to the EvEMTBench dataset root (or define it in hpc/clusters/local.env)}"
 export EVEMT_ROOT
 [ -d "$EVEMT_ROOT" ] || { echo "ERROR: \$EVEMT_ROOT not found: $EVEMT_ROOT"; exit 1; }
+# The aux overlay (topology graphs; read by the impedance baseline for the line parameters) sits next
+# to the SOURCE data root. Pin it here: EVEMTBENCH_DATA_ROOT is later pointed at the node-local staged
+# copy, whose sibling directory holds no aux overlay.
+export EVEMTBENCH_AUX_ROOT="${EVEMTBENCH_AUX_ROOT:-$(dirname "$EVEMT_ROOT")/evemtbench-aux}"
 
 GRID="${GRID:?set GRID}"
 PROTOCOL="${PROTOCOL:-held_out}"
@@ -100,9 +104,9 @@ fault_origin_global}"
 # --zero-seq only affects the deep baselines (the runner rejects it for the classical ones, whose
 # "+zero_seq" cells would duplicate the plain cells), so ZERO_SEQ=1 defaults to the deep set.
 if [ "$ZERO_SEQ" = 1 ]; then
-  BASELINES="${BASELINES:-mlp gru cnn resnet}"
+  BASELINES="${BASELINES:-mlp gru cnn resnet tst}"
 else
-  BASELINES="${BASELINES:-majority threshold random_forest mlp gru cnn resnet}"
+  BASELINES="${BASELINES:-majority threshold impedance random_forest mlp gru cnn resnet tst}"
 fi
 
 # --- Ask the manifest for pending cells BEFORE staging, so a fully-done chain link exits instantly

@@ -23,7 +23,6 @@ from ..tasks.labels.fault_phase import PHASE_CLASSES
 from ..tasks.labels.switch_type import SWITCH_TYPE_CLASSES
 from ..tasks.task import Task
 from ..tasks.taxonomy import Function, LabelKind
-from ..version import results_version
 from .metrics import (
     compute_binary_metrics,
     compute_multiclass_metrics,
@@ -132,12 +131,17 @@ def evaluate(
         raise NotImplementedError(f"evaluate does not support label kind {td.label_kind}")
 
     metrics = metric_fn(y_true, y_pred)
-    breakdowns = stratified_metrics(test.metadata, y_true, y_pred, metric_fn)
+    # binary=True only warns (SingleClassBinaryBreakdownWarning) about single-class groups, whose
+    # binary macro_f1 is not interpretable; it changes no returned value (docs/known_issues.md §3)
+    breakdowns = stratified_metrics(
+        test.metadata, y_true, y_pred, metric_fn, binary=td.label_kind is LabelKind.BINARY
+    )
 
     return EvalResult(
-        # the protocol's current contract version (held_out results stay v1.0.0 under the
-        # v1.1.0 scoped revision — see evemtbench.version)
-        benchmark_version=results_version(task.protocol),
+        # the current results version of this cell (held_out results stay v1.0.0 under the scoped
+        # revisions; fault location is re-run at v1.2.0 and the LP-1-patched fault_phase cells at
+        # v1.3.0 — see evemtbench.version). Task.results_version carries the grid and the source.
+        benchmark_version=task.results_version,
         task=td.task_id,
         protocol=task.protocol,
         grid=task.grid,

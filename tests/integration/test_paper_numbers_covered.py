@@ -110,6 +110,42 @@ def test_dashboard_paper_numbers_page_builds_with_provenance():
     assert f"provenance/{make_audit.BENCHMARK_VERSION}/index.json" in page
 
 
+@pytest.mark.parametrize(
+    ("mean", "ci"),
+    [
+        (0.893, 0.272),  # bounded interval overflows 1 -> paper prints it clipped "[0.621, 1.000]"
+        (0.040, 0.100),  # ... and below 0 -> "[0.000, 0.140]"
+        (0.886, 1e-4),  # half-width below display precision -> "$\\pm{<}0.001$"
+        (0.931, 0.012),  # plain "mean $\\pm$ ci"
+        (0.500, None),  # no interval (single seed / deterministic)
+    ],
+)
+def test_paper_numbers_page_formats_a_cell_like_the_paper(monkeypatch, mean, ci):
+    """Data-free regression: the paper-numbers page renders a selected cell with the paper's own
+    formatter (``paper_lib._fmt_mean_ci``), not a local ``mean ± ci``. A [0,1]-bounded interval
+    that overflows is printed clipped in the paper (F10), so the unclipped "0.893 ± 0.272" the page
+    once printed left the clipped bounds 0.621 / 1.000 untraceable on the dashboard."""
+    import paper_lib
+
+    import make_paper_tables
+    import make_results
+
+    choice = {"baseline": "tst", "mean": mean, "ci": ci, "n_seeds": 5, "selected_on": "val"}
+    pick = lambda *a, **k: dict(choice)  # noqa: E731
+    monkeypatch.setattr(make_results, "load_rows", lambda grid: {})
+    monkeypatch.setattr(make_paper_tables, "best_cell_choice", pick)
+    monkeypatch.setattr(paper_lib, "best_cell_choice", pick)
+
+    paper_cell = paper_lib._best_cell({}, "fault_detection", "global", "test", "balanced_accuracy")
+    page = make_audit.build_paper_numbers([], None)
+    want = Counter(_nums(paper_cell))
+    got = Counter(_nums(page))
+    assert want and all(got[n] >= c for n, c in want.items()), (
+        f"paper cell {paper_cell!r} -> numbers {dict(want)} not all on the dashboard page"
+    )
+    assert make_audit._detex_num(paper_cell) in page
+
+
 def test_every_paper_number_appears_on_the_dashboard():
     """When the sweep has run: every three-decimal number in the generated paper tables appears
     verbatim on the dashboard's paper-numbers page (same selection, same result.json). Skips until

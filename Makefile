@@ -13,8 +13,8 @@
 #   make supplementary          regenerate + compile supplementary.pdf
 #   make check-supplement       run the scientific consistency checker
 #
-# Three SI fragments read the released dataset rather than only outputs/ (EC support, ED negative
-# composition, current-scale diagnostic). They are grouped under the *-dataset targets and, on the
+# Four SI fragments read the released dataset rather than only outputs/ (EC support, ED negative
+# composition, current-scale diagnostic, fault-location locator breakdown). They are grouped under the *-dataset targets and, on the
 # cluster, MUST run inside a SLURM allocation — never on the shared login node:
 #
 #   srun --gres=gpu:a100small:1 -p a100mig --cpus-per-task=8 --time=1:00:00 -A <acct> \
@@ -35,11 +35,15 @@ MANUSCRIPT:= paper/manuscript
 # repository-only group can filter them out.
 DATASET_BUILDERS := $(ARTIFACTS)/build_supp_tab_ec_support.py \
                     $(ARTIFACTS)/build_supp_tab_ed_negative_support.py \
-                    $(ARTIFACTS)/build_supp_tab_current_shift.py
+                    $(ARTIFACTS)/build_supp_tab_current_shift.py \
+                    $(ARTIFACTS)/build_supp_tab_fl_locator_breakdown.py
 # Held-out headline tables (also \input by the SI).
 RES_BUILDERS   := $(wildcard $(ARTIFACTS)/build_tab_res_*.py)
+# Input-normalization control: needs the isolated control tree (ABL=...), so it has its own
+# norm-control / check-norm-control targets and stays out of the repository-only group.
+NORM_CONTROL_BUILDER := $(ARTIFACTS)/build_supp_tab_norm_control.py
 # Full per-baseline supplement tables + the repository-only SI evidence tables.
-SUPP_BUILDERS  := $(filter-out $(DATASET_BUILDERS),$(wildcard $(ARTIFACTS)/build_supp_tab_*.py))
+SUPP_BUILDERS  := $(filter-out $(DATASET_BUILDERS) $(NORM_CONTROL_BUILDER),$(wildcard $(ARTIFACTS)/build_supp_tab_*.py))
 # Cross-grid transfer tables.
 XFER_BUILDERS  := $(wildcard $(ARTIFACTS)/build_tab_transfer_*.py)
 # Static specification tables (authored content, no data inputs).
@@ -67,7 +71,7 @@ help:
 supp-artifacts-repo:
 	@for b in $(REPO_BUILDERS); do echo "-> $$b"; $(PY) $$b || exit 1; done
 
-## Regenerate the three dataset-backed SI fragments (needs the mounted dataset; run under SLURM).
+## Regenerate the four dataset-backed SI fragments (needs the mounted dataset; run under SLURM).
 supp-artifacts-dataset:
 	@for b in $(DATASET_BUILDERS); do echo "-> $$b"; $(PY) $$b || exit 1; done
 

@@ -212,3 +212,15 @@ def test_ci_bounds_is_the_tables_own_truncation_rule():
     assert ci_bounds(0.5, None, "balanced_accuracy") is None
     # and the printed form of a clipped interval really is the bracket notation
     assert _CLIPPED.match(paper_lib._fmt_mean_ci(0.893, 0.112, "balanced_accuracy"))
+
+
+def test_si_fl_figure_draws_the_locator_at_local_and_line_only():
+    """The SI per-baseline FL figure includes the impedance locator (the SI text says the figures
+    show the complete suite); it is defined only at the local and line views."""
+    _, _, stem, metric, _ = _PF_BY_KEY["fl"]
+    cells = paper_lib.per_baseline_matrix(
+        stem, metric, per_grid=held_out_rows(), baselines=paper_lib.FIGURE_BASELINES
+    )
+    imp = {(v, ts, g): c for (g, v, b, ts), c in cells.items() if b == "impedance"}
+    assert all(c is not None for (v, _, _), c in imp.items() if v in ("local", "line"))
+    assert all(c is None for (v, _, _), c in imp.items() if v == "global")

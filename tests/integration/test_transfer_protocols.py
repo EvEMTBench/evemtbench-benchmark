@@ -15,7 +15,7 @@ import pytest
 
 from evemtbench.splits.generator import generate_held_out, write_held_out_artifact
 from evemtbench.tasks.task import load_task
-from evemtbench.version import BENCHMARK_VERSION, SPLITS_VERSION, splits_version
+from evemtbench.version import SPLITS_VERSION, results_version, splits_version
 
 
 @pytest.fixture(scope="module")
@@ -92,22 +92,29 @@ def _run(argv):
 
 
 def _cell(out, task, protocol, grid, baseline="cnn"):
-    return Path(out) / BENCHMARK_VERSION / task / protocol / grid / baseline
+    return Path(out) / results_version(protocol, task) / task / protocol / grid / baseline
 
 
-def test_pretrain_then_zeroshot_and_finetune_roundtrip(fixture_root, transfer_splits, tmp_path):
-    """Train a tiny CNN on multi_grid, then transfer to double_line two ways from the checkpoint."""
+@pytest.mark.parametrize("baseline", ["cnn", "tst"])
+def test_pretrain_then_zeroshot_and_finetune_roundtrip(
+    fixture_root, transfer_splits, tmp_path, baseline
+):
+    """Pre-train a tiny deep baseline on multi_grid, then transfer to double_line two ways."""
     pytest.importorskip("torch")
     out = str(tmp_path / "outputs")
     task = "fault_detection_line"
     common = [
-        "--baseline", "cnn", "--seeds", "0", "--epochs", "1", "--device", "cpu",
+        "--baseline", baseline, "--seeds", "0", "--epochs", "1", "--device", "cpu",
         "--root", str(fixture_root), "--splits-root", str(transfer_splits), "--out", out,
     ]  # fmt: skip
 
     # 1) pre-train on multi_grid -> writes the transfer bundle
     _run(["--task", task, "--protocol", "multi_grid_pretrain", "--grid", "template_20kv", *common])
-    ckpt = _cell(out, task, "multi_grid_pretrain", "template_20kv") / "checkpoints" / "seed0.pt"
+    ckpt = (
+        _cell(out, task, "multi_grid_pretrain", "template_20kv", baseline)
+        / "checkpoints"
+        / "seed0.pt"
+    )
     assert ckpt.is_file(), "pretrain must save a transfer bundle"
 
     # 2) zero-shot on double_line: no training, prediction from the pretrained weights
@@ -115,7 +122,7 @@ def test_pretrain_then_zeroshot_and_finetune_roundtrip(fixture_root, transfer_sp
         "--task", task, "--protocol", "transfer_zeroshot", "--grid", "double_line",
         "--pretrain-grid", "template_20kv", *common,
     ])  # fmt: skip
-    zdir = _cell(out, task, "transfer_zeroshot", "double_line")
+    zdir = _cell(out, task, "transfer_zeroshot", "double_line", baseline)
     rec = json.loads((zdir / "run_record.json").read_text())
     assert rec["attestation"]["fit_on"].startswith("none")  # never trained on the target
     assert rec["normalize"] == "per_window"
@@ -126,7 +133,7 @@ def test_pretrain_then_zeroshot_and_finetune_roundtrip(fixture_root, transfer_sp
         "--task", task, "--protocol", "transfer_finetune", "--grid", "double_line",
         "--pretrain-grid", "template_20kv", *common,
     ])  # fmt: skip
-    fdir = _cell(out, task, "transfer_finetune", "double_line")
+    fdir = _cell(out, task, "transfer_finetune", "double_line", baseline)
     frec = json.loads((fdir / "run_record.json").read_text())
     assert "adapt_grid" in frec["attestation"]["fit_on"]
     assert frec["attestation"]["pretrained_from"] is not None

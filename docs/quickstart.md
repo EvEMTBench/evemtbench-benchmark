@@ -73,7 +73,7 @@ There are four protocols (`src/evemtbench/splits/protocols.py`):
 
 `held_out` covers all 24 tasks and every applicable baseline; the three pre-training/transfer protocols run
 only on the portable `local`/`line` task variants and only with the deep baselines
-(`mlp`, `gru`, `cnn`, `resnet`), and each transfer cell is scored once per pre-training source.
+(`mlp`, `gru`, `cnn`, `resnet`, `tst`), and each transfer cell is scored once per pre-training source.
 The runner fits once and evaluates every applicable test set, writing one `result.json` per
 `test_set`. Splits are committed under `src/evemtbench/splits/` and are the source of truth (see
 [versioning.md](versioning.md)): `splits/v1.0/held_out/` for `held_out` (the transfer protocols

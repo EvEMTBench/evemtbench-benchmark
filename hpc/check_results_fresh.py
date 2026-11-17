@@ -35,7 +35,6 @@ import argparse
 import difflib
 import json
 import os
-import re
 import subprocess
 import sys
 from pathlib import Path
@@ -53,12 +52,9 @@ def _repo() -> Path:
 
 
 # The only non-deterministic line in the HTML views: the render timestamp (leaderboard) /
-# timestamp + build sha (audit). Strip it before diffing.
-_VOLATILE = re.compile(r"<div class=v>updated [^<]*</div>")
-
-
-def _normalize(text: str) -> str:
-    return _VOLATILE.sub("", text)
+# timestamp + build sha (audit). Strip it before diffing. Single source with the view writer
+# (evemtbench._io.write_view_if_changed), which ignores the same line when deciding to rewrite.
+from evemtbench._io import normalize_view as _normalize  # noqa: E402
 
 
 class _Views:
@@ -111,10 +107,16 @@ def _fresh_results() -> str:
 
 
 def _fresh_leaderboard() -> str:
-    from evemtbench.leaderboard import _bibtex_from_cff, render_html, scan_results
+    from evemtbench.leaderboard import (
+        _bibtex_from_cff,
+        render_html,
+        scan_results,
+        scan_submissions,
+    )
     from evemtbench.version import BENCHMARK_VERSION
 
-    rows = scan_results("outputs")
+    # the same inputs as `evemtbench-leaderboard` defaults: outputs/ + committed submissions/
+    rows = scan_results("outputs") + scan_submissions(_repo() / "submissions")
     # generated_at=None => no timestamp line: the comparison is against deterministic content.
     return render_html(
         rows, version=BENCHMARK_VERSION, generated_at=None, citation=_bibtex_from_cff()
@@ -175,10 +177,10 @@ def _paper_fragment_checks(repo: Path) -> list[tuple[str, Path, str]]:
         **build_supplement_tables(),
         **build_transfer_tables(),
         **build_spec_tables(),
-        # SI evidence tables derived from committed repo artefacts only. The three DATASET_BACKED
-        # fragments (EC support, ED negative composition, current-scale) need the mounted dataset,
-        # so they are gated by `make check-supp-artifacts-dataset` on a machine that has it rather
-        # than by this commit-time hook.
+        # SI evidence tables derived from committed repo artefacts only. The DATASET_BACKED
+        # fragments (EC support, ED negative composition, current-scale, locator breakdown) need
+        # the mounted dataset, so they are gated by `make check-supp-artifacts-dataset` on a
+        # machine that has it rather than by this commit-time hook.
         **dataset_free_artifacts(),
     }
     return [
@@ -279,7 +281,10 @@ def main(argv: list[str] | None = None) -> int:
 
         (repo / "RESULTS.md").write_text(_fresh_results())
         (repo / "coverage_snapshot.json").write_text(_fresh_snapshot())
-        lb_main(["--outputs", "outputs", "--out", "leaderboard.html"])  # writes WITH a timestamp
+        lb_main(  # writes WITH a timestamp
+            ["--outputs", "outputs", "--out", "leaderboard.html",
+             "--submissions", str(repo / "submissions")]
+        )  # fmt: skip
         audit_main(["--outputs", "outputs", "--out", str(audit_dir)])  # ditto (ts + git sha)
         # paper fragments BEFORE the bundle: results/<version>/tables/ copies them from disk, so the
         # reverse order left the bundle one regeneration behind (a second --fix was needed)

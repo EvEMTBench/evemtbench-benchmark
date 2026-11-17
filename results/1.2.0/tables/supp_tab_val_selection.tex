@@ -1,0 +1,43 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_val_selection.py
+% Benchmark: EvEMTBench v1.2.0
+% Inputs:
+%   outputs/1.0.0/{fault_detection,fault_classification,fault_location}_{local,line,global}/held_out/<grid>/<baseline>/val/result.json
+%   outputs/1.0.0/{event_detection,event_classification}_global/held_out/<grid>/<baseline>/val/result.json
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{4.5pt}
+\caption{Validation-split selection audit: the headline score \emph{and identity} (in parentheses) of the validation-selected reference baseline that drives the model selection reported in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, per primary function, grid, and observability view. Each cell is the winner's validation mean\,$\pm$\,95\% CI over five seeds; its held-out \emph{test} and \emph{benchmark} values are in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, and the competing baselines' held-out values are in the S2 per-baseline tables. Arrows give the metric direction (balanced accuracy $\uparrow$; \acs{mae}\,\% $\downarrow$ for \ac{fl}). \notapp{}~= not defined for this view (the global-only event-scope functions \ac{ed}/\ac{ec} at \emph{local}/\emph{line}).}
+\label{tab:supp_val_selection}
+\begin{tabular}{ll ccc}
+\toprule
+\textbf{Function} & \textbf{Grid} & \textbf{local} & \textbf{line} & \textbf{global} \\
+\midrule
+\multirow{4}{*}{\ac{fd} $\uparrow$} & CIGR\'E MV (20\,kV)      & 0.888 $\pm$ 0.007 (\acs{tst}) & 0.845 $\pm$ 0.001 (\acs{rf}) & 0.889 $\pm$ 0.025 (\acs{tst}) \\
+                               & Double Line (110\,kV)    & 0.889 $\pm$ 0.001 (\acs{rf}) & 0.909 $\pm$ 0.054 (\acs{resnet}) & 0.898 $\pm{<}0.001$ (\acs{rf}) \\
+                               & Prot.\ Ref.\ (110\,kV)   & 0.952 $\pm$ 0.015 (\acs{resnet}) & 0.914 $\pm$ 0.033 (\acs{resnet}) & 0.927 $\pm$ 0.052 (\acs{tst}) \\
+                               & IEEE 39-Bus (345\,kV)    & 0.940 $\pm{<}0.001$ (\acs{rf}) & 0.947 $\pm$ 0.017 (\acs{tst}) & 0.936 $\pm$ 0.001 (\acs{rf}) \\
+\midrule
+\multirow{4}{*}{\ac{fc} $\uparrow$} & CIGR\'E MV (20\,kV)      & 0.676 $\pm$ 0.006 (\acs{resnet}) & 0.680 $\pm$ 0.008 (\acs{resnet}) & 0.532 $\pm$ 0.025 (\acs{tst}) \\
+                               & Double Line (110\,kV)    & 0.852 $\pm$ 0.009 (\acs{resnet}) & 0.858 $\pm$ 0.007 (\acs{resnet}) & 0.825 $\pm$ 0.094 (\acs{resnet}) \\
+                               & Prot.\ Ref.\ (110\,kV)   & 0.831 $\pm$ 0.013 (\acs{resnet}) & 0.809 $\pm$ 0.028 (\acs{resnet}) & 0.764 $\pm$ 0.110 (\acs{resnet}) \\
+                               & IEEE 39-Bus (345\,kV)    & 0.683 $\pm$ 0.005 (\acs{gru}) & 0.693 $\pm$ 0.010 (\acs{resnet}) & 0.696 $\pm$ 0.006 (\acs{rf}) \\
+\midrule
+\multirow{4}{*}{\ac{fl}\,\% $\downarrow$} & CIGR\'E MV (20\,kV)      & 23.921 $\pm$ 0.157 (\acs{cnn}) & 18.747 $\pm$ 1.324 (\acs{resnet}) & 15.422 $\pm$ 0.242 (\acs{tst}) \\
+                               & Double Line (110\,kV)    & 11.823 $\pm$ 0.680 (\acs{tst}) & 7.879 $\pm$ 1.058 (\acs{tst}) & 6.640 $\pm$ 1.447 (\acs{tst}) \\
+                               & Prot.\ Ref.\ (110\,kV)   & 12.075 $\pm$ 0.179 (\acs{gru}) & 6.889 $\pm$ 1.035 (\acs{tst}) & 6.300 $\pm$ 0.918 (\acs{tst}) \\
+                               & IEEE 39-Bus (345\,kV)    & 18.605 $\pm$ 0.196 (\acs{gru}) & 9.188 $\pm$ 0.527 (\acs{tst}) & 12.295 $\pm$ 0.375 (\acs{tst}) \\
+\midrule
+\multirow{4}{*}{\ac{ed} $\uparrow$} & CIGR\'E MV (20\,kV)      & \notapp & \notapp & 0.888 $\pm$ 0.019 (\acs{resnet}) \\
+                               & Double Line (110\,kV)    & \notapp & \notapp & 0.918 $\pm$ 0.002 (\acs{tst}) \\
+                               & Prot.\ Ref.\ (110\,kV)   & \notapp & \notapp & 0.881 $\pm$ 0.048 (\acs{gru}) \\
+                               & IEEE 39-Bus (345\,kV)    & \notapp & \notapp & 0.934 $\pm$ 0.001 (\acs{rf}) \\
+\midrule
+\multirow{4}{*}{\ac{ec} $\uparrow$} & CIGR\'E MV (20\,kV)      & \notapp & \notapp & 0.646 $\pm$ 0.008 (\acs{gru}) \\
+                               & Double Line (110\,kV)    & \notapp & \notapp & 0.766 $\pm$ 0.004 (\acs{resnet}) \\
+                               & Prot.\ Ref.\ (110\,kV)   & \notapp & \notapp & 0.777 $\pm$ 0.002 (\acs{resnet}) \\
+                               & IEEE 39-Bus (345\,kV)    & \notapp & \notapp & 0.774 $\pm$ 0.003 (\acs{rf}) \\
+\bottomrule
+\end{tabular}
+\end{table*}

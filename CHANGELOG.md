@@ -4,6 +4,248 @@ Benchmark-contract versions (see [docs/versioning.md](docs/versioning.md)). The 
 in `evemtbench.version` is stamped into every result; a **major** bump means scores are not
 comparable across versions.
 
+## 1.3.0 — faulted phase of `flt_1phg_hif_w_arc` restored by a label patch (scoped revision, by cell)
+
+- **The defect.** In the 1.x windows (`W0p050_S0p005`) every fault-active window of the
+  high-impedance single-phase-to-ground fault with arc (`flt_1phg_hif_w_arc`) carries
+  `y_phase_A = y_phase_B = y_phase_C = 0`, so the `fault_phase` valid-sample rule (at least one
+  phase bit) dropped the whole class from training, validation selection and the test scores. The
+  producer's one-phase rule (`psp_helper` `windows_helper._phases_from_select`) lists every other
+  `flt_1phg*` type but not this one, and an unknown type silently falls through to "no phase".
+  Affected, and nothing else (no other type, grid or family has a fault-active window without a
+  phase bit):
+
+  | partition | windows | episodes |
+  |---|--:|--:|
+  | CIGRE MV `adapt_grid` | 7,752 | 456 |
+  | CIGRE MV `benchmark` | 1,392 | 87 |
+  | `multi_grid` Template20kV (line view) | 4,318 | 254 line episodes |
+
+  The source label `events/event_phase_select_1ph` names exactly one phase for every one of these
+  episodes, and for every other fault type the window bits equal the source label on 100 % of
+  episodes (`docs/known_issues.md` §4).
+- **The fix: a committed label patch, not a re-window.** The windows (X, y parquet, manifests),
+  splits, window contract and label rules are unchanged. `src/evemtbench/data/label_patches/`
+  holds patch **LP-1**: an episode-keyed CSV (797 rows: grid, family, `sample_id`, the source
+  selector and the three phase bits; a/b/c -> A/B/C, the producer's rule for the other 1phg types)
+  and `index.json`, which pins the CSV sha256 and, per partition, the `manifest_sha256` it applies
+  to, the episode count and the number of patched windows. `hpc/build_label_patch.py` builds both
+  deterministically from the 1.x source labels (aux `settings_clean.csv` for CIGRE MV, the
+  archive's `Template20kV/labels/settings_clean.csv` for the multi_grid corpus) and writes an audit
+  table. `load_task` applies it only to `fault_phase` tasks, only for a v1.3.0 cell, and only on
+  the exact partition it was built for; any target that is not a fault-active, phase-less window
+  of the type, a count that differs from the pin, or an edited CSV raises `LabelPatchError`.
+- **Valid samples gained** (fault-active windows that are `fault_phase`-valid):
+
+  | grid / split | before | after | added |
+  |---|--:|--:|--:|
+  | CIGRE MV `adapt_grid` train / val / test | 45,275 / 9,671 / 9,671 | 50,698 / 10,827 / 10,844 | +12.0 % / +12.0 % / +12.1 % |
+  | CIGRE MV `benchmark` | 67,212 | 68,604 | +2.1 % |
+  | Template20kV train / val / test | 21,480 / 4,183 / 4,353 | 24,489 / 4,863 / 4,982 | +14.0 % / +16.3 % / +14.4 % |
+
+  The restored windows fall into the single-phase classes A, B and C.
+- **Scope of invalidation (per cell).** `results_version(protocol, task, *, grid=..., source=...)`
+  returns `1.3.0` for exactly the 151 `fault_phase` cells that read a repaired label (755 seed
+  runs), which are re-run into `outputs/1.3.0/`:
+  - `held_out` on cigre_mv, `fault_phase_{local,line,global}` (21 cells);
+  - `multi_grid_pretrain` on template_20kv, `fault_phase_{local,line}` (10);
+  - `transfer_zeroshot` and `transfer_finetune`, `fault_phase_{local,line}`, targeting cigre_mv
+    from every source (60) or targeting double_line / testgrid_110kv / ieee39 from the
+    template_20kv source, whose source models were trained without the class (60).
+
+  The other 203 `fault_phase` cells and every other task keep their trees and stamps (1.0.0 /
+  1.1.0 / 1.2.0) and are not re-run. For a `fault_phase` task `results_version` raises without
+  `grid`, so no caller can resolve the wrong tree. `CURRENT_RESULTS_VERSIONS` gains `1.3.0`; every
+  reader of `outputs/` resolves a row's tree from its task, protocol, grid and source
+  (`coverage.cell_results_version` / `cell_from_key`).
+- **Re-evaluation stays exact.** The patch is off for any record stamped before 1.3.0, so the
+  1.0.0 / 1.1.0 records re-evaluate on the labels they were computed with.
+- **Provenance.** `task.provenance["label_patches"]` (patch id, CSV sha256, grid, family,
+  manifest, episodes, patched windows) lands in `run_record.json["data"]` (schema: optional
+  `data.label_patches`). `integrity` checks that every v1.3.0 `fault_phase` record carries exactly
+  the patches its partitions call for (and older records none) and that the CSV matches its pin;
+  `reevaluate` adds the patch list to its provenance-equality control.
+- **Unchanged:** the projection cache (`DATA_CACHE_VERSION` stays `1.1.0`; the larger views get new
+  content-addressed files), `input_digests.json`, the splits, `contract/contract.json`,
+  `tasks/labels/fault_phase.py`, `tasks/valid_samples.py`.
+- `coverage_snapshot.json`: every cell row carries its `results_version`; the `fault_phase` tasks
+  are not listed in `results_versions_by_task` (their version depends on the cell).
+- `evemtbench-evaluate` and `load_task` gain `pretrain_grid` (the transfer source, part of the
+  per-cell version); `load_task` gains `label_patches` (None = resolved from the cell's version).
+- Also documented, not fixed in 1.x: `multi_grid` switching and busbar-fault episodes appear only
+  as `no_event` windows (`docs/known_issues.md` §5).
+
+**Why:** a derived label changed for one task family on two grids, so the comparability of exactly
+the cells that read it is invalidated (versioning policy, scoped revision). Repairing the labels
+through a committed, pinned overlay keeps the windows byte-identical, keeps every older result
+reproducible, and makes the repair reviewable in one small file; the producer is fixed for 2.0,
+which deletes the overlay.
+
+## Unreleased — conventional fault-locator baseline `impedance` (additive; no contract change)
+
+A physical reference for the fault-location (FL) tasks, in answer to the review request for an
+established fault-localisation method (EXP-06). No task, split, metric, valid-sample rule or
+`result.json` field changes, and no existing result is re-scored.
+
+- **The baseline.** `baselines/impedance.py` (signal layer `baselines/_phasor.py`): full-cycle DFT
+  phasors on the last complete cycle of a window; the one-terminal reactance method at `local`
+  (current-magnitude phase selector, zero-sequence compensation on ground loops) and the
+  two-terminal positive-sequence method at `line`. Deterministic, nothing is learned. `global` is
+  not applicable. See [docs/baselines.md](docs/baselines.md).
+- **Inputs.** The line's series impedance and length come from the grid topology graph (aux
+  overlay, `adapt_grid` family, the only one with a graph for all four reference grids), looked up
+  by `y_fault_line`, the oracle the `local`/`line` views are already centred on. The baseline is
+  the first to need the aux overlay at run time; `hpc/sweep.sh` now exports `EVEMTBENCH_AUX_ROOT`
+  next to the source data root, because the staged data root has no such sibling.
+- **No calibration by default.** The channels carry primary-level values, so the
+  secondary-to-primary impedance scale is 1. `impedance_scale` remains an explicit parameter (a
+  known VT/CT ratio, or `"fit"` on `train` only). The scale used, the line-parameter source, the
+  nominal frequency, the measured voltage level and the lines with one measured terminal are
+  written to the new, additive `run_record.json["calibration"]` field (present only for baselines
+  that expose `calibration_`; older records stay valid).
+- **Scope and registration.** `coverage.baseline_applies`: FL at `local` and `line`, `held_out`
+  only, on the four reference grids (8 new cells). It is listed in the new
+  `coverage.CONVENTIONAL_BASELINES` next to `threshold` and is not in `LEARNED_BASELINES`, so it
+  is outside the validation-selected reference pool and the floor gate's dominance check.
+  `TaskView.feature_axes()` is a new read-only accessor (which terminals a view measures).
+- **Reported, not guessed.** A line without usable parameters stops the run with the reason. The
+  one-ended CIGRE MV line 8-14 ([docs/known_issues.md](docs/known_issues.md) §1) falls back to the
+  one-terminal method in the `line` view and is mirrored to the label's reference end.
+- **Views.** `RESULTS.md`, the audit site, `coverage_snapshot.json` and the completed-runs
+  overview enumerate the new baseline and need a rebuild once its cells have run. The manuscript
+  builders (`hpc/paper_artifacts/`) know its label and n/a rule but leave it out of the manuscript
+  baseline set until its place in the manuscript is decided, so every generated manuscript
+  artifact is unchanged.
+
+## Unreleased — transformer reference baseline `tst` (additive; no task, split or metric change)
+
+- **New deep baseline `tst`** (`baselines/tst.py`): the Time Series Transformer encoder of Zerveas
+  et al. (KDD 2021, arXiv:2010.02803), trained from scratch under the shared deep-baseline regime
+  (`baselines/_train.py`: AdamW, cosine schedule, validation early stopping, 5 seeds). Patch
+  embedding `Conv1d(C, 128, kernel 16, stride 8)` (59 tokens for the 480-sample window), learnable
+  positional encoding, 3 encoder blocks (`d_model` 128, 8 heads, feed-forward 256, GELU, dropout
+  0.1, batch normalisation in place of layer normalisation), linear head on the concatenated token
+  outputs. The configuration is fixed a priori; nothing is tuned on `test` or `benchmark`.
+- **Deviations from the published model:** the strided patch embedding (the source makes one token
+  per time step), 8 attention heads (the source's generic configuration has 16), and a LayerNorm on
+  the patch tokens after the `sqrt(d_model)`-scaled projection. The first sweep without the token
+  norm diverged to NaN on the wide `global` views (27 seeds in 11 cells) and stopped early on every
+  view; gradient clipping did not prevent it. Those outputs are archived and every `tst` cell was
+  re-run with the token norm (issue #26). The shared
+  optimiser and batch size are kept in place of the source repository's RAdam / batch 128.
+- **Scope.** `tst` is appended to `coverage.ALL_BASELINES`, `LEARNED_BASELINES` and
+  `DEEP_BASELINES`, so it applies to all 24 tasks under `held_out` and to the pre-training and
+  transfer protocols, and it joins the validation-selection pool behind the headline tables. It is
+  last in every tuple, so no tie-break among the existing baselines changes. The sweep defaults
+  (`hpc/submit.sh`, `hpc/sweep.sh`, the loop and the campaign scripts) and the table, figure and
+  audit builders enumerate it; the per-baseline SI tables gain a column.
+- Existing results are untouched. The committed derived views (`RESULTS.md`, the leaderboard, the
+  audit site, `coverage_snapshot.json`, `results/<version>/`, the generated paper tables) have to
+  be regenerated once, because they enumerate baselines.
+
+## Unreleased — run-machinery hardening (tooling only; no contract change)
+
+Adapted from akmaier/Agent4CT (see `docs/EXTERNAL_REPOSITORY_REVIEW.md` §4). No task, split,
+metric or `result.json` field changes, and no result is re-scored.
+
+- **Installable package (roadmap W3).** `hpc/check_wheel.sh` builds the wheel and installs it into
+  a fresh venv. It then checks that the package data is in the wheel (committed splits, contract,
+  input digests, schemas, `py.typed`) and that no repo-only files are. Finally, from an empty
+  directory, it confirms that the installed package reads a committed split and that
+  `evemtbench-evaluate --self-test` passes.
+
+  Both CIs run it in `--clean` mode, which installs the declared dependencies from PyPI and so
+  proves that dependency list sufficient. `tests/unit/test_package_data.py` fails when a new data
+  file under `src/evemtbench/` is missing from `package-data`. `pyproject.toml` gains trove
+  classifiers, and `docs/release.md` gains the PyPI step. Nothing is uploaded yet; publishing is
+  the owner's call.
+
+- **Failure records + retry cap.** The runner keeps `failure.json` in a cell's directory while a
+  run is in flight. A crash closes it with the stage (`load`, `fit (seed n)`, `predict …`, …), the
+  exception type and the traceback tail; SIGTERM (the SLURM time limit) is recorded the same way.
+  A run that never closes its attempt (SIGKILL, OOM) reads as "no clean exit". Success deletes
+  the file. `coverage --emit-pending`/`--emit-failed` skip cells with ≥ `--max-attempts`
+  (default 3) failed attempts, `coverage --summary` groups not-done cells by failure reason, and
+  `coverage --failures` lists them (`evemtbench.failures`). Failures are operational state: no
+  builder reads them, and they are not part of `coverage_snapshot.json`.
+- **Atomic run artifacts.** `result.json`, `run_record.json`, `predictions_seed*.parquet` and
+  `failure.json` are written to a temporary sibling and renamed into place. `run_record.json` is
+  now written **before** the `result.json` files, so a cell can no longer read as `done` without
+  its run record.
+- **Working-tree state in `run_record.json`.** New fields `git_dirty` and `git_diff_sha256`
+  (SHA-256 of `git diff HEAD` when dirty; `null` when git is unavailable). They are additive, and
+  older records stay valid.
+- **Byte-identical view rebuilds.** `evemtbench-leaderboard` and `hpc/make_audit.py` leave a page
+  untouched when only its `updated <ts>[ · git <sha>]` line would change
+  (`evemtbench._io.write_view_if_changed`). A rebuild without a data change no longer rewrites
+  every audit page. The freshness gate and the writer share one normaliser.
+- `hpc/autonomous_loop.sh` reads the pending count from the line whose first field is `pending`
+  (not any line containing the word).
+- **Validation-selection reliability diagnostic.** A new section on `audit/robustness.html`
+  grades the validation-selected baseline after the fact, per (task, grid) under `held_out`. It
+  reports whether the pick is also best on `test` and `benchmark`, its regret (median and max, in
+  metric units), and Kendall τ-b between the validation and held-out rankings
+  (`evemtbench.evaluation.selection`; adapted from Agent4CT's board rank-correlation check). It
+  is a diagnostic only: selection is unchanged.
+
+- **Outside submissions (roadmap W4).** The new `submissions/<model>/` directory holds
+  `metadata.json` plus `result.json` files in the runner's schema. `evemtbench-validate-submission`
+  (`evemtbench.submission`) checks a submission without the dataset:
+  - the metadata, including no declared tuning on or training with held-out data;
+  - that every cell exists and applies to its grid;
+  - at least 3 seeds and the official metric set;
+  - that `aggregate` recomputes from `per_seed`;
+  - value ranges;
+  - `n_test` against the committed results bundle;
+  - `full`-track completeness;
+  - the run-record attestation, when one is included.
+
+  CI validates every committed submission. The leaderboard lists valid submissions next to the
+  reference baselines with a *self-reported* or *reproduced* badge, and keeps them out of the
+  in-house coverage cards and the validation-selected transfer table. Documented in
+  `docs/submission.md` §6.
+
+- **Single-class binary breakdown warning (CODE-02).** For a binary task, `evaluate` now emits
+  one `SingleClassBinaryBreakdownWarning` listing every breakdown group whose true labels hold a
+  single class, where binary `macro_f1` depends on whether the absent class is ever predicted
+  (`docs/known_issues.md` §3, which also now says which metrics to read there per task). No
+  returned or stored value changes.
+
+## 1.2.0 — fault-location valid samples restricted to line faults (scoped revision)
+
+- **The defect.** The fault-location (FL) target is the distance along the faulted *line*. The
+  v1.0/v1.1 valid-sample gate was "fault-active window with a non-null `y_fault_location`". In the
+  `adapt_grid` family the producer also fills a location for **bus-target** fault episodes
+  (`y_fault_line` = `MainBus*`), a value that is no position on any line, so those windows were
+  trained on, used for validation selection and scored on the in-distribution `test` set
+  (`docs/known_issues.md` §2 gives the measured share per grid). In the `benchmark` family
+  bus-target locations are NaN, and the `multi_grid` corpora have no bus-target window in the
+  gate, so neither was affected directly.
+- **The fix.** The gate adds the missing condition: `y_fault_line` names a line (`MainLn*`)
+  (`tasks/valid_samples.py`). `line_target_fault_location_mask`, formerly the opt-in line-only
+  diagnostic, is kept as an alias of the gate.
+- **Scope of invalidation (per-task versioning).** The FL tasks' `held_out`, `transfer_zeroshot`
+  and `transfer_finetune` results are re-run under the corrected gate into `outputs/1.2.0/` — NOT
+  comparable to their 1.0.0 / 1.1.0 counterparts (retained: `outputs/1.0.0/`, `outputs/1.1.0/`
+  and the frozen `results/1.0.0/` / `results/1.1.0/` bundles). The FL `multi_grid_pretrain` source
+  models are unaffected (same samples) and stay current in `outputs/1.1.0/`. Every other task is
+  byte-identical under v1.2.0: its `held_out` results stay in `outputs/1.0.0/`, its
+  pretrain/transfer results in `outputs/1.1.0/`, with their original stamps.
+  `evemtbench.version.results_version(protocol, task)` encodes the mapping (it gained the `task`
+  argument), and `CURRENT_RESULTS_VERSIONS` lists the three trees; every reader of `outputs/`
+  resolves a row's tree from its protocol and task, so a superseded FL row in an older tree is
+  never reported as current.
+- **Projection cache unchanged.** The persistent cache root is keyed by the new
+  `evemtbench.version.DATA_CACHE_VERSION` (still `1.1.0`) instead of `BENCHMARK_VERSION`: the
+  inputs are unchanged, so the revision must not relocate the cache. The narrower FL views get
+  new content-addressed files next to the existing ones.
+- `coverage_snapshot.json` gains `results_versions_by_task`, the `<task>/<protocol>` pairs whose
+  tree differs from the protocol default in `results_versions`.
+
+**Why:** a valid-sample rule is a frozen artifact, and changing it invalidates comparability for
+the tasks it selects samples for (versioning policy). Bus-target windows carried a target the task
+does not define, in training, in validation selection and in the in-distribution test score.
+
 ## 1.1.0 — corrected (topology-grouped) multi_grid source-corpus splits (scoped revision)
 
 - **The defect.** A `multi_grid` episode is one *line* of one simulation (`sample_id =

@@ -1,0 +1,33 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_ed_negative_support.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   src/evemtbench/splits/v1.0/held_out/<grid>/{test,benchmark}.txt
+%   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/y_*.parquet  (released dataset)
+%   src/evemtbench/tasks/labels/event_detection.py  (frozen ED label deriver)
+\begin{table*}[t]
+\centering
+\scriptsize
+\setlength{\tabcolsep}{2.0pt}
+\caption{Composition of the \ac{ed} evaluation sets, in \emph{windows}. \ac{ed} scores every window: a window is positive iff it overlaps an active fault or switching event, and every other window is negative. Negatives are decomposed twice --- by position relative to the episode's active block (\emph{pre-event} / \emph{post-event}, plus every window of a \emph{quiescent} episode that carries no event at all), and by the event family of the episode they come from. This quantifies the change in negative-class composition between evaluation families discussed in Methods. At \texttt{v1.1.0} no reference-grid family contains dedicated quiescent episodes, so that column is structurally zero on every row; the composition shift is instead a shift in \emph{episode mix} --- $67$--$71\%$ of the in-distribution negatives come from benign switching episodes, against only $4$--$6\%$ in the \texttt{eval\_grid} family, which is almost entirely fault episodes --- and in the pre-/post-event balance. By construction pre\,+\,post\,+\,quiescent\,=\,fault-episode\,+\,switching-episode\,+\,quiescent\,=\,all negatives, and positives\,+\,negatives\,=\,total; the artefact checker asserts both. Derived from the committed partitions and the released window labels with the benchmark's frozen \ac{ed} label deriver.}
+\label{tab:supp_ed_negative_support}
+\begin{tabular}{ll r rrr rr rr r}
+\toprule
+ & & & \multicolumn{3}{c}{\textbf{Negatives by position}} & \multicolumn{2}{c}{\textbf{Negatives by episode family}} & & & \\
+\cmidrule(lr){4-6}\cmidrule(lr){7-8}
+\textbf{Grid} & \textbf{Family} & \textbf{positive} & \textbf{pre} & \textbf{post} & \textbf{quiesc.} & \textbf{fault ep.} & \textbf{switch.\ ep.} & \textbf{all neg.} & \textbf{total} & \textbf{neg./total (\%)} \\
+\midrule
+CIGR\'E MV (20\,kV) & \texttt{adapt\_grid} test & 20,040 & 8,916 & 5,222 & 0 & 4,106 & 10,032 & 14,138 & 34,178 & 41.4 \\
+CIGR\'E MV (20\,kV) & \texttt{eval\_grid} & 70,164 & 31,563 & 1,980 & 0 & 31,515 & 2,028 & 33,543 & 103,707 & 32.3 \\
+\midrule
+Double Line (110\,kV) & \texttt{adapt\_grid} test & 20,462 & 9,000 & 5,038 & 0 & 4,450 & 9,588 & 14,038 & 34,500 & 40.7 \\
+Double Line (110\,kV) & \texttt{eval\_grid} & 17,220 & 7,707 & 396 & 0 & 7,791 & 312 & 8,103 & 25,323 & 32.0 \\
+\midrule
+Prot.\ Ref.\ (110\,kV) & \texttt{adapt\_grid} test & 19,712 & 8,784 & 5,176 & 0 & 4,060 & 9,900 & 13,960 & 33,672 & 41.5 \\
+Prot.\ Ref.\ (110\,kV) & \texttt{eval\_grid} & 38,120 & 17,045 & 840 & 0 & 17,235 & 650 & 17,885 & 56,005 & 31.9 \\
+\midrule
+IEEE 39-Bus (345\,kV) & \texttt{adapt\_grid} test & 20,530 & 9,018 & 5,021 & 0 & 4,655 & 9,384 & 14,039 & 34,569 & 40.6 \\
+IEEE 39-Bus (345\,kV) & \texttt{eval\_grid} & 151,830 & 67,956 & 3,498 & 0 & 68,789 & 2,665 & 71,454 & 223,284 & 32.0 \\
+\bottomrule
+\end{tabular}
+\end{table*}

@@ -18,6 +18,7 @@ from __future__ import annotations
 import argparse
 import hashlib
 import html
+import importlib
 import json
 import re
 import string
@@ -42,6 +43,8 @@ from evemtbench.coverage import (
     TRANSFER_PROTOCOLS,
     Cell,
     _arg_line,
+    cell_from_key,
+    cell_results_version,
     check_floor,
     expected_test_sets,
     iter_cells,
@@ -49,6 +52,7 @@ from evemtbench.coverage import (
     scan,
 )
 from evemtbench.data.roots import GRIDS
+from evemtbench.evaluation import selection as SEL
 from evemtbench.evaluation.metrics import METRIC_DIRECTION
 from evemtbench.evaluation.significance import bootstrap_ci, ci95_halfwidth
 from evemtbench.leaderboard import (
@@ -68,8 +72,11 @@ from evemtbench.tasks.registry import get_task, list_tasks
 from evemtbench.version import (
     BENCHMARK_VERSION,
     CURRENT_RESULTS_VERSIONS,
+    FL_RESULTS_VERSION,
+    FP_RESULTS_VERSION,
     MULTI_GRID_SPLITS_VERSION,
     SPLITS_VERSION,
+    TRANSFER_RESULTS_VERSION,
     results_version,
 )
 
@@ -185,8 +192,10 @@ def collect_run_records(
     st = RunRecordStats()
     git_shas, lock_shas, pythons, torchs, hosts = set(), set(), set(), set(), set()
     # ``version=None`` (default) iterates every CURRENT results tree and keeps a record only if
-    # its protocol is current IN that tree (results_version(protocol) == tree version) — the
-    # superseded pretrain/transfer results still on disk under the older tree must not feed the
+    # its cell is current IN that tree (the cell's results_version == tree version, resolved per
+    # cell: task, protocol, grid, source) — the superseded results still on disk under an older
+    # tree (1.0.0 pretrain/transfer, pre-1.2.0 fault location, pre-1.3.0 patched fault_phase
+    # cells) must not feed the
     # audit. An explicit ``version`` reads that single tree unfiltered (historical inspection).
     for tree in (version,) if version is not None else CURRENT_RESULTS_VERSIONS:
         root = Path(outputs) / tree
@@ -196,14 +205,14 @@ def collect_run_records(
         _pins = VRE.parse_lock(_renv) if _renv.is_file() else {}
         for p in sorted(root.rglob("run_record.json")) if root.is_dir() else []:
             # Cell key relative to ITS tree root (<task>/<protocol>/<grid>/<baseline_tag>[...]):
-            # the current trees' cells are disjoint by protocol, so keys never collide.
+            # the current trees' cells are disjoint per cell, so keys never collide.
             try:
                 cell_key = str(p.parent.relative_to(root))
             except ValueError:
                 cell_key = None
             if version is None:
-                parts = (cell_key or "").split("/")
-                if len(parts) < 2 or results_version(parts[1]) != tree:
+                cell = cell_from_key(cell_key or "")
+                if cell is None or cell_results_version(cell) != tree:
                     continue
             try:
                 rec = json.loads(p.read_text())
@@ -295,14 +304,16 @@ def _reproduce_cmd(task: str, protocol: str, grid: str, cfg: dict) -> str:
 def _metrics_by_cell(rows: list[Row], version: str | None) -> dict[str, dict]:
     """cell key -> {test_set: {metric: {mean, std, ci95}}, "_n": {test_set: seeds}} from Rows.
 
-    Filtered to ``version`` (``None`` = each row's per-protocol CURRENT version,
-    ``results_version(r.protocol)``): cell keys carry no version segment, so without this a
+    Filtered to ``version`` (``None`` = each row's per-cell CURRENT version,
+    ``results_version(r.protocol, r.task, grid=r.grid, source=r.source)``): cell keys carry no
+    version segment, so without this a
     leftover result.json from a superseded version (``scan_results`` reads every version present)
     could cross-attach its metrics to a same-keyed cell — the provenance index must carry only
     current numbers."""
     out: dict[str, dict] = {}
     for r in rows:
-        if r.version != (results_version(r.protocol) if version is None else version):
+        current = results_version(r.protocol, r.task, grid=r.grid, source=r.source)
+        if r.version != (current if version is None else version):
             continue
         ck = f"{r.task}/{r.protocol}/{r.grid}/{r.baseline}"
         if r.protocol in TRANSFER_PROTOCOLS and r.source and r.source != PRETRAIN_GRID:
@@ -386,9 +397,12 @@ def provenance_cells(
             continue
         cfg = dict(rec.get("args") or {})
         baseline_arg = cfg.get("baseline") or baseline_tag.split("+")[0]
-        # version=None => the cell's artifacts live in its protocol's CURRENT tree (held_out
-        # cells point into the frozen older tree, pretrain/transfer into the current one).
-        base = f"outputs/{results_version(protocol) if version is None else version}/{ck}"
+        # version=None => the cell's artifacts live in its CURRENT tree (held_out and
+        # pretrain/transfer cells point into their older trees, fault location into 1.2.0, the
+        # LP-1-patched fault_phase cells into 1.3.0).
+        _cell = cell_from_key(ck)
+        _tree = cell_results_version(_cell) if (version is None and _cell) else version
+        base = f"outputs/{_tree}/{ck}"
         cell_metrics = {k: v for k, v in mbc.get(ck, {}).items() if k != "_n"}
         n_by_ts = mbc.get(ck, {}).get("_n", {})
         ckpts = rec.get("checkpoints") or {}
@@ -842,7 +856,9 @@ def _page(active: str, title: str, body: str, *, generated_at: str | None) -> st
         f"<title>{_esc(title)}</title><style>{AUDIT_CSS}</style></head><body>"
         f"<header>{_nav(active)}<h1>{_esc(title)}</h1>"
         f"<div class=v>benchmark version {_esc(BENCHMARK_VERSION)} · held_out results "
-        f"v{_esc(results_version('held_out'))} · splits v{_esc(SPLITS_VERSION)}/held_out, "
+        f"v{_esc(results_version('held_out'))} (fault location v{_esc(FL_RESULTS_VERSION)}, "
+        f"faulted phase on cigre_mv v{_esc(FP_RESULTS_VERSION)}) · "
+        f"splits v{_esc(SPLITS_VERSION)}/held_out, "
         f"v{_esc(MULTI_GRID_SPLITS_VERSION)}/multi_grid</div>"
         f"{updated}</header>{body}{footer}<script>{SORT_JS}</script></body></html>"
     )
@@ -890,7 +906,10 @@ def _results_table(rows: list[Row], *, caption: str, prov: dict | None = None) -
     # must be a current number for its protocol so its trace strip resolves against the current
     # provenance index. See build_audit_pages for the rationale.
     held = [
-        r for r in rows if r.protocol == "held_out" and r.version == results_version("held_out")
+        r
+        for r in rows
+        if r.protocol == "held_out"
+        and r.version == results_version("held_out", r.task, grid=r.grid)
     ]
     keys = sorted(
         {(r.task, r.grid, r.baseline) for r in held},
@@ -1095,6 +1114,8 @@ def build_coverage(cov: CoverageView) -> str:
                             rule = (
                                 "transfer_deep_only"
                                 if proto.startswith("transfer")
+                                else "impedance_scope"
+                                if baseline == "impedance"
                                 else "threshold_scope"
                             )
                             title = f"{task} / {proto} / {grid} / {baseline} — N/A: {MAN.NA_REASONS[rule]}"
@@ -1182,20 +1203,30 @@ def build_environment(values: dict[str, str], records: RunRecordStats) -> str:
     )
     lock = _REPO / "requirements.lock"
     lock_sha = hashlib.sha256(lock.read_bytes()).hexdigest() if lock.exists() else "—"
-    # The held_out results keep their original lock; the pretrain/transfer re-scores get their
-    # own env/results-v<BENCHMARK_VERSION>.lock — list it only once it is captured (is_file()).
+    # The held_out results keep their original lock; each later results tree (the 1.1.0
+    # pretrain/transfer re-scores, the 1.2.0 fault-location re-runs) gets its own
+    # env/results-v<tree>.lock — list each only once it is captured (is_file()).
     held_v = results_version("held_out")
     renv = _REPO / "env" / f"results-v{held_v}.lock"
     renv_sha = hashlib.sha256(renv.read_bytes()).hexdigest() if renv.exists() else "—"
     cur_lock_li = ""
-    cur_renv = _REPO / "env" / f"results-v{BENCHMARK_VERSION}.lock"
-    if BENCHMARK_VERSION != held_v and cur_renv.is_file():
+    _lock_scope = {
+        TRANSFER_RESULTS_VERSION: "The environment for the pretrain/transfer re-scores under the "
+        "corrected multi_grid splits; the held_out results keep the lock above.",
+        FL_RESULTS_VERSION: "The environment for the fault-location re-runs under the corrected "
+        "(line-faults-only) valid-sample rule.",
+        FP_RESULTS_VERSION: "The environment for the faulted-phase re-runs with label patch LP-1 "
+        "(high-impedance-with-arc faults regain their faulted phase).",
+    }
+    for tree in CURRENT_RESULTS_VERSIONS:
+        cur_renv = _REPO / "env" / f"results-v{tree}.lock"
+        if tree == held_v or not cur_renv.is_file():
+            continue
         cur_sha = hashlib.sha256(cur_renv.read_bytes()).hexdigest()
-        cur_lock_li = (
-            f"<li><b>results environment (v{_esc(BENCHMARK_VERSION)} re-scores)</b> "
-            f"{_src(f'env/results-v{BENCHMARK_VERSION}.lock')} — sha256 <code>{_esc(cur_sha)}"
-            "</code>. The environment for the pretrain/transfer re-scores under the corrected "
-            "multi_grid splits; the held_out results keep the lock above.</li>"
+        cur_lock_li += (
+            f"<li><b>results environment (v{_esc(tree)} re-scores)</b> "
+            f"{_src(f'env/results-v{tree}.lock')} — sha256 <code>{_esc(cur_sha)}"
+            f"</code>. {_lock_scope.get(tree, '')}</li>"
         )
     fmt_list = lambda xs: _esc(", ".join(xs)) if xs else "— (none recorded yet)"  # noqa: E731
     recs = "".join(
@@ -1518,6 +1549,8 @@ def build_baseline_page(baseline: str, rows: list[Row], prov: dict | None = None
     scope = ""
     if baseline == "threshold":
         scope = f"<p class=v>Scope: {_esc(MAN.NA_REASONS['threshold_scope'])}.</p>"
+    elif baseline == "impedance":
+        scope = f"<p class=v>Scope: {_esc(MAN.NA_REASONS['impedance_scope'])}.</p>"
     elif baseline in ("majority", "random_forest"):
         scope = f"<p class=v>Note: {_esc(MAN.NA_REASONS['transfer_deep_only'])}.</p>"
     brows = [r for r in rows if r.baseline == baseline]
@@ -1537,12 +1570,18 @@ def build_baseline_page(baseline: str, rows: list[Row], prov: dict | None = None
 def collect_headline_seeds(outputs: str | Path = "outputs", *, version: str | None = None) -> dict:
     """task -> grid -> baseline -> per-seed headline values (held_out / test set), read straight
     from the committed result.json files (the leaderboard Row drops per_seed). Headline cells are
-    held_out, so ``version=None`` (default) resolves to that protocol's CURRENT results tree."""
+    held_out, so ``version=None`` (default) reads each task's CURRENT held_out tree (the
+    fault-location tasks' from the 1.2.0 tree, never their superseded 1.0.0 copies)."""
     data: dict = {}
-    root = Path(outputs) / (results_version("held_out") if version is None else version)
-    if not root.is_dir():
-        return data
-    for p in sorted(root.glob("*/held_out/*/*/test/result.json")):
+    trees = CURRENT_RESULTS_VERSIONS if version is None else (version,)
+    paths = [
+        p
+        for tree in trees
+        for p in sorted((Path(outputs) / tree).glob("*/held_out/*/*/test/result.json"))
+        # <tree>/<task>/held_out/<grid>/<baseline>/test/result.json -> the task dir is parts[-6]
+        if version is not None or results_version("held_out", p.parts[-6], grid=p.parts[-4]) == tree
+    ]
+    for p in paths:
         try:
             doc = json.loads(p.read_text())
         except (OSError, json.JSONDecodeError):
@@ -1646,6 +1685,101 @@ def build_robustness(seeds: dict) -> str:
         f"<div class=counts><div class=k><b>{n_stable}</b>of {n_scored} scored task headlines "
         "rank-stable under every scheme</div></div>" + "".join(sections)
     )
+
+
+def selection_diagnostics(rows: list[Row]) -> list[dict]:
+    """Per (task, grid) validation-selection diagnostics over the CURRENT held_out rows
+    (:mod:`evemtbench.evaluation.selection`), sorted by task tier, task and grid. A cell enters
+    only when it has validation re-scores (``hpc/rescore_validation.py``)."""
+    scores: dict[tuple[str, str], dict[str, dict[str, float]]] = {}
+    for r in rows:
+        if r.protocol != "held_out" or r.baseline not in LEARNED_BASELINES:
+            continue
+        if r.test_set not in ("val", *SEL.GRADED_SETS) or r.task not in list_tasks():
+            continue
+        v = r.mean(_headline_of(r.task))
+        if v is not None:
+            scores.setdefault((r.task, r.grid), {}).setdefault(r.test_set, {})[r.baseline] = v
+    out = []
+    for (task, grid), sc in sorted(
+        scores.items(),
+        key=lambda kv: (get_task(kv[0][0]).tier or 9, kv[0][0], _grid_sort_key(kv[0][1])),
+    ):
+        d = SEL.cell_diagnostic(sc, _headline_of(task), LEARNED_BASELINES)
+        if d is not None:
+            out.append({"task": task, "grid": grid, **d})
+    return out
+
+
+def build_selection_reliability(rows: list[Row]) -> str:
+    """The validation-selection reliability section of audit/robustness.html: does the baseline
+    chosen on validation stay the best on the held-out sets, and do the rankings agree?
+    Diagnostic only — the reported choice is never changed by it."""
+    diags = selection_diagnostics(rows)
+    head = (
+        "<h2 id=selection>Validation-selection reliability</h2>"
+        "<p>Every reported baseline is <b>chosen on the validation split</b>. This section grades "
+        "that choice <i>after the fact</i> on the held-out sets, and the grading never feeds back "
+        "into the choice. <b>Same winner</b>: the validation pick is also best on the "
+        "reported set. <b>Regret</b>: how far the pick falls short of the best baseline on that "
+        "set, in metric units (0 = no loss). <b>τ</b>: Kendall τ-b between two rankings of the "
+        "learned baselines. With five baselines τ is coarse, so read regret first. Adapted "
+        "from akmaier/Agent4CT's board rank-correlation check.</p>"
+    )
+    if not diags:
+        return head + "<p>No held_out cells with validation re-scores on disk yet.</p>"
+    summ = SEL.summarize(diags)
+
+    def _tau(t):
+        return "—" if t is None else f"{t:+.2f}"
+
+    counts = []
+    for ts in SEL.GRADED_SETS:
+        s = summ.get(ts)
+        if not s:
+            continue
+        reg = ", ".join(
+            f"{_esc(m)} {v:.3f} (max {s['max_regret'][m]:.3f})"
+            for m, v in s["median_regret"].items()
+        )
+        counts.append(
+            f"<div class=k><b>{s['n_same_winner']}</b>of {s['n_cells']} cells: validation pick "
+            f"is also best on <code>{ts}</code> · median regret {reg} · mean τ(val, {ts}) "
+            f"{_tau(s['mean_tau_val'])}</div>"
+        )
+    counts.append(
+        f"<div class=k><b>{_tau(summ['mean_tau_test_benchmark'])}</b>mean τ(test, benchmark) over "
+        f"{summ['n_tau_test_benchmark']} cells: does the in-distribution ranking carry over to "
+        "the cross-distribution family?</div>"
+    )
+    body = []
+    for d in diags:
+        cells = []
+        for ts in SEL.GRADED_SETS:
+            g = d["sets"].get(ts)
+            if g is None:
+                cells.append("<td>—</td><td>—</td><td>—</td>")
+                continue
+            best = (
+                '<span class="badge measured">same</span>' if g["same_winner"] else _esc(g["best"])
+            )
+            cells.append(f"<td>{best}</td><td>{g['regret']:.3f}</td><td>{_tau(g['tau_val'])}</td>")
+        body.append(
+            f'<tr><td><a href="t_{_esc(d["task"])}.html">{_esc(d["task"])}</a></td>'
+            f"<td>{_esc(d['grid'])}</td><td class=dim>{_esc(d['metric'])}</td>"
+            f"<td class=base>{_esc(d['selected'])}</td>{''.join(cells)}"
+            f"<td>{_tau(d['tau_test_benchmark'])}</td></tr>"
+        )
+    table = (
+        "<div class=tablewrap><table class=sortable><thead>"
+        "<tr><th rowspan=2>task</th><th rowspan=2>grid</th><th rowspan=2>metric</th>"
+        "<th rowspan=2>picked on val</th><th colspan=3>test</th><th colspan=3>benchmark</th>"
+        "<th rowspan=2>τ(test, benchmark)</th></tr>"
+        "<tr><th>best on set</th><th>regret</th><th>τ(val, set)</th>"
+        "<th>best on set</th><th>regret</th><th>τ(val, set)</th></tr>"
+        f"</thead><tbody>{''.join(body)}</tbody></table></div>"
+    )
+    return head + f"<div class=counts>{''.join(counts)}</div>" + table
 
 
 def build_ground_truth(values: dict[str, str], cov: CoverageView) -> str:
@@ -1763,6 +1897,9 @@ def build_paper_numbers(
     from make_paper_tables import GRID_ROWS, OBS, PAPER_FUNCTIONS, TEST_SETS, best_cell_choice
     from make_results import load_rows
 
+    # paper_lib is importable only once make_paper_tables has put hpc/paper_artifacts on sys.path.
+    _fmt_mean_ci = importlib.import_module("paper_lib")._fmt_mean_ci
+
     per_grid = {g: load_rows(g) for g, _ in GRID_ROWS}
     _TS = {"test": "in-distribution (test)", "benchmark": "never-trained (benchmark)"}
     n_numbers = 0
@@ -1787,7 +1924,11 @@ def build_paper_numbers(
                     n_numbers += 1
                     base = choice["baseline"]
                     mean, ci, n = choice["mean"], choice["ci"], choice["n_seeds"]
-                    val = f"{mean:.3f} ± {ci:.3f}" if ci is not None else f"{mean:.3f}"
+                    # The paper's own cell formatter, not a local "mean ± ci": a [0,1]-bounded
+                    # interval that overflows is printed clipped as "mean [lo, hi]" (F10) and a
+                    # sub-precision half-width as "±<0.001", so the page must render the same
+                    # digits or a paper number is untraceable here.
+                    val = _detex_num(_fmt_mean_ci(mean, ci, metric))
                     cell_key = f"{task_id}/held_out/{grid}/{base}"
                     prov_cell = (prov or {}).get(cell_key)
                     repro = (prov_cell or {}).get("reproduce", "")
@@ -1863,12 +2004,16 @@ def build_audit_pages(
     with ``build_provenance_index`` — ``fresh_views`` does; standalone callers may omit it."""
     # The audit is the provenance record of the CURRENT results. scan_results returns rows for
     # EVERY version present under outputs/ (superseded prior-version data may still be on disk), so
-    # keep only each protocol's current rows (results_version(protocol) — held_out stays at its
-    # frozen version, pretrain/transfer at BENCHMARK_VERSION) — otherwise a superseded number would
+    # keep only each cell's current rows (results_version(protocol, task) — held_out stays at its
+    # frozen version, pretrain/transfer at theirs, fault location at 1.2.0) — otherwise a superseded number would
     # be published on the audit site with no matching provenance/trace, contradicting the
     # traceability guarantee. Mirrors make_results / the coverage scan / the provenance index /
     # paper_numbers.
-    rows = [r for r in rows if r.version == results_version(r.protocol)]
+    rows = [
+        r
+        for r in rows
+        if r.version == results_version(r.protocol, r.task, grid=r.grid, source=r.source)
+    ]
     values = compute_values(rows, cov, records)
     prov = prov_cells if prov_cells is not None else provenance_cells(rows, records)
     headline_seeds = headline_seeds or {}
@@ -1887,7 +2032,9 @@ def build_audit_pages(
     add("provenance.html", "Provenance of the process", build_provenance())
     add("ground_truth.html", "Ground truth & grading", build_ground_truth(values, cov))
     add(
-        "robustness.html", "Robustness — alternative aggregations", build_robustness(headline_seeds)
+        "robustness.html",
+        "Robustness — alternative aggregations",
+        build_robustness(headline_seeds) + build_selection_reliability(rows),
     )
     for task in list_tasks():
         add(
@@ -1979,11 +2126,19 @@ def main(argv: list[str] | None = None) -> None:
     pages, prov = fresh_views(args.outputs, generated_at=stamp)  # one scan feeds both views
     out = Path(args.out)
     out.mkdir(parents=True, exist_ok=True)
+    from evemtbench._io import write_view_if_changed
+
+    written = 0
     for name, content in sorted({**pages, **prov}.items()):
         dest = out / name
         dest.parent.mkdir(parents=True, exist_ok=True)  # provenance/<version>/index.json is nested
-        dest.write_text(content)
-    print(f"wrote {len(pages)} pages + {len(prov)} provenance file(s) to {out}/ (updated {stamp})")
+        # a page whose content is unchanged apart from its "updated <ts> · git <sha>" line keeps
+        # its old bytes, so a rebuild without a data change leaves the tree byte-identical
+        written += write_view_if_changed(dest, content)
+    print(
+        f"wrote {written} of {len(pages)} pages + {len(prov)} provenance file(s) to {out}/ "
+        f"(changed files stamped {stamp}; unchanged files left as they were)"
+    )
 
 
 if __name__ == "__main__":

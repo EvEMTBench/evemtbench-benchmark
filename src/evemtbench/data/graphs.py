@@ -53,8 +53,9 @@ def load_grid_graph(
     tarballs by :mod:`evemtbench.data.extract_aux` and is as trusted as the dataset itself. It is
     NOT a safe reader for a third-party or user-supplied file — never point ``root`` at an untrusted
     directory, and do not accept a ``graph.pickle`` from a benchmark submission. The pickle format
-    is inherited from the upstream data generator; the graphs are only used for topology
-    summaries and reporting, never on the scoring path, so a submission never needs to supply one.
+    is inherited from the upstream data generator. The graphs are used for topology summaries and
+    reporting, and by one reference baseline (``baselines/impedance.py`` reads the line parameters
+    from it); the evaluation layer never reads them, so a submission never needs to supply one.
     """
     _require_networkx()  # needed to unpickle the nx graph object
     path = _graph_path(grid, family, root)

@@ -83,3 +83,42 @@ def test_macro_f1_supported_for_binary_single_class_truth():
     assert b["macro_f1_supported"] == pytest.approx(
         f1_score(y_true, y_pred, average="macro", labels=[0], zero_division=0)
     )
+
+
+# --- binary zero-denominator rates stay undefined (CODE-02 criterion 4) ---------------------------
+
+
+def test_binary_all_positive_subset_false_alarm_rate_is_nan_not_zero():
+    """No negatives (FP + TN = 0): false-alarm rate undefined, missed rate defined."""
+    for y_pred in ([1, 1, 1, 1], [1, 1, 1, 0]):
+        m = compute_binary_metrics(np.array([1, 1, 1, 1]), np.array(y_pred))
+        assert math.isnan(m["false_alarm_rate"])
+        assert math.isnan(m["balanced_accuracy"])  # single true class
+    one_missed = compute_binary_metrics(np.array([1, 1, 1, 1]), np.array([1, 1, 1, 0]))
+    assert one_missed["missed_fault_rate"] == pytest.approx(0.25)
+
+
+def test_binary_all_negative_subset_missed_rate_is_nan_not_zero():
+    """No positives (TP + FN = 0): missed rate undefined, false-alarm rate defined."""
+    for y_pred in ([0, 0, 0, 0], [0, 0, 0, 1]):
+        m = compute_binary_metrics(np.array([0, 0, 0, 0]), np.array(y_pred))
+        assert math.isnan(m["missed_fault_rate"])
+        assert math.isnan(m["balanced_accuracy"])
+    one_alarm = compute_binary_metrics(np.array([0, 0, 0, 0]), np.array([0, 0, 0, 1]))
+    assert one_alarm["false_alarm_rate"] == pytest.approx(0.25)
+
+
+def test_binary_event_named_rates_share_the_nan_contract():
+    """The event-detection names map to the same rates, so they are undefined in the same cases."""
+    names = ("missed_event_rate", "false_event_trip_rate")
+    pos = compute_binary_metrics(np.array([1, 1]), np.array([1, 0]), names)
+    neg = compute_binary_metrics(np.array([0, 0]), np.array([0, 1]), names)
+    assert pos["missed_event_rate"] == 0.5 and math.isnan(pos["false_event_trip_rate"])
+    assert math.isnan(neg["missed_event_rate"]) and neg["false_event_trip_rate"] == 0.5
+
+
+def test_binary_two_class_subset_defines_every_rate():
+    m = compute_binary_metrics(np.array([0, 1, 0, 1]), np.array([0, 1, 1, 1]))
+    for k in ("balanced_accuracy", "missed_fault_rate", "false_alarm_rate", "macro_f1"):
+        assert math.isfinite(m[k])
+    assert m["missed_fault_rate"] == 0.0 and m["false_alarm_rate"] == 0.5

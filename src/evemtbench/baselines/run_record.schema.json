@@ -1,7 +1,7 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "evemtbench/run_record.schema.json",
-  "title": "EvEMTBench run_record.json \u2014 per-cell provenance record",
+  "title": "EvEMTBench run_record.json — per-cell provenance record",
   "description": "Written by evemtbench.baselines.runner next to each cell's result.json. Required keys are the set every record in the corpus carries; 'normalize' (added mid-v0.2) and 'host'/'data'/'cuda_device' are optional so records written before provenance hardening still validate. Additive policy: new keys may appear (additionalProperties true); removing or renaming a required key is a breaking change.",
   "type": "object",
   "additionalProperties": true,
@@ -34,6 +34,21 @@
         "null"
       ],
       "pattern": "^[0-9a-f]{40}$"
+    },
+    "git_dirty": {
+      "type": [
+        "boolean",
+        "null"
+      ],
+      "description": "whether tracked files differed from git_sha when the run started (git diff HEAD non-empty); null when git was unavailable. Added after 1.1.0; absent in older records."
+    },
+    "git_diff_sha256": {
+      "type": [
+        "string",
+        "null"
+      ],
+      "pattern": "^[0-9a-f]{64}$",
+      "description": "sha256 of `git diff HEAD` when git_dirty is true, else null."
     },
     "lockfile_sha256": {
       "type": [
@@ -246,6 +261,39 @@
               "manifest_sha256": {
                 "type": "string",
                 "pattern": "^[0-9a-f]{64}$"
+              }
+            }
+          }
+        },
+        "label_patches": {
+          "type": "array",
+          "description": "Committed label patches applied by this load (evemtbench.data.label_patches; v1.3.0 on, fault_phase only). Absent or empty: none applied.",
+          "items": {
+            "type": "object",
+            "required": ["id", "sha256", "grid", "family", "manifest_sha256", "rows_patched"],
+            "properties": {
+              "id": {
+                "type": "string"
+              },
+              "sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "grid": {
+                "type": "string"
+              },
+              "family": {
+                "type": "string"
+              },
+              "manifest_sha256": {
+                "type": "string",
+                "pattern": "^[0-9a-f]{64}$"
+              },
+              "episodes": {
+                "type": "integer"
+              },
+              "rows_patched": {
+                "type": "integer"
               }
             }
           }

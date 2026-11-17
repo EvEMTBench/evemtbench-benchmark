@@ -87,7 +87,8 @@ golden-tested) — never from waveforms.
 | artifact | where | status |
 |---|---|---|
 | splits | `src/evemtbench/splits/v1.0/held_out/<grid>/` (held_out; transfer reuses it) · `src/evemtbench/splits/v1.1/multi_grid_pretrain/<grid>/` (pre-training; `version.splits_version`) | **committed, frozen** (regenerate bit-for-bit; changing = major bump) |
-| results (raw) | `outputs/<version>/<task>/<protocol>/<grid>/<baseline>/<test_set>/` | derived, git-ignored; coverage manifest is the source of truth |
+| results (raw) | `outputs/<version>/<task>/<protocol>/<grid>/<baseline>/<test_set>/` | derived, git-ignored; coverage manifest is the source of truth. A cell directory may also hold `failure.json` (operational: failed attempts of a not-yet-done cell; removed on success; read only by `coverage`) |
+| outside submissions | `submissions/<model>/` — `metadata.json` + `results/<task>/<protocol>/<grid>/[pretrain-<src>/]<test_set>/result.json` | committed via pull request; validated in CI (`evemtbench-validate-submission`); listed on the leaderboard with a tier badge ([submission.md §6](submission.md#6-submitting-to-the-leaderboard)) |
 | results (public bundle) | `results/<version>/` — `aggregated_results.{csv,json}` + `tables/*.tex` | committed, **builder-generated** (`hpc/make_results_bundle.py`, freshness-gated); the self-contained public tier between raw `outputs/` and the private `paper/manuscript/` (never hand-edit) |
 | rendered tables | `RESULTS.md`, `leaderboard.html` | committed but **builder-generated** (freshness-gated; never hand-edit) |
 | projection caches | `$EVEMTBENCH_PROJECTION_CACHE` | derived, content-addressed, safe to delete |

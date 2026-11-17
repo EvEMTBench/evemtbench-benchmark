@@ -11,7 +11,7 @@
 | **Valid samples** | fault-active windows whose fault type is **in the 9-class vocab** (a type outside it is excluded, never mapped to −1) |
 | **Protocol** | `held_out` (all variants); the `local`/`line` variants also run `multi_grid_pretrain`, `transfer_zeroshot` and `transfer_finetune` (deep baselines only — see [protocol.md](../protocol.md)) |
 | **Metrics** | balanced accuracy, macro F1, accuracy (+ per-class F1) |
-| **Baselines** | majority, random_forest, mlp, gru, cnn, resnet (threshold N/A — binary only) |
+| **Baselines** | majority, random_forest, mlp, gru, cnn, resnet, tst (threshold N/A — binary only) |
 
 ## Notes / claims
 

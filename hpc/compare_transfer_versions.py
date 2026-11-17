@@ -2,7 +2,7 @@
 
 Compares every (task, protocol, grid, baseline, source, test_set) cell of the pretrain/transfer
 protocols between two outputs trees — by default the superseded episode-split results
-(``outputs/1.0.0``) and the corrected topology-grouped results (``outputs/<BENCHMARK_VERSION>``) —
+(``outputs/1.0.0``) and the corrected topology-grouped results (``outputs/1.1.0``) —
 and emits a machine-readable JSON plus a compact Markdown summary:
 
 * per-cell absolute metric deltas (every aggregate metric both sides carry);
@@ -26,7 +26,7 @@ import json
 from pathlib import Path
 
 from evemtbench.coverage import PRETRAIN_GRID, iter_cells
-from evemtbench.version import BENCHMARK_VERSION
+from evemtbench.version import TRANSFER_RESULTS_VERSION
 
 PROTOCOLS = ("multi_grid_pretrain", "transfer_zeroshot", "transfer_finetune")
 # headline metric per task function (matches the registry's td.metrics[0])
@@ -140,7 +140,7 @@ def main() -> None:
     p = argparse.ArgumentParser(description=__doc__.splitlines()[0])
     p.add_argument("--outputs", default="outputs")
     p.add_argument("--old", default="1.0.0")
-    p.add_argument("--new", default=BENCHMARK_VERSION)
+    p.add_argument("--new", default=TRANSFER_RESULTS_VERSION)
     p.add_argument("--out-json", default=None)
     p.add_argument("--out-md", default=None)
     args = p.parse_args()

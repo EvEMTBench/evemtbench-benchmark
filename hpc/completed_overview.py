@@ -36,7 +36,17 @@ ROOTS = {"repo-local": os.environ.get("OUT", "outputs")}
 _SHARED = os.environ.get("SHARED_OUT")
 if _SHARED and os.path.realpath(_SHARED) != os.path.realpath(ROOTS["repo-local"]):
     ROOTS["shared"] = _SHARED
-BASELINES = ["majority", "threshold", "random_forest", "mlp", "gru", "cnn", "resnet"]
+BASELINES = [
+    "majority",
+    "threshold",
+    "impedance",
+    "random_forest",
+    "mlp",
+    "gru",
+    "cnn",
+    "resnet",
+    "tst",
+]
 
 
 def scan():
@@ -135,6 +145,10 @@ def emit_markdown():
     L.append("")
     L.append("## Notes")
     L.append("- `threshold` is a detection-only baseline (one task) → 1/grid complete, not a gap.")
+    L.append(
+        "- `impedance` is a fault-location-only baseline (`local` + `line`) → 2/grid complete, "
+        "not a gap."
+    )
     L.append("- The migrated held_out cells live in both pools; the union dedupes them.")
     L.append("- ieee39 held_out is HELD (new `adapt_grid` incoming) → counts frozen/partial.")
     L.append("- Metrics (not just completion) render in `RESULTS.md` / `leaderboard.html`.")

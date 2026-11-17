@@ -7,6 +7,7 @@ set -euo pipefail
 cd "$HOME/Repositories/evemtbench-benchmark"
 source hpc/clusters/local.env
 export PYTHONPATH=src
+# projcache/<evemtbench.version.DATA_CACHE_VERSION> — the cache version, not the benchmark version
 export EVEMTBENCH_PROJECTION_CACHE="$WORK/evemtbench/projcache/1.1.0"
 export EVEMTBENCH_CACHE_READONLY=1
 export EVEMTBENCH_WANDB=0

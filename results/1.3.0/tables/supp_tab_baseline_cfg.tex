@@ -1,0 +1,37 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_baseline_cfg.py
+% Benchmark: EvEMTBench v1.3.0
+% Inputs:
+%   src/evemtbench/baselines/{mlp,gru,cnn,resnet,tst,random_forest,threshold,impedance}.py  (frozen constructor defaults, introspected)
+%   outputs/{1.0.0,1.2.0,1.3.0}/*/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json  (executed seed set)
+\begin{table}[t]
+\centering
+\small
+\caption{Reference-baseline configurations (benchmark \texttt{v1.3.0}). The five deep baselines share one training regime (top) and differ only in architecture (and, for the \ac{tst}, the dropout rate its source prescribes); the classical baselines are fully specified by their listed rule. Every numeric hyperparameter is read from the shipped baseline classes when this table is generated, so it cannot drift from the code.}
+\label{tab:supp_baseline_cfg}
+\begin{tabular}{L{3.0cm} L{12.5cm}}
+\toprule
+\textbf{Component} & \textbf{Configuration} \\
+\midrule
+\multicolumn{2}{l}{\textit{Shared deep-baseline training regime (\ac{mlp}/\ac{gru}/\ac{cnn}/\ac{resnet}/\ac{tst})}} \\
+Optimiser & AdamW, learning rate $0.001$, weight decay $0.0001$ \\
+Batch / epochs & batch size 256; up to 60 epochs \\
+Learning-rate schedule & cosine annealing, $T_{\max}=60$ (stepped per epoch) \\
+Early stopping & on validation loss, patience 12, best-checkpoint restore \\
+Loss & cross-entropy with inverse-frequency class weights (classification); mean-squared error (MSE) on train-standardised targets, de-standardised at predict (regression, \ac{fl}) \\
+Input & per-channel standardisation fitted on train only \\
+Seeds & 5 per cell ($0$--$4$): model init, batch-shuffle order, dropout (not the split) \\
+\midrule
+\ac{mlp} & flattened window $\to 512$-$256$-$128$; each layer Linear\,+\,BatchNorm\,+\,ReLU\,+\,Dropout($0.3$) \\
+\ac{gru} & 1-layer GRU, hidden size 128, read at the final step; Dropout($0.3$)\,+\,Linear head \\
+\ac{cnn} & three dilated Conv1d blocks (Conv\,+\,BatchNorm\,+\,ReLU), width 64, kernels $7/5/3$ at dilations $1/2/4$, global average pooling, Dropout($0.3$) \\
+\ac{resnet} & three residual blocks (filters $64/128/128$), each three Conv1d with kernels $8/5/3$ and a $1{\times}1$ shortcut; global average pooling, Dropout($0.3$) \\
+\ac{tst} & Time Series Transformer encoder: patch embedding Conv1d (kernel 16, stride 8; 59 tokens for a 480-sample window) scaled by $\sqrt{d}$ and layer-normalised per token, learnable positional encoding, 3 post-norm encoder blocks (width $d=128$, 8 heads, feed-forward 256, GELU, BatchNorm in place of LayerNorm), Dropout($0.1$), Linear head on the concatenated token outputs. Deviations from the source: the strided patch embedding (one token per time step there), 8 heads (16 there) and the token LayerNorm (none there) \\
+\midrule
+\emph{majority} & most-frequent train class (classification) / train-mean target (regression) \\
+\emph{threshold} & phase-maximum \ac{rms}-current statistic; threshold maximises balanced accuracy over a 200-point train quantile grid; binary \ac{fd}, \emph{local} only \\
+\emph{random forest} & 200 trees, unbounded depth, balanced class weights (classifier); seven per-channel time-axis features: mean, std, min, max, peak-to-peak, \ac{rms}, peak $|\cdot|$ \\
+\emph{impedance locator} & fundamental-frequency phasors by a full-cycle DFT over the last complete cycle of the window; \emph{local}: one-terminal reactance method on the fault loop chosen by a current-based phase selector, zero-sequence compensated for ground loops; \emph{line}: two-terminal method on positive-sequence phasors (one-terminal fallback where the far terminal is not measured); series impedance and length of the faulted line from the grid topology, impedance scale $1$, no fitted parameter; \ac{fl}, \emph{local} and \emph{line} only \\
+\bottomrule
+\end{tabular}
+\end{table}

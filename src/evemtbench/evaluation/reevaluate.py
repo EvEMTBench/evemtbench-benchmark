@@ -46,7 +46,7 @@ import pandas as pd
 from ..coverage import Cell, cell_dir, iter_cells
 from ..splits.protocols import PRETRAIN_TRANSFER_PROTOCOLS, TRANSFER_PROTOCOLS
 from ..tasks.task import load_task
-from ..version import results_version
+from ..version import label_patches_enabled, results_version
 from .aggregate import (
     aggregate_seed_breakdowns,
     aggregate_seed_metrics,
@@ -144,6 +144,29 @@ def _provenance_matches(recomputed: dict, recorded: dict | None) -> str | None:
     rec_parts, new_parts = _key(recorded.get("partitions")), _key(recomputed.get("partitions"))
     if rec_parts and new_parts and rec_parts != new_parts:
         return "window-manifest/feature hashes differ from the recorded partitions"
+
+    def _patches(lp):
+        return sorted(
+            (
+                p.get("id"),
+                p.get("sha256"),
+                p.get("grid"),
+                p.get("family"),
+                p.get("manifest_sha256"),
+                p.get("rows_patched"),
+            )
+            for p in lp or []
+        )
+
+    # The committed label patches (v1.3.0+): the record and the re-load must have applied the SAME
+    # patches (id + file sha256) to the same partitions. A pre-1.3.0 record carries none, and its
+    # re-load (patches off for its version) applies none, so it re-evaluates on its own labels.
+    rec_lp, new_lp = (
+        _patches(recorded.get("label_patches")),
+        _patches(recomputed.get("label_patches")),
+    )
+    if rec_lp != new_lp:
+        return f"label patches differ: recorded {rec_lp}, re-load applied {new_lp}"
     return None
 
 
@@ -191,21 +214,46 @@ def reevaluate_unit(
     One ``load_task`` is amortised over the unit's cells and test sets — that call is the expensive
     part (label tables + split hashing), and it is identical for every baseline and source.
     """
-    try:
-        task = load_task(task_id, protocol, grid=grid, root=root, splits_root=splits_root)
-    except Exception as exc:  # a grid/protocol combination with no data on this machine
-        for c in cells:
-            report.skip(f"{task_id}/{protocol}/{grid}/{c.baseline}", "load_task failed", str(exc))
-        return
+    # One load per label-patch setting: the committed label patches apply to a v1.3.0+ fault_phase
+    # tree and never to an older one, so a unit that spans both (an explicit historical --version,
+    # or transfer cells whose sources land in different trees) gets each on its own labels.
+    loaded: dict[bool, object] = {}
+
+    def _task_for(patched: bool):
+        if patched not in loaded:
+            try:
+                loaded[patched] = load_task(
+                    task_id,
+                    protocol,
+                    grid=grid,
+                    root=root,
+                    splits_root=splits_root,
+                    label_patches=patched,
+                )
+            except Exception as exc:  # a grid/protocol combination with no data on this machine
+                loaded[patched] = exc
+        return loaded[patched]
 
     env = _dist_versions()
 
     for cell in cells:
-        # None = each protocol's own results tree (held_out stays in 1.0.0), as coverage resolves it
-        ver = version or results_version(protocol)
+        # None = the cell's own results tree (per protocol, task, grid and source), as coverage
+        # resolves it
+        ver = version or results_version(
+            protocol,
+            task_id,
+            grid=grid,
+            source=(cell.source if protocol in TRANSFER_PROTOCOLS else None),
+        )
+        task = _task_for(label_patches_enabled(task_id, ver))
+        if isinstance(task, Exception):
+            report.skip(
+                f"{task_id}/{protocol}/{grid}/{cell.baseline}", "load_task failed", str(task)
+            )
+            continue
         cdir = cell_dir(out, cell, version=ver)
-        root = out / ver
-        label = str(cdir.relative_to(root)) if cdir.is_relative_to(root) else str(cdir)
+        tree = out / ver  # not `root`: that is the data root the loader closure reads
+        label = str(cdir.relative_to(tree)) if cdir.is_relative_to(tree) else str(cdir)
         record = _load_json(cdir / "run_record.json")
         if record is None:
             report.skip(label, "run_record.json missing/unreadable")

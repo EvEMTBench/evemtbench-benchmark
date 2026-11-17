@@ -59,6 +59,22 @@ the windows `y` (never loading `X`):
 
 Run: `python -m evemtbench.analysis --task <id> --grid <grid> --baseline <b> --test-set <test|benchmark>`.
 
+## Validation-selection reliability (diagnostic)
+
+Where a table reports "the" model for a cell, that model is the learned baseline that wins on the
+**validation** split. Its score is then quoted on `test` and `benchmark`. The audit's robustness
+page (`audit/robustness.html#selection`, `evemtbench.evaluation.selection`) grades that choice
+after the fact, per (task, grid) under `held_out`, with three numbers:
+
+- **Same winner:** whether the validation pick is also best on the held-out set.
+- **Regret:** how far the pick falls short of the best baseline on that set, in metric units.
+  It is never pooled across metrics.
+- **Kendall τ-b:** agreement between the validation ranking and the held-out ranking, and
+  between the `test` and `benchmark` rankings.
+
+The held-out sets only grade the choice; they never change it. With five learned baselines τ is
+coarse, so read regret first.
+
 ## Reading transfer
 
 Every metric is conditional on **(task × observability × grid × protocol × test_set)**. The

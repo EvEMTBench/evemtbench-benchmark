@@ -2,7 +2,7 @@
 
 [![ci](https://github.com/EvEMTBench/evemtbench-benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/EvEMTBench/evemtbench-benchmark/actions/workflows/ci.yml)
 [![arXiv](https://img.shields.io/badge/arXiv-2609.28149-b31b1b)](https://arxiv.org/abs/2609.28149)
-![benchmark v1.1.0](https://img.shields.io/badge/benchmark-v1.1.0-blue)
+![benchmark v1.3.0](https://img.shields.io/badge/benchmark-v1.3.0-blue)
 ![python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 [![code: MIT](https://img.shields.io/badge/code-MIT-green)](LICENSE)
 [![data: CC-BY-4.0](https://img.shields.io/badge/data-CC--BY--4.0-green)](LICENSES/DATA-LICENSE.md)
@@ -18,7 +18,7 @@ data. The benchmark layer turns the EvEMTBench dataset into a fair, comparable e
 Benchmark for Machine Learning in Power System Protection*, arXiv:2609.28149 (2026) —
 <https://arxiv.org/abs/2609.28149>
 
-**Status (benchmark contract v1.1.0).** The reference evaluation is complete across the full
+**Status (benchmark contract v1.3.0).** The reference evaluation is complete across the full
 expected matrix: every task on every reference grid under `held_out`, and the portable `local` /
 `line` fault tasks under pre-training and both transfer protocols (deep baselines only). The
 committed `coverage_snapshot.json` is the recorded state. Browse the outcomes in
@@ -77,7 +77,8 @@ result = evaluate(task, my_model.predict(task.test))
 ```
 
 CLIs: `evemtbench-evaluate` (score predictions), `evemtbench-run` (run a baseline),
-`evemtbench-splits` (regenerate splits), `evemtbench-leaderboard`, `evemtbench-significance`.
+`evemtbench-splits` (regenerate splits), `evemtbench-leaderboard`, `evemtbench-significance`,
+`evemtbench-validate-submission` (check a leaderboard submission; see [docs/submission.md](docs/submission.md#6-submitting-to-the-leaderboard)).
 
 ## Grids & protocols
 
@@ -131,8 +132,9 @@ protocols without stating which. Vocabularies: [docs/taxonomy.md](docs/taxonomy.
 cards: [docs/task_cards/](docs/task_cards/); metrics: [docs/metrics.md](docs/metrics.md); the tier
 ladder and roadmap: [docs/task_suite_roadmap.md](docs/task_suite_roadmap.md).
 
-Baselines: `majority`, `threshold` (overcurrent; FD binary + `local` only), `random_forest`, `mlp`,
-`gru`, `cnn`, `resnet` (1-D waveform); a topology-aware `gnn` is planned. See
+Baselines: `majority`, `threshold` (overcurrent; FD binary + `local` only), `impedance`
+(conventional impedance-based fault locator; FL `local` + `line` only), `random_forest`, `mlp`,
+`gru`, `cnn`, `resnet` (1-D waveform), `tst` (patch Transformer); a topology-aware `gnn` is planned. See
 [docs/baselines.md](docs/baselines.md).
 
 ## Documentation
@@ -177,7 +179,7 @@ done (`python -m evemtbench.coverage --summary`; persisted as the committed `cov
 `--summary` defaults to `held_out` (pass `--protocols` to widen) and reads a local `outputs/` tree,
 which is not part of the repository — in a fresh clone every cell reads as pending, so use the
 committed snapshot for the recorded state.
-Deep baselines (`mlp`, `gru`, `cnn`, `resnet`) need a CUDA-capable GPU. `hpc/make_results.py`
+Deep baselines (`mlp`, `gru`, `cnn`, `resnet`, `tst`) need a CUDA-capable GPU. `hpc/make_results.py`
 regenerates `RESULTS.md` from `outputs/`; see [docs/extending.md](docs/extending.md) for the full
 run/scratch/memory workflow.
 

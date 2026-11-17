@@ -20,7 +20,13 @@ from pathlib import Path
 from .evaluation.metrics import METRIC_DIRECTION
 from .evaluation.significance import ci95_halfwidth
 from .tasks.registry import get_task, list_tasks
-from .version import BENCHMARK_VERSION, results_version
+from .version import (
+    BENCHMARK_VERSION,
+    FL_RESULTS_VERSION,
+    FP_RESULTS_VERSION,
+    TRANSFER_RESULTS_VERSION,
+    results_version,
+)
 
 # Registry size — the per-grid coverage denominator (was hard-coded to 9).
 _N_TASKS = len(list_tasks())
@@ -49,6 +55,8 @@ class Row:
     n_params: int | None = None  # trainable params (capacity, reported not equalized)
     fit_seconds: float | None = None  # mean per-seed training wall-time (compute reporting)
     source: str | None = None  # transfer pre-training source grid (None = non-transfer / 20 kV)
+    # outside submission tier ("self-reported" / "reproduced"); None = in-house reference run
+    tier: str | None = None
 
     def mean(self, metric: str) -> float | None:
         m = self.metrics.get(metric)
@@ -56,10 +64,12 @@ class Row:
 
 
 def _is_current(r: Row) -> bool:
-    """A row is CURRENT iff its version is its protocol's current results version — held_out rows
-    stay current at their frozen version; superseded pretrain/transfer rows in an older tree are
-    not (see ``evemtbench.version.results_version``)."""
-    return r.version == results_version(r.protocol)
+    """A row is CURRENT iff its version is the current results version of its (protocol, task) —
+    held_out rows stay current at their frozen version; superseded rows in an older tree (the
+    1.0.0 pretrain/transfer rows, the pre-1.2.0 fault-location rows, the pre-1.3.0 rows of the
+    LP-1-patched fault_phase cells) are not (see ``evemtbench.version.results_version``, resolved
+    per cell with the row's grid and transfer source)."""
+    return r.version == results_version(r.protocol, r.task, grid=r.grid, source=r.source)
 
 
 def _fmt_params(n: int | None) -> str:
@@ -150,6 +160,55 @@ def scan_results(outputs_dir: str | Path) -> list[Row]:
             )
         )
     return rows
+
+
+def scan_submissions(
+    submissions_dir: str | Path, *, reference: str | Path | None = None
+) -> list[Row]:
+    """Rows for every VALID outside submission under ``submissions_dir`` (roadmap W4), tagged with
+    its tier: ``reproduced`` when a maintainer re-ran the code (``metadata.reproduced``), else
+    ``self-reported``. A submission that fails :func:`evemtbench.submission.validate_submission`
+    is left out with a note on stderr; CI rejects it before it is ever merged."""
+    import sys
+
+    from .submission import default_reference, validate_submission
+
+    root = Path(submissions_dir)
+    if not root.is_dir():
+        return []
+    reference = reference if reference is not None else default_reference()
+    rows: list[Row] = []
+    for d in sorted(p for p in root.iterdir() if p.is_dir()):
+        rep = validate_submission(d, reference=reference)
+        if not rep.ok:
+            print(f"leaderboard: skipping invalid submission {d.name}", file=sys.stderr)
+            continue
+        meta = json.loads((d / "metadata.json").read_text())
+        tier = "reproduced" if meta.get("reproduced") else "self-reported"
+        for r in scan_results(d / "results"):
+            r.tier = tier
+            rows.append(r)
+    return rows
+
+
+_TIER_CSS = (
+    ".tier{display:inline-block;margin-left:.4em;padding:0 .4em;border-radius:.6em;"
+    "font-size:.72em;font-weight:500;vertical-align:middle;border:1px solid currentColor}"
+    ".tier.self{color:#8a6d1a}.tier.repro{color:#1f7a3d}"
+)
+
+
+def _base_label(name: str, tier: str | None) -> str:
+    """A model name, plus its submission-tier badge for outside entries."""
+    label = html.escape(name)
+    if tier == "reproduced":
+        label += ' <span class="tier repro" title="re-run by a maintainer">reproduced</span>'
+    elif tier == "self-reported":
+        label += (
+            ' <span class="tier self" title="validated format; numbers reported by the '
+            'submitter">self-reported</span>'
+        )
+    return label
 
 
 def _headline_metric(trows: list[Row]) -> str:
@@ -262,6 +321,7 @@ def _comparison_section(rows: list[Row]) -> str:
             if not idx:
                 continue
             baselines = sorted({b for b, _ in idx})
+            tiers = {r.baseline: r.tier for r in idx.values()}
 
             def _best(b, *, headline=headline, idx=idx, direction=direction):
                 vals = [
@@ -287,7 +347,7 @@ def _comparison_section(rows: list[Row]) -> str:
                     f"<td>{_fmt(idx[(b, g)], headline) if (b, g) in idx else '—'}</td>"
                     for g in grids
                 )
-                body.append(f"<tr><td class=base>{html.escape(b)}</td>{cells}</tr>")
+                body.append(f"<tr><td class=base>{_base_label(b, tiers.get(b))}</td>{cells}</tr>")
             task_tables.append(
                 f"<div class=cmptask><h3>{html.escape(task)} "
                 f"<span class=dim>· {html.escape(headline)} · {html.escape(primary)}</span></h3>"
@@ -329,12 +389,69 @@ def _source_label(src: str | None) -> str:
     return f"{_source_kv(src):g} kV"
 
 
+def _val_selected_baseline(
+    val_rows: list[Row],
+    task: str,
+    protocol: str,
+    source: str,
+    grid: str,
+    metric: str,
+    reported: frozenset[str] | set[str] = frozenset(),
+) -> str | None:
+    """The transfer cell's baseline, chosen on a VALIDATION signal — never on the benchmark set the
+    cell reports. Mirrors ``hpc/paper_artifacts/paper_lib.py::best_transfer_row`` so the board and
+    the paper name the same model:
+
+    * ``transfer_zeroshot`` — the ``source`` corpus's ``multi_grid_pretrain`` val (one pretrained
+      model applied to every target, so the choice is grid-independent);
+    * ``transfer_finetune`` — that source's fine-tune val on the target ``grid``.
+
+    Candidates are :data:`~evemtbench.coverage.LEARNED_BASELINES` in that order; the argbest follows
+    ``METRIC_DIRECTION`` and ties keep the earlier entry (strict ``>``), as in the paper kernel.
+    Returns ``None`` when no candidate has a validation score, or when a candidate in ``reported``
+    (the baselines with a result on the reported set) has none: as in the paper's
+    ``_validated_candidates``, a candidate may not drop out of the pool silently."""
+    from .coverage import LEARNED_BASELINES
+
+    if protocol == "transfer_zeroshot":
+
+        def match(r: Row) -> bool:
+            return r.protocol == "multi_grid_pretrain" and r.grid == source
+
+    elif protocol == "transfer_finetune":
+
+        def match(r: Row) -> bool:
+            return (
+                r.protocol == "transfer_finetune"
+                and r.grid == grid
+                and (r.source or _DEFAULT_SOURCE) == source
+            )
+
+    else:
+        return None
+    val = {r.baseline: r.mean(metric) for r in val_rows if r.task == task and match(r)}
+    if any(val.get(b) is None for b in LEARNED_BASELINES if b in reported):
+        return None
+    direction = METRIC_DIRECTION.get(metric, 1)
+    sel, sel_v = None, None
+    for b in LEARNED_BASELINES:
+        v = val.get(b)
+        if v is None:
+            continue
+        if sel_v is None or direction * (v - sel_v) > 0:
+            sel, sel_v = b, v
+    return sel
+
+
 def _transfer_section(rows: list[Row]) -> str:
     """Cross-grid transfer (OOD): per task, zero-shot vs fine-tune from the multi_grid pre-training,
     across the reference grids in **voltage order** (each annotated same-V / cross-V vs the 20 kV
-    source), on the held-out ``benchmark`` set, best baseline per cell. Empty if no transfer runs.
+    source), on the held-out ``benchmark`` set, one **validation-selected** baseline per cell
+    (see :func:`_val_selected_baseline`; a cell without a validation signal renders ``—``, never a
+    winner picked on the benchmark it reports). Empty if no transfer runs.
     Current rows only — superseded transfer results from an older version tree must not
     double-render next to their re-scored counterparts."""
+    val_rows = [r for r in rows if r.test_set == "val" and _is_current(r)]
     trows = [
         r
         for r in rows
@@ -351,20 +468,39 @@ def _transfer_section(rows: list[Row]) -> str:
         headline = _headline_metric(task_rows)
         if not headline:
             continue
-        direction = METRIC_DIRECTION.get(headline, 1)
 
         srcs = sorted({r.source or _DEFAULT_SOURCE for r in task_rows}, key=_source_kv)
 
-        def _best(proto, src, g, *, headline=headline, direction=direction, task_rows=task_rows):
-            cand = [
-                r
+        def _best(proto, src, g, *, headline=headline, task=task, task_rows=task_rows):
+            reported = {
+                r.baseline
                 for r in task_rows
                 if r.protocol == proto
                 and (r.source or _DEFAULT_SOURCE) == src
                 and r.grid == g
                 and r.mean(headline) is not None
-            ]
-            return max(cand, key=lambda r: direction * r.mean(headline)) if cand else None
+            }
+            sel = _val_selected_baseline(val_rows, task, proto, src, g, headline, reported)
+            if sel is None:
+                return None  # no validation signal: never fall back to selecting on benchmark
+            return next(
+                (
+                    r
+                    for r in task_rows
+                    if r.protocol == proto
+                    and (r.source or _DEFAULT_SOURCE) == src
+                    and r.grid == g
+                    and r.baseline == sel
+                    and r.mean(headline) is not None
+                ),
+                None,
+            )
+
+        def _cell(proto, src, g, *, headline=headline, _best=_best):
+            r = _best(proto, src, g)
+            if r is None:
+                return "—"
+            return f"{_fmt(r, headline)} <span class=dim>{html.escape(r.baseline)}</span>"
 
         head = (
             "<tr><th>protocol · source</th>"
@@ -377,14 +513,12 @@ def _transfer_section(rows: list[Row]) -> str:
         body = []
         for proto, label in _TRANSFER_PROTO_LABELS:
             for src in srcs:  # source axis: one row per (protocol, pre-training source)
-                cells = "".join(
-                    f"<td>{_fmt(_best(proto, src, g), headline) if _best(proto, src, g) else '—'}</td>"
-                    for g in grids
-                )
+                cells = "".join(f"<td>{_cell(proto, src, g)}</td>" for g in grids)
                 body.append(f"<tr><td class=base>{label} · {_source_label(src)}</td>{cells}</tr>")
         task_tables.append(
             f"<div class=cmptask><h3>{html.escape(task)} "
-            f"<span class=dim>· {html.escape(headline)} · best baseline · benchmark</span></h3>"
+            f"<span class=dim>· {html.escape(headline)} · validation-selected baseline · "
+            f"benchmark</span></h3>"
             f"<div class=tablewrap><table class=sortable>"
             f"<caption>{html.escape(task)} — cross-grid transfer (benchmark)</caption>"
             f"<thead>{head}</thead><tbody>{''.join(body)}</tbody></table></div></div>"
@@ -597,7 +731,7 @@ def render_html(
                 f' data-grid="{html.escape(r.grid)}"'
                 f' data-ts="{html.escape(r.test_set)}" data-base="{html.escape(r.baseline)}"'
                 f' data-proto="{html.escape(r.protocol)}" data-source="{html.escape(r.source or "")}">'
-                f"<td class=base>{html.escape(r.baseline)}</td>"
+                f"<td class=base>{_base_label(r.baseline, r.tier)}</td>"
                 f"<td>{html.escape(r.protocol)}</td>"
                 f"<td class=dim>{html.escape(src_cell)}</td>"
                 f"<td>{html.escape(r.grid)}</td>"
@@ -622,11 +756,15 @@ def render_html(
             f"<thead>{head}</thead><tbody>{''.join(body)}</tbody></table></div></section>"
         )
 
-    # Filter bar: version (default "current" = each protocol's current results version — held_out
-    # at its frozen version + pretrain/transfer at BENCHMARK_VERSION, selected via the rows'
-    # data-cur flag) + grid / test_set / baseline / protocol (default all).
+    # Filter bar: version (default "current" = each row's current results version — held_out at
+    # its frozen version, pretrain/transfer at theirs, fault location at its own; selected via the
+    # rows' data-cur flag) + grid / test_set / baseline / protocol (default all).
     versions = sorted({r.version for r in rows}, reverse=True)
-    cur_label = f"current (held_out {results_version('held_out')} + transfer {BENCHMARK_VERSION})"
+    cur_label = (
+        f"current (held_out {results_version('held_out')} + transfer {TRANSFER_RESULTS_VERSION}"
+        f" + fault location {FL_RESULTS_VERSION} + faulted phase {FP_RESULTS_VERSION} on the"
+        " LP-1-patched cells)"
+    )
     vopts = (
         f'<option value="__cur__">{html.escape(cur_label)}</option>'
         + "".join(f'<option value="{html.escape(v)}">{html.escape(v)}</option>' for v in versions)
@@ -659,7 +797,7 @@ def render_html(
         "Per-class F1: “n/a” = no samples of that class on this grid/test set (undefined, e.g. HIF "
         "is MV-only) — distinct from a genuine 0.000 (class present, model scored zero)."
     )
-    css = BASE_CSS
+    css = BASE_CSS + _TIER_CSS
     js = SORT_JS
     # --- page chrome (head/nav/legend/cta/footer) ---
     favicon = FAVICON
@@ -699,11 +837,13 @@ def render_html(
         f"<title>{html.escape(title)}</title><style>{css}</style></head><body>"
         f"<header>{nav}<h1>{html.escape(title)}</h1>"
         f"<div class=v>benchmark v{html.escape(version or 'n/a')} (held_out results "
-        f"v{html.escape(results_version('held_out'))}) · {len(rows)} runs total</div>"
+        f"v{html.escape(results_version('held_out'))}, transfer v{html.escape(TRANSFER_RESULTS_VERSION)}, "
+        f"fault location v{html.escape(FL_RESULTS_VERSION)}, faulted phase "
+        f"v{html.escape(FP_RESULTS_VERSION)} on the LP-1-patched cells) · {len(rows)} runs total</div>"
         f"{updated}{cta}</header>"
         # headline sections render CURRENT rows only (per-protocol version) — superseded
         # older-tree results stay reachable through the detail tables' version filter
-        f"{_coverage_panel([r for r in rows if _is_current(r)])}"
+        f"{_coverage_panel([r for r in rows if _is_current(r) and r.tier is None])}"
         f"<div class=note>{html.escape(note)}</div>"
         f"{legend}"
         f"{_comparison_section([r for r in rows if _is_current(r)])}"
@@ -747,15 +887,23 @@ def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="Render an internal HTML leaderboard from outputs/.")
     p.add_argument("--outputs", default="outputs", help="directory tree of result.json files")
     p.add_argument("--out", default="leaderboard.html", help="output HTML path")
+    p.add_argument(
+        "--submissions",
+        default="submissions",
+        help="directory of outside submissions (roadmap W4); listed with tier badges if present",
+    )
     args = p.parse_args(argv)
 
-    rows = scan_results(args.outputs)
+    rows = scan_results(args.outputs) + scan_submissions(args.submissions)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
     html_str = render_html(
         rows, version=BENCHMARK_VERSION, generated_at=generated_at, citation=_bibtex_from_cff()
     )
-    Path(args.out).write_text(html_str)
-    print(f"leaderboard: {len(rows)} runs -> {args.out}")
+    from ._io import write_view_if_changed
+
+    # unchanged apart from the timestamp -> leave the file (and its old timestamp) alone
+    wrote = write_view_if_changed(args.out, html_str)
+    print(f"leaderboard: {len(rows)} runs -> {args.out}{'' if wrote else ' (unchanged)'}")
 
 
 if __name__ == "__main__":

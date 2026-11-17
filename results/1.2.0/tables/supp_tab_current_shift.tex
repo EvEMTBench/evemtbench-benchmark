@@ -1,0 +1,27 @@
+% AUTO-GENERATED. DO NOT EDIT.
+% Generator: hpc/paper_artifacts/build_supp_tab_current_shift.py
+% Benchmark: EvEMTBench v1.1.0
+% Inputs:
+%   src/evemtbench/splits/v1.0/held_out/<grid>/{train,benchmark}.txt
+%   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/X_*.raw  (released dataset, raw physical units)
+%   src/evemtbench/baselines/threshold.py::_current_statistic  (the statistic)
+%   src/evemtbench/tasks/valid_samples.py  (fault-detection valid-sample mask)
+\begin{table*}[t]
+\centering
+\small
+\setlength{\tabcolsep}{5pt}
+\caption{Raw current scale of the fitting distribution versus the never-trained \texttt{eval\_grid} family. The per-window statistic is the \emph{phase-maximum \ac{rms} current}: the root-mean-square of each phase current over the $480$ samples of a $50\,$ms window, maximised over the three phases --- the decision variable of the shipped overcurrent baseline and the same primitive as the random forest's per-channel \ac{rms} feature. It is evaluated on the six channels of the \emph{local} observability view (the faulted line's near-end cubicle), in \textbf{raw simulated amperes, before any standardisation}. Windows are the \emph{non-active} (steady-state) windows of the fault-detection valid-sample set, i.e.\ the pre-/post-fault windows of fault episodes --- the operating point of the set, and exactly the windows on which a collapsed detector raises its false alarms. Aggregation is the median over windows, with the interquartile range in brackets; \emph{ratio} is median(\texttt{eval\_grid})\,/\,median(train). $n$ is the number of windows entering each statistic. The statistic, view, window subset and aggregation are fixed by committed benchmark code and were specified before the values were computed.}
+\label{tab:supp_current_shift}
+\begin{tabular}{l rlr rlr r}
+\toprule
+ & \multicolumn{3}{c}{\textbf{\texttt{adapt\_grid} train}} & \multicolumn{3}{c}{\textbf{\texttt{eval\_grid}}} & \\
+\cmidrule(lr){2-4}\cmidrule(lr){5-7}
+\textbf{Grid} & \textbf{median (A)} & \textbf{[IQR]} & \textbf{$n$} & \textbf{median (A)} & \textbf{[IQR]} & \textbf{$n$} & \textbf{ratio} \\
+\midrule
+CIGR\'E MV (20\,kV) & 34.0 & [10.3, 232.0] & 19,061 & 32.3 & [9.2, 230.3] & 31,515 & 1.0$\times$ \\
+Double Line (110\,kV) & 280.5 & [209.9, 355.2] & 20,722 & 291.2 & [273.5, 342.3] & 7,791 & 1.0$\times$ \\
+Prot.\ Ref.\ (110\,kV) & 334.8 & [258.1, 408.7] & 18,995 & 339.7 & [326.9, 343.8] & 17,235 & 1.0$\times$ \\
+IEEE 39-Bus (345\,kV) & 433.3 & [222.6, 691.4] & 21,481 & 333.9 & [211.7, 525.3] & 68,789 & 0.8$\times$ \\
+\bottomrule
+\end{tabular}
+\end{table*}

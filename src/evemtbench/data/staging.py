@@ -17,7 +17,7 @@ from __future__ import annotations
 import os
 from pathlib import Path
 
-from ..version import BENCHMARK_VERSION
+from ..version import DATA_CACHE_VERSION
 from .roots import resolve_data_root
 
 # --- staging tunables (single source of truth; shell reads them via the `config` subcommand) ---
@@ -27,12 +27,16 @@ VIEWS = ("train", "val", "test", "benchmark")
 
 
 def persistent_cache_root() -> Path:
-    """Persistent projection-cache directory, **version-scoped** so a contract bump (new
-    ``BENCHMARK_VERSION``) gets a fresh dir and old caches can be GC'd. Precedence mirrors
+    """Persistent projection-cache directory, **version-scoped** by
+    :data:`evemtbench.version.DATA_CACHE_VERSION` so a change of the cached inputs gets a fresh dir
+    and old caches can be GC'd. That constant is deliberately NOT ``BENCHMARK_VERSION``: a contract
+    revision that leaves the windowed inputs untouched (v1.2.0 only narrows the fault-location
+    valid samples; those views get new content-addressed filenames in the same directory) must not
+    relocate, and thereby orphan, the existing cache. Precedence mirrors
     :mod:`evemtbench.data.roots`:
 
-    1. ``$EVEMTBENCH_PROJECTION_CACHE_ROOT`` (then ``/<BENCHMARK_VERSION>``),
-    2. ``<data-root>/projcache/<BENCHMARK_VERSION>`` derived from the resolved data root.
+    1. ``$EVEMTBENCH_PROJECTION_CACHE_ROOT`` (then ``/<DATA_CACHE_VERSION>``),
+    2. ``<data-root>/projcache/<DATA_CACHE_VERSION>`` derived from the resolved data root.
 
     NOTE: the fallback (2) follows ``$EVEMTBENCH_DATA_ROOT``. Any context that **stages** data and
     repoints ``EVEMTBENCH_DATA_ROOT`` to ephemeral scratch (e.g. ``build_cache.sh``) MUST set
@@ -41,7 +45,7 @@ def persistent_cache_root() -> Path:
     """
     env = os.environ.get("EVEMTBENCH_PROJECTION_CACHE_ROOT")
     base = Path(env) if env else resolve_data_root("adapt_grid").parent / "projcache"
-    return base / BENCHMARK_VERSION
+    return base / DATA_CACHE_VERSION
 
 
 def view_cache_files(
@@ -94,7 +98,7 @@ def prune_stale_versions(*, dry_run: bool = True) -> list[Path]:
     stale = [
         p
         for p in parent.iterdir()
-        if p.is_dir() and p.name != BENCHMARK_VERSION and any(p.glob("proj_*.f32"))
+        if p.is_dir() and p.name != DATA_CACHE_VERSION and any(p.glob("proj_*.f32"))
     ]
     if not dry_run:
         import shutil

@@ -12,7 +12,7 @@
 # baselines. Each job runs hpc/sweep.sh, which re-checks the coverage manifest and skips done cells
 # (idempotent). gres routes the partition (a40 default; GRES=gpu:a100:1 for A100). No --partition,
 # no node excludes, no --mem (Alex allocates ~16 cores + 60/120/240 G host RAM per GPU).
-# AUTO-ROUTING: an all-classical BASELINES set (majority/threshold/random_forest — CPU-only) is sent to
+# AUTO-ROUTING: an all-classical BASELINES set (majority/threshold/impedance/random_forest — CPU-only) is sent to
 # a MIG slice on a100mig with MIG_CPUS cores instead of a full A40, so CPU work doesn't burn a whole
 # GPU (GRES= disables it). The autonomous loop exploits this by submitting TWO waves per grid
 # (BASELINES + JOBTAG=cls|deep) — see autonomous_loop.sh::submit_waves. JOBTAG appends a per-grid
@@ -27,7 +27,7 @@
 #                         Self-terminating (a 0-pending link exits fast). K default 1 (no chain).
 # Example (finish the timed-out deep sweep):
 #   SPLIT_BASELINES=1 CHAIN=3 GRIDS="double_line testgrid_110kv cigre_mv ieee39" \
-#     BASELINES="mlp gru cnn resnet" hpc/submit.sh --submit
+#     BASELINES="mlp gru cnn resnet tst" hpc/submit.sh --submit
 #
 # NORMALIZE=auto|none|per_window -> forces the input normalization (default auto = per-protocol:
 #                         none for held_out, per_window for pretrain/transfer). Only for ablations.
@@ -36,7 +36,7 @@
 # idle-guard (JOBNAME takes one grid at a time; see the guard below):
 #   OUT=$ABL/outputs NORMALIZE=per_window EVEMTBENCH_WANDB=0 GRIDS=double_line \
 #     JOBNAME=pwctrl.double_line TASKS="fault_location_line fault_classification_line" \
-#     BASELINES="mlp gru cnn resnet" SPLIT_BASELINES=1 hpc/submit.sh --submit
+#     BASELINES="mlp gru cnn resnet tst" SPLIT_BASELINES=1 hpc/submit.sh --submit
 #
 # DRY-RUN BY DEFAULT: prints the plan + sbatch lines. Pass --submit to actually queue.
 #   hpc/submit.sh                                    # dry-run, ready grids, full task suite
@@ -86,7 +86,7 @@ fault_phase_local fault_phase_line fault_phase_global \
 fault_category_local fault_category_line fault_category_global \
 fault_origin_global}"
 SEEDS="${SEEDS:-0 1 2 3 4}"; EPOCHS="${EPOCHS:-60}"
-BASELINES="${BASELINES:-majority threshold random_forest mlp gru cnn resnet}"
+BASELINES="${BASELINES:-majority threshold impedance random_forest mlp gru cnn resnet tst}"
 
 # Resource spec (override per run). Defaults come from the cluster profile: DEFAULT_GRES, and
 # DEFAULT_PARTITION (empty on Alex — gres selects the partition; set on TinyGPU — -p picks the type).
@@ -110,12 +110,12 @@ CHAIN="${CHAIN:-1}"
 SPLIT_BASELINES="${SPLIT_BASELINES:-0}"
 SOFT_DEADLINE_OVERRIDE="${SOFT_DEADLINE_SEC:-}"
 
-# CPU-only classical baselines (majority/threshold/random_forest) never touch the GPU, so a job whose
+# CPU-only classical baselines (majority/threshold/impedance/random_forest) never touch the GPU, so a job whose
 # BASELINES are ALL classical is auto-routed to a MIG slice on the a100mig partition instead of holding
 # a full A40 (raises acc_utilization; the streamed threshold/rf comfortably fit a slice's RAM). Deep or
 # mixed baseline sets stay on a full GPU. An explicit GRES= override disables the auto-routing. The
 # decision is made per submitted baseline SUBSET, so it is correct under SPLIT_BASELINES too.
-CLASSICAL_SET=" majority threshold random_forest "
+CLASSICAL_SET=" majority threshold impedance random_forest "
 # MIG_GRES / MIG_PARTITION / SUPPORTS_MIG come from the cluster profile (Alex: on; TinyGPU: off).
 is_classical() { local b; for b in $1; do case "$CLASSICAL_SET" in *" $b "*) ;; *) return 1 ;; esac; done; return 0; }
 

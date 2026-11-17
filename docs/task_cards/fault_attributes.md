@@ -34,6 +34,10 @@ id); a change is a **major** version bump.
 - **Faulted-phase** is single-label over the 7 phase combinations (relay phase selection). A true
   independent-per-phase (multi-label) variant is deferred (needs a new `LabelKind`; see the
   [roadmap](../task_suite_roadmap.md)).
+  Since v1.3.0 the faulted phase of `flt_1phg_hif_w_arc`, which the 1.x windows carry with no phase
+  bit, is restored by label patch LP-1 on CIGRE MV and the Template20kV corpus
+  ([known_issues.md](../known_issues.md) §4); before, the `fault_phase` valid-sample rule dropped the
+  class there.
 - **Fault-category** separates the mechanism: `shc` (solid short circuit), `incipient`
   (self-extinguishing HIF), `hif` (high-impedance ground fault). **HIF occurs only on the MV grid**
   (CigreMV) → zero support on HV/EHV (NaN per-class F1, like FC's HIF). It is the notoriously hard,

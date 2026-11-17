@@ -44,6 +44,7 @@ DATASET_BACKED = (
     "supp_tab_ec_support.tex",
     "supp_tab_ed_negative_support.tex",
     "supp_tab_current_shift.tex",
+    "supp_tab_fl_locator_breakdown.tex",
 )
 
 _SPLITS_ROOT = _REPO / "src" / "evemtbench" / "splits"
@@ -237,7 +238,7 @@ def transfer_scratch_rows() -> list[dict]:
     Selected out of ``DEEP_BASELINES``, NOT the full ``LEARNED_BASELINES``, because this reference is
     read against the transfer tables and those apply only to the deep baselines
     (``coverage.baseline_applies``: a classical baseline has no transferable weights, so no
-    ``random_forest`` transfer cell exists). Selecting out of all five drew the two sides of the
+    ``random_forest`` transfer cell exists). Selecting out of all learned baselines drew the two sides of the
     comparison from different candidate sets and could name a model the transfer arm cannot field --
     it published ``rf`` at 0.499 balanced accuracy for FD/local/Double Line, where the random forest
     wins the in-distribution validation split (0.889) and then collapses on the never-trained
@@ -310,7 +311,7 @@ def transfer_scratch_table() -> str:
         "\\emph{target} grid's validation split, and evaluated on that grid's never-trained "
         "\\texttt{eval\\_grid} family --- the same evaluation set the transfer tables report. The "
         "reference is independent of the pre-training source, so it is tabulated once here rather "
-        "than repeated in every source row. The architecture is selected out of the four deep "
+        "than repeated in every source row. The architecture is selected out of the five deep "
         "baselines only, matching the candidate set the transfer protocols can field (a classical "
         "baseline carries no transferable weights), so both sides of the comparison are drawn from "
         "the same pool; the unrestricted per-baseline \\texttt{held\\_out} results are in "
@@ -436,7 +437,7 @@ def primary_valid_counts_table() -> str:
 def _defaults_from_source(module: str, cls: str) -> dict:
     """Constructor keyword defaults of a baseline class, read from its SOURCE rather than imported.
 
-    Parsed with :mod:`ast` on purpose: the four deep baselines ``import torch``, and this reporting
+    Parsed with :mod:`ast` on purpose: the deep baselines ``import torch``, and this reporting
     layer must stay importable where torch is absent — CI's mirror runner has no torch, and the
     pre-commit freshness gate rebuilds this table there. The values are still exactly the shipped
     ones; this reads the same ``def __init__`` the runtime uses, it just does not execute it.
@@ -475,8 +476,10 @@ def baseline_cfg_rows() -> dict:
         "gru": _defaults_from_source("gru", "GRUBaseline"),
         "cnn": _defaults_from_source("cnn", "CNNBaseline"),
         "resnet": _defaults_from_source("resnet", "ResNetBaseline"),
+        "tst": _defaults_from_source("tst", "TSTBaseline"),
         "random_forest": _defaults_from_source("random_forest", "RandomForestBaseline"),
         "threshold": _defaults_from_source("threshold", "ThresholdBaseline"),
+        "impedance": _defaults_from_source("impedance", "ImpedanceBaseline"),
     }
 
 
@@ -489,7 +492,7 @@ def protocol_seeds() -> list[int]:
     seen: set[tuple[int, ...]] = set()
     for grid, _ in pl.GRID_ROWS:
         for (_task, baseline), by_set in load_rows(grid).items():
-            if baseline not in ("mlp", "gru", "cnn", "resnet", "random_forest"):
+            if baseline not in ("mlp", "gru", "cnn", "resnet", "tst", "random_forest"):
                 continue
             for doc in by_set.values():
                 seeds = tuple(doc.get("seeds") or ())
@@ -505,21 +508,27 @@ def baseline_cfg_table() -> str:
     training regime factored out. Hyperparameter values are introspected from the shipped baseline
     classes; only the prose descriptions are authored here."""
     cfg = baseline_cfg_rows()
-    deep = cfg["mlp"]  # the training regime is shared by all four deep baselines (asserted below)
-    for name in ("gru", "cnn", "resnet"):
-        for k in ("epochs", "batch_size", "lr", "weight_decay", "patience", "dropout"):
+    deep = cfg["mlp"]  # the training regime is shared by all five deep baselines (asserted below)
+    regime = ("epochs", "batch_size", "lr", "weight_decay", "patience")
+    for name in ("gru", "cnn", "resnet", "tst"):
+        # dropout is architecture-level for tst (its source prescribes 0.1); the row states it
+        for k in regime if name == "tst" else (*regime, "dropout"):
             if cfg[name][k] != deep[k]:
                 raise AssertionError(
                     f"deep baselines no longer share the training regime: {name}.{k}="
                     f"{cfg[name][k]} vs mlp.{k}={deep[k]} — split the table before shipping"
                 )
-    rf, thr = cfg["random_forest"], cfg["threshold"]
+    rf, thr, imp = cfg["random_forest"], cfg["threshold"], cfg["impedance"]
+    if not isinstance(imp["impedance_scale"], (int, float)):
+        raise AssertionError(
+            "the impedance locator default is no longer a fixed scale — reword its row"
+        )
     seeds = protocol_seeds()
     hidden = "$-$".join(str(h) for h in deep["hidden_sizes"])
     rows = [
         (
             r"\multicolumn{2}{l}{\textit{Shared deep-baseline training regime "
-            r"(\ac{mlp}/\ac{gru}/\ac{cnn}/\ac{resnet})}} \\"
+            r"(\ac{mlp}/\ac{gru}/\ac{cnn}/\ac{resnet}/\ac{tst})}} \\"
         ),
         f"Optimiser & AdamW, learning rate ${deep['lr']:g}$, weight decay "
         f"${deep['weight_decay']:g}$ \\\\",
@@ -546,6 +555,15 @@ def baseline_cfg_table() -> str:
         f"{2 * cfg['resnet']['width']}/{2 * cfg['resnet']['width']}$), each three Conv1d with "
         f"kernels $8/5/3$ and a $1{{\\times}}1$ shortcut; global average pooling, "
         f"Dropout(${cfg['resnet']['dropout']}$) \\\\",
+        f"\\ac{{tst}} & Time Series Transformer encoder: patch embedding Conv1d (kernel "
+        f"{cfg['tst']['patch_len']}, stride {cfg['tst']['stride']}; 59 tokens for a 480-sample "
+        f"window) scaled by $\\sqrt{{d}}$ and layer-normalised per token, learnable positional encoding, "
+        f"{cfg['tst']['n_layers']} post-norm encoder blocks (width $d={cfg['tst']['d_model']}$, "
+        f"{cfg['tst']['n_heads']} heads, feed-forward {cfg['tst']['dim_ff']}, GELU, BatchNorm in "
+        f"place of LayerNorm), Dropout(${cfg['tst']['dropout']}$), Linear head on the "
+        "concatenated token outputs. Deviations from the source: the strided patch embedding "
+        f"(one token per time step there), {cfg['tst']['n_heads']} heads (16 there) and the token "
+        "LayerNorm (none there) \\\\",
         r"\midrule",
         r"\emph{majority} & most-frequent train class (classification) / train-mean target "
         r"(regression) \\",
@@ -556,19 +574,27 @@ def baseline_cfg_table() -> str:
         f"{'unbounded' if rf['max_depth'] is None else rf['max_depth']} depth, balanced class "
         "weights (classifier); seven per-channel time-axis features: mean, std, min, max, "
         "peak-to-peak, \\ac{rms}, peak $|\\cdot|$ \\\\",
+        r"\emph{impedance locator} & fundamental-frequency phasors by a full-cycle DFT over the last "
+        r"complete cycle of the window; \emph{local}: one-terminal reactance method on the fault "
+        r"loop chosen by a current-based phase selector, zero-sequence compensated for ground loops; "
+        r"\emph{line}: two-terminal method on positive-sequence phasors (one-terminal fallback where "
+        r"the far terminal is not measured); series impedance and length of the faulted line from "
+        f"the grid topology, impedance scale ${imp['impedance_scale']:g}$, no fitted parameter; "
+        r"\ac{fl}, \emph{local} and \emph{line} only \\",
     ]
     return (
         pl.provenance_header(
             "hpc/paper_artifacts/build_supp_tab_baseline_cfg.py",
             [
-                "src/evemtbench/baselines/{mlp,gru,cnn,resnet,random_forest,threshold}.py"
+                "src/evemtbench/baselines/{mlp,gru,cnn,resnet,tst,random_forest,threshold,impedance}.py"
                 "  (frozen constructor defaults, introspected)",
                 pl._held_out_glob("*", "{val,test,benchmark}") + "  (executed seed set)",
             ],
         )
         + "\\begin{table}[t]\n\\centering\n\\small\n"
         f"\\caption{{Reference-baseline configurations (benchmark \\texttt{{v{BENCHMARK_VERSION}}}). "
-        "The four deep baselines share one training regime (top) and differ only in architecture; "
+        "The five deep baselines share one training regime (top) and differ only in architecture "
+        "(and, for the \\ac{tst}, the dropout rate its source prescribes); "
         "the classical baselines are fully specified by their listed rule. Every numeric "
         "hyperparameter is read from the shipped baseline classes when this table is generated, so "
         "it cannot drift from the code.}\n"
@@ -915,6 +941,175 @@ def current_shift_table(root=None) -> str:
     )
 
 
+_FL_VIEWS = ("line", "local")
+_FL_ONE_ENDED_GRID = "cigre_mv"
+
+
+def fl_locator_breakdown(root=None) -> list[dict]:
+    """Fault-location MAE of the impedance locator and of the validation-selected learned reference,
+    per grid, view and evaluation family, split by window position and, on CIGRE MV, by line.
+
+    ``full`` windows lie entirely inside the fault interval (``overlap_ratio == 1``); ``partial``
+    windows also contain samples before inception or after clearing (``0 < overlap_ratio < 1``). The one-ended lines come from
+    the locator's own topology rule (:func:`evemtbench.baselines.impedance.lines_measured_at_far_end`).
+    Errors are recomputed per seed from the committed prediction files joined to the task view, and
+    each seed's overall MAE must equal the stored ``per_seed`` value (the join is exact)."""
+    import numpy as np
+    import pandas as pd
+
+    from evemtbench.baselines.impedance import lines_measured_at_far_end
+    from evemtbench.evaluation.predictions_io import align_to_view
+    from evemtbench.tasks.task import load_task
+    from evemtbench.version import results_version
+
+    out = []
+    for view in _FL_VIEWS:
+        task_id = f"fault_location_{view}"
+        tree = _REPO / "outputs" / results_version("held_out", task_id)
+        for grid, _ in pl.GRID_ROWS:
+            rows = load_rows(grid)
+            task = load_task(task_id, "held_out", grid=grid, root=root)
+            for split, _lab in _EVAL_FAMILIES:
+                v = task.view(split)
+                meta = v.metadata.reset_index(drop=True)
+                y = np.asarray(v.labels, dtype=float)
+                ov = np.concatenate(
+                    [s.ws.y["overlap_ratio"].to_numpy()[s.rows] for s in v._sources]
+                )
+                keys = np.concatenate(
+                    [s.ws.y[["sample_id", "window_idx"]].to_numpy()[s.rows] for s in v._sources]
+                )
+                if not (keys == meta[["sample_id", "window_idx"]].to_numpy()).all():
+                    raise RuntimeError(f"{task_id}/{grid}/{split}: overlap_ratio not aligned")
+                full = ov >= 1.0 - 1e-9
+                groups = {"full": full, "partial": (ov > 0) & ~full}
+                one_ended, _mirrored = lines_measured_at_far_end(v)
+                if grid == _FL_ONE_ENDED_GRID and view == "line":
+                    lines = meta["y_fault_line"].astype(str).to_numpy()
+                    is_one = np.isin(lines, one_ended)
+                    groups["one_ended"] = is_one
+                    groups["two_ended"] = ~is_one
+                choice = pl.best_cell_choice(rows, task_id, split, "mae", grid=grid)
+                for role, baseline in (("locator", "impedance"), ("learned", choice["baseline"])):
+                    d = tree / task_id / "held_out" / grid / baseline / split
+                    res = json.loads((d / "result.json").read_text())
+                    stored = {int(p["seed"]): p["metrics"]["mae"] for p in res["per_seed"]}
+                    per = {g: [] for g in groups}
+                    for pp in sorted(d.glob("predictions_seed*.parquet")):
+                        seed = int(pp.stem.removeprefix("predictions_seed"))
+                        err = np.abs(align_to_view(meta, pd.read_parquet(pp)).astype(float) - y)
+                        if abs(err.mean() - stored[seed]) > 1e-9:
+                            raise RuntimeError(f"{d}: seed {seed} MAE does not match result.json")
+                        for g, m in groups.items():
+                            per[g].append(float(err[m].mean()))
+                    if len(per["full"]) != len(stored):
+                        raise RuntimeError(f"{d}: prediction files do not cover every seed")
+                    for g, m in groups.items():
+                        out.append(
+                            {
+                                "view": view,
+                                "grid": grid,
+                                "set": split,
+                                "role": role,
+                                "baseline": baseline,
+                                "group": g,
+                                "n": int(m.sum()),
+                                "mae": float(np.mean(per[g])),
+                            }
+                        )
+    return out
+
+
+def fl_locator_breakdown_table(root=None) -> str:
+    """SI table: :func:`fl_locator_breakdown` — locator vs selected learned reference by window
+    position, plus the one-ended CIGRE MV line."""
+    recs = fl_locator_breakdown(root=root)
+    at = {(r["view"], r["grid"], r["set"], r["role"], r["group"]): r for r in recs}
+    lab = dict(pl.GRID_ROWS)
+
+    def mae(view, grid, split, role, group):
+        return f"{at[(view, grid, split, role, group)]['mae']:.1f}"
+
+    def acs(view, grid, split):
+        b = at[(view, grid, split, "learned", "full")]["baseline"]
+        return pl._BASELINE_ACS.get(b, b)
+
+    body = []
+    for view in _FL_VIEWS:
+        body.append(f"\\multicolumn{{8}}{{l}}{{\\textit{{{view} view}}}} \\\\")
+        for grid, _ in pl.GRID_ROWS:
+            for i, (split, slab) in enumerate(_EVAL_FAMILIES):
+                n_full = at[(view, grid, split, "locator", "full")]["n"]
+                n_part = at[(view, grid, split, "locator", "partial")]["n"]
+                body.append(
+                    (lab[grid] if i == 0 else "")
+                    + f" & {slab} & {100 * n_part / (n_full + n_part):.0f} & "
+                    + " & ".join(
+                        mae(view, grid, split, role, g)
+                        for g in ("full", "partial")
+                        for role in ("locator", "learned")
+                    )
+                    + f" & {acs(view, grid, split)} \\\\"
+                )
+        body.append(r"\midrule")
+    body.pop()
+    one = []
+    g = _FL_ONE_ENDED_GRID
+    for split, slab in _EVAL_FAMILIES:
+        n_one = at[("line", g, split, "locator", "one_ended")]["n"]
+        n_two = at[("line", g, split, "locator", "two_ended")]["n"]
+        one.append(
+            f"{slab} & {100 * n_one / (n_one + n_two):.0f} & "
+            + " & ".join(
+                mae("line", g, split, role, grp)
+                for grp in ("one_ended", "two_ended")
+                for role in ("locator", "learned")
+            )
+            + f" & {acs('line', g, split)} \\\\"
+        )
+    return (
+        pl.provenance_header(
+            "hpc/paper_artifacts/build_supp_tab_fl_locator_breakdown.py",
+            [
+                "outputs/<fl version>/fault_location_{line,local}/held_out/<grid>/"
+                "<impedance|selected>/{test,benchmark}/{result.json,predictions_seed*.parquet}",
+                "outputs/<fl version>/fault_location_{line,local}/held_out/<grid>/<baseline>/val/"
+                "result.json  (selection)",
+                "$EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/y_*.parquet  (released dataset:"
+                " overlap_ratio, y_fault_line)",
+            ],
+        )
+        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        "\\caption{Fault-location error of the impedance-based locator and of the "
+        "validation-selected learned reference by window position. \\ac{mae} in \\% of line "
+        "length, five-seed mean for the learned reference (the locator is deterministic). "
+        "\\emph{Full} windows lie entirely inside the fault interval; \\emph{partial} windows "
+        "also contain samples before fault inception or after clearing, which can enter the "
+        "one-cycle phasor estimate. "
+        "\\emph{Partial \\%} is the share of partial windows in the evaluated set. The lower "
+        "block splits the CIGR\\'E \\ac{mv} line view into line 8--14, whose line view repeats its "
+        "single measured terminal so that the locator falls back to the one-terminal method, and "
+        "all other lines. Computed from the stored per-seed predictions of the reported cells; the "
+        "per-seed totals reproduce the reported values.}\n"
+        "\\label{tab:supp_fl_locator_breakdown}\n"
+        + pl._SHRINK_TO_FIT
+        + "\\begin{tabular}{ll r rr rr l}\n\\toprule\n"
+        " & & & \\multicolumn{2}{c}{\\textbf{full}} & \\multicolumn{2}{c}{\\textbf{partial}} & \\\\\n"
+        "\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\n"
+        "\\textbf{Grid} & \\textbf{Set} & \\textbf{partial \\%} & \\textbf{locator} & "
+        "\\textbf{learned} & \\textbf{locator} & \\textbf{learned} & \\textbf{selected} \\\\\n"
+        "\\midrule\n" + "\n".join(body) + "\n\\midrule\n"
+        " & & & \\multicolumn{2}{c}{\\textbf{line 8--14}} & "
+        "\\multicolumn{2}{c}{\\textbf{other lines}} & \\\\\n"
+        "\\cmidrule(lr){4-5}\\cmidrule(lr){6-7}\n"
+        "\\textbf{CIGR\\'E \\ac{mv}, line view} & \\textbf{Set} & \\textbf{8--14 \\%} & "
+        "\\textbf{locator} & \\textbf{learned} & \\textbf{locator} & \\textbf{learned} & \\\\\n"
+        "\\midrule\n"
+        + "\n".join(" & " + r for r in one)
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+    )
+
+
 # ==================================================================================================
 # Registry — the SI artifacts owned by this module (one entry = one file = one build_*.py).
 # ==================================================================================================
@@ -954,6 +1149,11 @@ SUPP_ARTIFACTS: dict[str, dict] = {
         "script": "hpc/paper_artifacts/build_supp_tab_current_shift.py",
         "dataset": True,
     },
+    "supp_tab_fl_locator_breakdown.tex": {
+        "builder": fl_locator_breakdown_table,
+        "script": "hpc/paper_artifacts/build_supp_tab_fl_locator_breakdown.py",
+        "dataset": True,
+    },
 }
 
 
@@ -974,6 +1174,8 @@ __all__ = [
     "ec_support_table",
     "ed_negative_composition",
     "ed_negative_support_table",
+    "fl_locator_breakdown",
+    "fl_locator_breakdown_table",
     "partition_audit_rows",
     "protocol_seeds",
     "partition_audit_table",

@@ -37,7 +37,7 @@ import paperfig_style as style
 from paper_lib import (
     _BINARY_RATE_KEYS,
     _PF_BY_KEY,
-    BASELINES,
+    FIGURE_BASELINES,
     GRID_ROWS,
     OBS,
     TEST_SETS,
@@ -62,11 +62,13 @@ _GLOBAL_ONLY = {"ed", "ec"}
 BASELINE_LABEL = {
     "majority": "majority",
     "threshold": "threshold",
+    "impedance": "impedance",
     "random_forest": "RF",
     "mlp": "MLP",
     "gru": "GRU",
     "cnn": "CNN",
     "resnet": "ResNet",
+    "tst": "TST",
 }
 
 #: Per-test-set marker style. Filled = in-distribution, hollow = never-trained, so the pair reads
@@ -115,7 +117,9 @@ def build_per_baseline_figure(key: str, out_dir: Path | None = None):
     _, _name, stem, metric, _ = _PF_BY_KEY[key]
     views = _panel_rows(key)
     per_grid = held_out_rows()
-    cells = per_baseline_matrix(stem, metric, per_grid=per_grid, views=views)
+    cells = per_baseline_matrix(
+        stem, metric, per_grid=per_grid, views=views, baselines=FIGURE_BASELINES
+    )
 
     # Drop a baseline the function never defines anywhere in this figure. `threshold` is the case
     # that matters: the overcurrent relay is binary-FD-local only, so for FC/FL/ED/EC its row is
@@ -123,7 +127,7 @@ def build_per_baseline_figure(key: str, out_dir: Path | None = None):
     # undefined one. A baseline defined in *some* panel keeps its row, so a genuine gap stays visible.
     drawn = [
         b
-        for b in BASELINES
+        for b in FIGURE_BASELINES
         if any(
             cells.get((grid, view, b, ts)) is not None
             for grid, _ in GRID_ROWS
@@ -131,7 +135,7 @@ def build_per_baseline_figure(key: str, out_dir: Path | None = None):
             for ts in TEST_SETS
         )
     ]
-    dropped = [b for b in BASELINES if b not in drawn]
+    dropped = [b for b in FIGURE_BASELINES if b not in drawn]
     if dropped:
         print(f"omitted (undefined for {key} at every view): {', '.join(dropped)}")
 

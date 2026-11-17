@@ -25,7 +25,16 @@ sys.path.insert(0, str(Path(__file__).resolve().parents[2] / "src"))
 
 from evemtbench.coverage import LEARNED_BASELINES, PRETRAIN_GRID, PRETRAIN_GRIDS
 from evemtbench.evaluation.metrics import METRIC_DIRECTION
-from make_results import BASELINES, ci_val, load_rows, mean_val, warn_once
+from make_results import BASELINES as _RESULT_BASELINES
+from make_results import ci_val, load_rows, mean_val, warn_once
+
+#: Baselines the per-baseline result tables enumerate. The conventional fault locator
+#: (``impedance``, EXP-06) is never a selection candidate; its place in the result tables is an
+#: open layout decision, so these builders leave it out of their set.
+BASELINES = [b for b in _RESULT_BASELINES if b != "impedance"]
+#: Baselines the per-baseline SI figures draw: every registered baseline, so the locator appears in
+#: the local and line fault-location panels (the SI text says the figures show the complete suite).
+FIGURE_BASELINES = list(_RESULT_BASELINES)
 
 _HERE = Path(__file__).resolve()
 _HPC = _HERE.parents[1]  # hpc/
@@ -59,11 +68,24 @@ def provenance_header(generator: str, inputs: list[str] | tuple[str, ...]) -> st
     return "\n".join(lines) + "\n"
 
 
-#: The committed held_out result tree (``outputs/1.0.0/`` under v1.1.0's scoped revision).
+#: The committed held_out result tree of the tasks ``task_glob`` names: ``outputs/1.0.0/``, or
+#: ``outputs/1.2.0/`` for the fault-location tasks (corrected valid-sample gate). A glob that
+#: names a faulted-phase task also names ``outputs/1.3.0/`` (the LP-1-patched cigre_mv cells; the
+#: tree is per grid, see ``results_version``). ``"*"`` (every task) names every tree.
 def _held_out_glob(task_glob: str, sets: str = "{val,test,benchmark}") -> str:
-    from evemtbench.version import results_version
+    from evemtbench.version import FL_RESULTS_VERSION, FP_RESULTS_VERSION, results_version
 
-    return f"outputs/{results_version('held_out')}/{task_glob}/held_out/<grid>/<baseline>/{sets}/result.json"
+    fp = task_glob == "*" or "fault_phase" in task_glob
+    # a faulted-phase glob has no single tree: start from the protocol's default and add 1.3.0
+    ver = results_version("held_out", None if task_glob.startswith("fault_phase") else task_glob)
+    trees = {ver}
+    if task_glob == "*":
+        trees.add(FL_RESULTS_VERSION)
+    if fp:
+        trees.add(FP_RESULTS_VERSION)
+    if len(trees) > 1:
+        ver = "{" + ",".join(sorted(trees)) + "}"
+    return f"outputs/{ver}/{task_glob}/held_out/<grid>/<baseline>/{sets}/result.json"
 
 
 # --------------------------------------------------------------------------------------------------
@@ -102,11 +124,13 @@ _PF_BY_KEY = {row[0]: row for row in PAPER_FUNCTIONS}
 _BASELINE_LABEL = {
     "majority": "majority (floor)",
     "threshold": "threshold (overcurrent)",
+    "impedance": "impedance (fault locator)",
     "random_forest": r"\ac{rf}",
     "mlp": r"\ac{mlp}",
     "gru": r"\ac{gru}",
     "cnn": r"\ac{cnn}",
     "resnet": r"\ac{resnet}",
+    "tst": r"\ac{tst}",
 }
 # Scale-down-ONLY width backstop for the wide SI tables: shrinks a tabular that would overrun
 # \textwidth, leaves a narrow one untouched (adjustbox is absent from the offline tectonic bundle,
@@ -215,6 +239,9 @@ def _held_unsupported(stem: str, view: str, baseline: str | None = None) -> bool
         return True
     if baseline == "threshold" and not (stem == "fault_detection" and view == "local"):
         return True
+    # the impedance-based locator is defined only for FL at the local and line views
+    if baseline == "impedance" and not (stem == "fault_location" and view in ("local", "line")):
+        return True
     return False
 
 
@@ -227,15 +254,15 @@ def _argbest_baseline(metric: str, doc_of, pool=LEARNED_BASELINES) -> str | None
     ``doc_of(baseline)`` returns that baseline's result doc (or ``None``); the winner is the argmax
     of ``mean_val(doc, metric)`` in METRIC_DIRECTION (lower-is-better metrics pick the minimum), ties
     keeping the earlier ``pool`` entry (strict ``>``). Shared kernel for the F06
-    validation-selection (``best_cell_choice`` / ``best_transfer_row``) and the legacy
-    select-on-reported-set fallback.
+    validation-selection (``best_cell_choice`` / ``best_transfer_row``). It is only ever given
+    validation docs: no caller may pass the evaluation scores a table reports.
 
-    ``pool`` is the candidate set. It defaults to :data:`LEARNED_BASELINES` — the five the held_out
+    ``pool`` is the candidate set. It defaults to :data:`LEARNED_BASELINES` — the six the held_out
     matrix fields — which is what every result table wants. A caller that compares against an arm
     with a NARROWER pool must pass that narrower pool, or the two sides of the comparison are drawn
     from different candidate sets: the cross-grid transfer protocols apply only to
     ``DEEP_BASELINES`` (``coverage.baseline_applies``), because a classical baseline has no
-    transferable weights, so a from-scratch reference selected out of all five can name a model the
+    transferable weights, so a from-scratch reference selected out of all six can name a model the
     transfer arm structurally cannot field. See :func:`supplement_lib.transfer_scratch_rows`."""
     direction = METRIC_DIRECTION.get(metric, 1)
     sel_base, sel_val = None, None
@@ -248,8 +275,68 @@ def _argbest_baseline(metric: str, doc_of, pool=LEARNED_BASELINES) -> str | None
     return sel_base
 
 
+class SelectionEvidenceError(RuntimeError):
+    """A populated cell lacks the validation evidence its model selection needs.
+
+    Raised instead of ever choosing a model by the evaluation scores a table reports (the former
+    "legacy fallback"). ``cell`` identifies the cell (protocol, task, grid, source, reported set,
+    metric); ``missing`` lists the baselines that have an evaluation result there but no usable
+    validation score. A build that hits this must not publish: re-score validation
+    (``hpc/rescore_validation.py``) or record the exclusion in :data:`SELECTION_EXCLUSIONS`."""
+
+    def __init__(self, cell: dict, missing: list[str]):
+        self.cell, self.missing = dict(cell), list(missing)
+        ident = ", ".join(f"{k}={v}" for k, v in cell.items())
+        super().__init__(
+            f"selection blocked ({ident}): no usable validation result for {', '.join(missing)}. "
+            "A model is never selected on the evaluation scores it reports; re-score validation "
+            "(hpc/rescore_validation.py) or record an exclusion with its reason in "
+            "paper_lib.SELECTION_EXCLUSIONS."
+        )
+
+
+#: Recorded exclusions from validation candidacy:
+#: ``{(protocol, task_id, grid, source or None, baseline): reason}``. A baseline that has an
+#: evaluation result but no usable validation score blocks its cell unless it is listed here; a
+#: listed baseline cannot win the cell and is announced on every build (``warn_once``). Empty: the
+#: v1.0.0 / v1.1.0 matrices carry validation evidence for every evaluated candidate.
+SELECTION_EXCLUSIONS: dict[tuple[str, str, str | None, str | None, str], str] = {}
+
+
+def _validated_candidates(cell: dict, pool, has_eval, val_score) -> list[str] | None:
+    """The baselines of ``pool`` that may compete for ``cell``, or ``None`` for an empty cell.
+
+    ``has_eval(b)`` says whether baseline ``b`` has a result on the reported set; ``val_score(b)``
+    is its validation score or ``None``. An empty cell (no ``pool`` entry evaluated) is not an
+    error: it renders as pending. In a populated cell every evaluated candidate must carry a usable
+    validation score, or the cell raises :class:`SelectionEvidenceError` --- so a candidate can
+    neither be selected on evaluation scores nor drop out of the pool silently. Baselines recorded
+    in :data:`SELECTION_EXCLUSIONS` are removed from candidacy, loudly."""
+    evaluated = [b for b in pool if has_eval(b)]
+    if not evaluated:
+        return None
+    key = (cell["protocol"], cell["task"], cell["grid"], cell["source"])
+    candidates = []
+    for b in pool:
+        reason = SELECTION_EXCLUSIONS.get((*key, b))
+        if reason is None:
+            candidates.append(b)
+        else:
+            ident = ", ".join(f"{k}={v}" for k, v in cell.items())
+            warn_once(f"selection ({ident}): baseline '{b}' excluded by record: {reason}")
+    missing = [b for b in candidates if b in evaluated and val_score(b) is None]
+    if missing:
+        raise SelectionEvidenceError(cell, missing)
+    return candidates
+
+
 def best_cell_choice(
-    rows: dict, task_id: str, test_set: str, metric: str, pool=LEARNED_BASELINES
+    rows: dict,
+    task_id: str,
+    test_set: str,
+    metric: str,
+    pool=LEARNED_BASELINES,
+    grid: str | None = None,
 ) -> dict | None:
     """The reported learned baseline for (task_id, test_set), or ``None`` if no result exists.
 
@@ -258,39 +345,59 @@ def best_cell_choice(
     ``test_set`` is reported. Selecting on validation rather than on the very test set being
     reported removes the winner's-curse (selection-on-test) bias. Direction from METRIC_DIRECTION
     (lower-is-better metrics like MAE pick the minimum); ties keep the earlier ``pool``
-    entry (strict ``>``). Falls back to legacy selection-on-``test_set`` when no ``val`` doc exists
-    for the cell (e.g. protocols not re-scored), so the function degrades gracefully. Returns
-    ``{baseline, mean, ci, n_seeds, selected_on}``.
+    entry (strict ``>``). Returns ``{baseline, mean, ci, n_seeds, selected_on}``, where
+    ``selected_on`` is always ``"val"``.
+
+    There is no fallback to the reported set. ``None`` means the cell is empty (no ``pool``
+    baseline has a result on ``test_set``) or its validation winner has no result there yet --- the
+    winner is never replaced by another model. A populated cell in which an evaluated candidate
+    has no usable validation score raises :class:`SelectionEvidenceError`.
 
     ``pool`` narrows the candidate set; see :func:`_argbest_baseline` for when that is required.
+    ``grid`` only names the cell in errors and exclusion records; when omitted it is read from the
+    cell's result docs.
 
     ``rows`` is ``load_rows(grid)`` = ``{(task_id, baseline): {test_set: doc}}``."""
+
+    def val_of(b: str):
+        return rows.get((task_id, b), {}).get("val")
+
+    def rep_of(b: str):
+        return rows.get((task_id, b), {}).get(test_set)
+
+    if grid is None:
+        grid = next((d["grid"] for b in pool if (d := rep_of(b)) and d.get("grid")), None)
+    cell = {
+        "protocol": "held_out",
+        "task": task_id,
+        "grid": grid,
+        "source": None,
+        "reported_set": test_set,
+        "metric": metric,
+    }
+    candidates = _validated_candidates(
+        cell,
+        pool,
+        lambda b: mean_val(rep_of(b), metric) is not None,
+        lambda b: mean_val(val_of(b), metric),
+    )
+    if candidates is None:
+        return None  # empty cell: nothing evaluated on this set
     # 1) select the winner by its validation-split score
-    sel_base = _argbest_baseline(metric, lambda b: rows.get((task_id, b), {}).get("val"), pool)
-    if sel_base is not None:
-        # 2) report the validation-selected baseline's value on the requested test_set
-        rep = rows.get((task_id, sel_base), {}).get(test_set)
-        mean = mean_val(rep, metric)
-        if mean is None:
-            return None  # selected baseline has no result on this test set yet
-        return {
-            "baseline": sel_base,
-            "mean": mean,
-            "ci": ci_val(rep, metric),
-            "n_seeds": len((rep or {}).get("seeds") or []),
-            "selected_on": "val",
-        }
-    # 3) fallback: no validation re-score for this cell -> legacy selection on the reported set
-    best_base = _argbest_baseline(metric, lambda b: rows.get((task_id, b), {}).get(test_set), pool)
-    best_doc = rows.get((task_id, best_base), {}).get(test_set) if best_base is not None else None
-    if best_doc is None:
-        return None
+    sel_base = _argbest_baseline(metric, val_of, candidates)
+    if sel_base is None:
+        return None  # every evaluated candidate is a recorded exclusion
+    # 2) report the validation-selected baseline's value on the requested test_set
+    rep = rep_of(sel_base)
+    mean = mean_val(rep, metric)
+    if mean is None:
+        return None  # selected baseline has no result on this test set yet
     return {
-        "baseline": best_base,
-        "mean": mean_val(best_doc, metric),
-        "ci": ci_val(best_doc, metric),
-        "n_seeds": len(best_doc.get("seeds") or []),
-        "selected_on": "test",
+        "baseline": sel_base,
+        "mean": mean,
+        "ci": ci_val(rep, metric),
+        "n_seeds": len((rep or {}).get("seeds") or []),
+        "selected_on": "val",
     }
 
 
@@ -420,11 +527,12 @@ def per_baseline_matrix(
     per_grid: dict | None = None,
     views=OBS,
     test_sets=TEST_SETS,
+    baselines=BASELINES,
 ) -> dict[tuple[str, str, str, str], dict | None]:
     """Every per-baseline held_out cell of one function, as plain data (no matplotlib).
 
     Keyed ``(grid, view, baseline, test_set)`` over :data:`GRID_ROWS` x ``views`` x
-    :data:`BASELINES` x ``test_sets``; the value is ``{mean, ci, lo, hi, n_seeds}`` or ``None``.
+    ``baselines`` x ``test_sets``; the value is ``{mean, ci, lo, hi, n_seeds}`` or ``None``.
     ``None`` covers both states the S2 tables render as markers: a (view, baseline) combination the
     function does not define (``\\notapp``), and a defined cell with no result yet (``\\pending``).
 
@@ -438,7 +546,7 @@ def per_baseline_matrix(
     out: dict[tuple[str, str, str, str], dict | None] = {}
     for grid, _ in GRID_ROWS:
         for view in views:
-            for baseline in BASELINES:
+            for baseline in baselines:
                 unsupported = _held_unsupported(stem, view, baseline)
                 for test_set in test_sets:
                     key = (grid, view, baseline, test_set)
@@ -473,12 +581,6 @@ def _best_cell(rows: dict, stem: str, view: str, test_set: str, metric: str) -> 
     choice = best_cell_choice(rows, f"{stem}_{view}", test_set, metric)
     if choice is None:
         return r"\pending"
-    if choice["selected_on"] == "test":
-        warn_once(
-            f"held_out cell {stem}_{view}/{test_set} ({metric}): no validation re-score for any "
-            f"learned baseline; '{choice['baseline']}' selected on the reported set "
-            "(legacy fallback)"
-        )
     return _fmt_mean_ci(choice["mean"], choice["ci"], metric)
 
 
@@ -510,14 +612,14 @@ def _supp_cell(rows: dict, stem: str, view: str, baseline: str, test_set: str, m
 #
 # The body must contain exactly ONE ``\midrule`` before it, because
 # tests/integration/test_supplement_tables.py counts the five-state markers in
-# ``latex.split("\midrule")[1]`` and expects N_BODY_CELLS = 7 * 12. Grid groups are therefore
+# ``latex.split("\midrule")[1]`` and expects N_BODY_CELLS = 8 * 12. Grid groups are therefore
 # separated with \addlinespace, never with a rule.
 # --------------------------------------------------------------------------------------------------
 def supp_table(key: str, test_set: str) -> str:
     r"""Full per-baseline results for one function on one held_out test set.
 
     Rows are ``(grid, observability view)`` in :data:`GRID_ROWS` x :data:`OBS` order; columns are the
-    seven :data:`BASELINES`. Cells come from :func:`_supp_cell`, so a (view, baseline) combination
+    eight :data:`BASELINES`. Cells come from :func:`_supp_cell`, so a (view, baseline) combination
     the function does not define renders ``\notapp`` and a defined-but-unrun cell ``\pending`` --
     the same five-state marker set the rest of the SI uses."""
     _, name, stem, metric, metric_label = _PF_BY_KEY[key]
@@ -595,7 +697,7 @@ def result_table(key: str) -> str:
             [_held_out_glob(f"{stem}_{{local,line,global}}")],
         )
         + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.1pt}\n"
-        f"\\caption{{{name} --- reference baseline (best of RF/MLP/GRU/CNN/ResNet, "
+        f"\\caption{{{name} --- reference baseline (best of RF/MLP/GRU/CNN/ResNet/TST, "
         "selected on the validation split; a beatable reference, full per-baseline breakdown "
         "in the Supplementary), headline metric "
         f"({metric_label}) per grid and observability view, for the two \\texttt{{held\\_out}} "
@@ -626,15 +728,17 @@ def _source_short(source: str) -> str:
 
 
 def _transfer_index(outputs: str | Path = "outputs") -> dict:
-    """``{(task_id, grid, protocol, source): [Row, ...]}`` for the version's transfer runs on
-    benchmark. ``source`` is the pre-training grid the transfer was seeded from (``Row.source``;
-    legacy source-less results default to ``PRETRAIN_GRID`` = the 20 kV template)."""
+    """``{(task_id, grid, protocol, source): [Row, ...]}`` for the CURRENT transfer runs on
+    benchmark (``Row.version == results_version(protocol, task)``: the fault-location transfer
+    cells live in the 1.2.0 tree, every other task's in 1.1.0; a superseded copy in an older tree
+    is never indexed). ``source`` is the pre-training grid the transfer was seeded from
+    (``Row.source``; legacy source-less results default to ``PRETRAIN_GRID`` = the 20 kV template)."""
     from evemtbench.leaderboard import scan_results
-    from evemtbench.version import BENCHMARK_VERSION
+    from evemtbench.version import results_version
 
     idx: dict = {}
     for r in scan_results(outputs):
-        if r.version != BENCHMARK_VERSION:
+        if r.version != results_version(r.protocol, r.task, grid=r.grid, source=r.source):
             continue
         if r.protocol not in ("transfer_zeroshot", "transfer_finetune"):
             continue
@@ -654,33 +758,57 @@ def _transfer_val_index(outputs: str | Path = "outputs") -> dict:
       val on the target grid per source (legacy source-less path = the 20 kV default; a
       ``pretrain-<src>`` subdir = that source).
 
-    Missing keys degrade to legacy select-on-benchmark (val artifacts under ``**/val/`` are
-    gitignored). Produced by ``hpc/rescore_validation.py``."""
+    A populated transfer cell whose key is missing here fails in :func:`best_transfer_row`; it is
+    never selected on the benchmark it reports (val artifacts under ``**/val/`` are gitignored, so
+    a checkout without ``outputs/`` has empty cells, not failures). Produced by
+    ``hpc/rescore_validation.py``.
+
+    Each doc is read from the CURRENT tree of its (protocol, task): the ``multi_grid_pretrain``
+    source-model val docs from 1.1.0 for every task (fault location included — its source corpora
+    are unaffected by the v1.2.0 gate), the ``transfer_finetune`` val docs from 1.1.0, or from
+    1.2.0 for the fault-location tasks."""
     import glob
     import json
 
-    from evemtbench.version import BENCHMARK_VERSION
+    from evemtbench.coverage import cell_from_key, cell_results_version
+    from evemtbench.version import CURRENT_RESULTS_VERSIONS
 
     idx: dict = {}
-    base = f"{outputs}/{BENCHMARK_VERSION}"
 
     def _warn_bad(f: str, e: Exception) -> None:
         warn_once(f"skipping unreadable/malformed val result.json: {f} ({type(e).__name__}: {e})")
 
-    for f in glob.glob(f"{base}/*/multi_grid_pretrain/*/*/val/result.json"):
+    def _cur(protocol: str, tail: str) -> list[str]:
+        """Current-tree files ``<outputs>/<ver>/<task>/<protocol>/<tail>``: a file is kept when
+        its tree is the current one of its cell (task, protocol, grid, source; parsed from the
+        path below the tree root)."""
+        n = len(Path(outputs).parts)  # <outputs>/<ver>/<task>/... -> the task dir is parts[n + 1]
+
+        def _current(f: str, ver: str) -> bool:
+            cell = cell_from_key(Path(*Path(f).parts[n + 1 :]))
+            return cell is not None and cell_results_version(cell) == ver
+
+        return [
+            f
+            for ver in CURRENT_RESULTS_VERSIONS
+            for f in glob.glob(f"{outputs}/{ver}/*/{protocol}/{tail}")
+            if _current(f, ver)
+        ]
+
+    for f in _cur("multi_grid_pretrain", "*/*/val/result.json"):
         try:
             d = json.load(open(f))
             idx[("multi_grid_pretrain", d["grid"], d["task"], d["baseline"])] = d
         except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
             _warn_bad(f, e)
     # transfer_finetune val: legacy source-less path (=> 20 kV) and source-tokened (pretrain-<src>)
-    for f in glob.glob(f"{base}/*/transfer_finetune/*/*/val/result.json"):
+    for f in _cur("transfer_finetune", "*/*/val/result.json"):
         try:
             d = json.load(open(f))
             idx[("transfer_finetune", d["grid"], d["task"], d["baseline"], PRETRAIN_GRID)] = d
         except (OSError, json.JSONDecodeError, KeyError, TypeError) as e:
             _warn_bad(f, e)
-    for f in glob.glob(f"{base}/*/transfer_finetune/*/*/pretrain-*/val/result.json"):
+    for f in _cur("transfer_finetune", "*/*/pretrain-*/val/result.json"):
         try:
             d = json.load(open(f))
             src = Path(f).parent.parent.name.replace("pretrain-", "")  # .../pretrain-<src>/val/…
@@ -703,9 +831,11 @@ def best_transfer_row(
     ``None``). F06 consistency: the winner is selected on a VALIDATION signal, never on the benchmark
     it reports — ``transfer_zeroshot`` on the ``source``'s ``multi_grid`` pretrain val
     (grid-independent: one pretrained model applied to every target), ``transfer_finetune`` on that
-    source's fine-tune val on the target grid. Falls back to legacy select-on-benchmark when the
-    relevant val re-score is absent (e.g. the 110/345 kV fine-tune val is not yet scored)."""
-    direction = METRIC_DIRECTION.get(metric, 1)
+    source's fine-tune val on the target grid. Neither signal substitutes for the other, and there
+    is no fallback to the benchmark set: a populated cell in which an evaluated baseline has no
+    usable validation score (or whose protocol has no validation rule) raises
+    :class:`SelectionEvidenceError`. ``None`` means the cell is empty or its validation winner has
+    no benchmark row yet (rendered ``\\pending``); the winner is never replaced by another model."""
     bench = {
         r.baseline: r
         for r in idx.get((task_id, grid, protocol, source), [])
@@ -728,25 +858,23 @@ def best_transfer_row(
         def val_of(b: str):
             return None
 
-    sel_base = _argbest_baseline(metric, val_of)
-    if sel_base is not None:
-        # a baseline with a benchmark row but no val doc can never win this cell (e.g. a re-score
-        # rejected by the positive control) — say so instead of shrinking the candidate pool mutely
-        for b in sorted(bench):
-            if val_of(b) is None:
-                warn_once(
-                    f"transfer cell {task_id}/{grid}/{protocol}/src={source}: baseline '{b}' has "
-                    "a benchmark row but no val doc — excluded from validation selection"
-                )
-        return bench.get(sel_base)  # None -> \pending if the winner lacks a benchmark cell here
-    # fallback: no val re-score for this (source, protocol) -> legacy selection on the benchmark set
-    if not bench:
-        return None
-    warn_once(
-        f"transfer cell {task_id}/{grid}/{protocol}/src={source}: no val re-score for any "
-        "baseline; winner selected on the reported benchmark set (legacy fallback)"
+    cell = {
+        "protocol": protocol,
+        "task": task_id,
+        "grid": grid,
+        "source": source,
+        "reported_set": "benchmark",
+        "metric": metric,
+    }
+    # a baseline with a benchmark row but no val doc (e.g. a re-score rejected by the positive
+    # control) blocks the cell unless its exclusion is recorded: it may not shrink the pool mutely
+    candidates = _validated_candidates(
+        cell, LEARNED_BASELINES, lambda b: b in bench, lambda b: mean_val(val_of(b), metric)
     )
-    return max(bench.values(), key=lambda r: direction * r.mean(metric))
+    if candidates is None:
+        return None  # empty cell: no learned baseline has a benchmark row
+    sel_base = _argbest_baseline(metric, val_of, candidates)
+    return bench.get(sel_base)  # None -> \pending if the winner lacks a benchmark cell here
 
 
 def _transfer_cell(
@@ -798,23 +926,28 @@ def transfer_table(
         if gi < len(GRID_ROWS) - 1:
             body_lines.append(r"\midrule")
     body = "\n".join(body_lines)
-    from evemtbench.version import BENCHMARK_VERSION
+    from evemtbench.version import results_version
+
+    # the trees this function's transfer cells / selection docs are current in (fault location:
+    # transfer cells in 1.2.0, its multi_grid_pretrain source models still in 1.1.0)
+    _tr_ver = results_version("transfer_finetune", f"{stem}_local")
+    _src_ver = results_version("multi_grid_pretrain", f"{stem}_local")
 
     header = provenance_header(
         f"hpc/paper_artifacts/build_tab_transfer_{key}.py",
         [
-            f"outputs/{BENCHMARK_VERSION}/{stem}_{{local,line}}/transfer_{{zeroshot,finetune}}/"
+            f"outputs/{_tr_ver}/{stem}_{{local,line}}/transfer_{{zeroshot,finetune}}/"
             "<grid>/<baseline>/[pretrain-<source>/]benchmark/result.json",
-            f"outputs/{BENCHMARK_VERSION}/{stem}_{{local,line}}/multi_grid_pretrain/<source>/"
+            f"outputs/{_src_ver}/{stem}_{{local,line}}/multi_grid_pretrain/<source>/"
             "<baseline>/val/result.json  (zero-shot selection)",
-            f"outputs/{BENCHMARK_VERSION}/{stem}_{{local,line}}/transfer_finetune/<grid>/"
+            f"outputs/{_tr_ver}/{stem}_{{local,line}}/transfer_finetune/<grid>/"
             "<baseline>/[pretrain-<source>/]val/result.json  (fine-tune selection)",
         ],
     )
     return (
         header + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
         f"\\caption{{{name} --- cross-grid transfer reference baseline (best of "
-        "MLP/GRU/CNN/ResNet, selected on the validation split, never on the reported "
+        "MLP/GRU/CNN/ResNet/TST, selected on the validation split, never on the reported "
         "\\texttt{eval\\_grid} set: \\emph{fine-tune} on the target grid's validation split, "
         "\\emph{zero-shot} on the "
         "pre-training source's \\texttt{multi\\_grid} validation --- so the zero-shot choice is "
@@ -979,6 +1112,7 @@ threshold & conventional (overcurrent) & local current & binary \ac{fd}, \emph{l
 \ac{gru} & deep (sequence) & raw window & sequence model \\
 \ac{cnn} & deep (1-D waveform) & raw window & waveform model \\
 \ac{resnet} & deep (1-D residual) & raw window & residual waveform model \\
+\ac{tst} & deep (Transformer) & raw window & Time Series Transformer encoder; deviates from the source in its strided patch embedding (16 samples, stride 8), its 8 heads and a LayerNorm on the patch tokens \\
 \ac{gnn} \planned & deep (topology-aware) & grid graph & cross-topology contender \\
 \bottomrule
 \end{tabular}
@@ -1039,8 +1173,10 @@ _BASELINE_ACS = {
     "gru": r"\acs{gru}",
     "cnn": r"\acs{cnn}",
     "resnet": r"\acs{resnet}",
+    "tst": r"\acs{tst}",
     "majority": "maj.",
     "threshold": "thr.",
+    "impedance": "imp.",
 }
 
 
@@ -1227,7 +1363,7 @@ def _fc_class_support(grid: str, test_set: str = "test") -> dict:
 
     from evemtbench.version import results_version
 
-    ver = results_version("held_out")
+    ver = results_version("held_out", "fault_classification_line")
     pat = f"outputs/{ver}/fault_classification_line/held_out/{grid}/*/{test_set}/result.json"
     for f in sorted(glob.glob(pat)):
         try:
@@ -1289,7 +1425,7 @@ _DIAGNOSTICS = [  # (row label, task stem, natural view, class kind)
     ("Switch detection", "switch_detection", "global", "binary"),
     ("Switch type", "switch_type", "global", "8-class"),
 ]
-_DIAG_BASELINES = ["majority", "random_forest", "mlp", "gru", "cnn", "resnet"]
+_DIAG_BASELINES = ["majority", "random_forest", "mlp", "gru", "cnn", "resnet", "tst"]
 
 
 def _diag_cell(rows: dict, task_id: str, baseline: str) -> str:
@@ -1345,7 +1481,7 @@ def build_paper_tables() -> dict[str, str]:
 
 def _val_audit_cell(rows: dict, stem: str, view: str, metric: str) -> str:
     """S10 audit cell: the winner's validation score *plus the winner's identity* — auditing a
-    best-of-five selection needs at least who won (evemt-v3 V3-082/041), not only the score."""
+    best-of-six selection needs at least who won (evemt-v3 V3-082/041), not only the score."""
     if _held_unsupported(stem, view):
         return r"\notapp"
     choice = best_cell_choice(rows, f"{stem}_{view}", "val", metric)
@@ -1357,6 +1493,7 @@ def _val_audit_cell(rows: dict, stem: str, view: str, metric: str) -> str:
         "gru": r"\acs{gru}",
         "cnn": r"\acs{cnn}",
         "resnet": r"\acs{resnet}",
+        "tst": r"\acs{tst}",
     }
     label = short.get(choice["baseline"], choice["baseline"])
     return f"{_fmt_mean_ci(choice['mean'], choice['ci'], metric)} ({label})"

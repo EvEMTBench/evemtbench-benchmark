@@ -23,7 +23,7 @@ from evemtbench.coverage import (
     Cell,
     cell_dir,
 )
-from evemtbench.version import BENCHMARK_VERSION
+from evemtbench.version import TRANSFER_RESULTS_VERSION, results_version
 
 TASK, GRID, BASELINE = "fault_category_line", "cigre_mv", "cnn"
 PROTOCOL = TRANSFER_PROTOCOLS[0]
@@ -44,7 +44,18 @@ def test_default_source_key_is_unchanged():
     """Default source keeps the legacy source-less key, so already-logged runs keep their ids."""
     name, key = cell_identity(TASK, PROTOCOL, GRID, BASELINE, PRETRAIN_GRID)
     assert name == f"{TASK}/{PROTOCOL}/{GRID}/{BASELINE}"
-    assert key == f"{BENCHMARK_VERSION}/{name}"
+    # the key lives in the cell's CURRENT results tree; for this (non fault-location) transfer cell
+    # that is still the 1.1.0 tree after the v1.2.0 revision, which is what keeps the logged ids
+    assert results_version(PROTOCOL, TASK) == TRANSFER_RESULTS_VERSION == "1.1.0"
+    assert key == f"1.1.0/{name}"
+
+
+def test_fault_location_transfer_cell_gets_a_new_key():
+    """A fault-location transfer cell is re-run under the v1.2.0 gate into a new tree, so its
+    tracking key (and run id) must differ from the superseded 1.1.0 run of the same cell."""
+    name, key = cell_identity("fault_location_line", PROTOCOL, GRID, BASELINE, PRETRAIN_GRID)
+    assert key == f"1.2.0/{name}"
+    assert _tracking.run_id_for(key) != _tracking.run_id_for(f"1.1.0/{name}")
 
 
 @pytest.mark.parametrize("source", [s for s in PRETRAIN_GRIDS if s != PRETRAIN_GRID])
@@ -62,3 +73,27 @@ def test_non_transfer_protocols_ignore_pretrain_grid():
     a = cell_identity(TASK, "held_out", GRID, BASELINE, None)
     b = cell_identity(TASK, "held_out", GRID, BASELINE, "template_345kv")
     assert a == b
+
+
+def test_normalization_control_gets_its_own_run_id():
+    """The normalization control re-runs a held_out cell with per-window normalization into a
+    separate output root. Sharing the main cell's key made that run resume into the main cell's
+    W&B run and overwrite its summary, so a non-default normalization must qualify the key."""
+    held_out = "held_out"
+    _, main_key = cell_identity("fault_location_line", held_out, GRID, BASELINE, None)
+    _, default_key = cell_identity(
+        "fault_location_line", held_out, GRID, BASELINE, None, normalize="none"
+    )
+    name, control_key = cell_identity(
+        "fault_location_line", held_out, GRID, BASELINE, None, normalize="per_window"
+    )
+    assert default_key == main_key
+    assert name.endswith("/norm-per_window")
+    assert _tracking.run_id_for(control_key) != _tracking.run_id_for(main_key)
+
+
+def test_transfer_default_normalization_keeps_the_key():
+    """per_window is the transfer default, so passing it must not change already-logged ids."""
+    assert cell_identity(TASK, PROTOCOL, GRID, BASELINE, PRETRAIN_GRID, normalize="per_window")[
+        1
+    ] == _key(PRETRAIN_GRID)
