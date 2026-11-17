@@ -21,6 +21,7 @@ class _Task:
 
 @pytest.fixture
 def rv():
+    pytest.importorskip("torch")  # rescore_validation loads checkpoints; torch-free CI skips
     import rescore_validation
 
     return rescore_validation

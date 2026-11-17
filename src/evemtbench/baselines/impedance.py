@@ -731,7 +731,7 @@ class ImpedanceBaseline:
         z1_total = np.array([params[ln].z1_total for ln in lines], dtype=complex)
         k0 = np.array([params[ln].k0 for ln in lines], dtype=complex)
         if scale_override is not None:
-            scale = np.full(len(lines), float(scale_override))
+            scale: np.ndarray = np.full(len(lines), float(scale_override))
         else:
             default = np.nan if self.default_scale_ is None else self.default_scale_
             by_line = {ln: self.scales_.get(ln, default) for ln in params}
@@ -792,7 +792,7 @@ class ImpedanceBaseline:
         raw = np.where(np.isfinite(raw), raw, np.nan)
         location = np.clip(np.where(np.isnan(raw), _MIDLINE, raw), 0.0, 100.0)
         if not two_terminal:
-            method = np.full(len(lines), "one_terminal", dtype=object)
+            method: np.ndarray = np.full(len(lines), "one_terminal", dtype=object)
         else:
             method = np.where(one_ended, "one_terminal_fallback", "two_terminal")
         return pd.DataFrame(
