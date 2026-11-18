@@ -23,6 +23,7 @@ from ..tasks.labels.fault_phase import PHASE_CLASSES
 from ..tasks.labels.switch_type import SWITCH_TYPE_CLASSES
 from ..tasks.task import Task
 from ..tasks.taxonomy import Function, LabelKind
+from ..version import DEFAULT_PRETRAIN_GRID
 from .metrics import (
     compute_binary_metrics,
     compute_multiclass_metrics,
@@ -65,9 +66,15 @@ class EvalResult:
     test_set: str = "test"  # which held-out set: "test" (adapt_grid) or "benchmark"
     breakdowns: dict[str, dict] = field(default_factory=dict)
     seed_summary: dict | None = None
+    # Transfer protocols only: the pre-training source the scored cell belongs to. Two sources give
+    # the same metrics for the same predictions, so without it the document cannot name its cell.
+    source: str | None = None
 
     def to_dict(self) -> dict:
-        return dataclasses.asdict(self)
+        d = dataclasses.asdict(self)
+        if d["source"] is None:  # non-transfer results keep their exact previous shape
+            del d["source"]
+        return d
 
     def to_json(self, indent: int = 2) -> str:
         sanitized = _nan_to_none(json.loads(json.dumps(self.to_dict(), default=float)))
@@ -149,4 +156,9 @@ def evaluate(
         metrics=metrics,
         test_set=test_set,
         breakdowns=breakdowns,
+        source=(
+            (task.pretrain_grid or DEFAULT_PRETRAIN_GRID)
+            if task.protocol in ("transfer_zeroshot", "transfer_finetune")
+            else None
+        ),
     )

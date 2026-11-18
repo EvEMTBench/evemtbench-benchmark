@@ -67,7 +67,7 @@ evidence tables (partition/leakage audit, valid-sample counts, EC support, ED ne
 composition, current-scale diagnostic, transfer-vs-scratch reference, selection audit).
 Each table names its owning generator and inputs in a header comment. Result cells are
 `mean $\pm$ 95% CI`; `\res` = no result yet. Compile standalone by prepending
-`\input{_preamble.tex}` (it stubs `\res`/`\ac`/`\acs`).
+`\input{_preamble.tex}` (it stubs the manuscript macros the tables use).
 
 ## Full provenance
 

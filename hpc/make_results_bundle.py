@@ -156,6 +156,12 @@ _PREAMBLE = r"""% Minimal standalone preamble for the results/<version>/tables/*
 \providecommand{\res}{--}
 \providecommand{\ac}[1]{#1}
 \providecommand{\acs}[1]{#1}
+\providecommand{\Ac}[1]{#1}
+\providecommand{\acp}[1]{#1s}
+\providecommand{\oos}{\textsf{---}}
+\providecommand{\notapp}{\textsf{n/a}}
+\providecommand{\undefm}{\textsf{U}}
+\providecommand{\planned}{\textsf{planned}}
 """
 
 
@@ -205,7 +211,7 @@ def _readme(version: str, n_records: int, n_cells: int) -> str:
         "composition, current-scale diagnostic, transfer-vs-scratch reference, selection audit).\n"
         "Each table names its owning generator and inputs in a header comment. Result cells are\n"
         "`mean $\\pm$ 95% CI`; `\\res` = no result yet. Compile standalone by prepending\n"
-        "`\\input{_preamble.tex}` (it stubs `\\res`/`\\ac`/`\\acs`).\n\n"
+        "`\\input{_preamble.tex}` (it stubs the manuscript macros the tables use).\n\n"
         "## Full provenance\n\n"
         "For per-number traceability — output file, evaluation code, training log, training code,\n"
         "config, W&B run and the exact reproduce command behind each number — see the audit\n"
@@ -214,7 +220,7 @@ def _readme(version: str, n_records: int, n_cells: int) -> str:
 
 
 def build_results_bundle(
-    outputs: str | Path = "outputs", *, version: str | None = None
+    outputs: str | Path = "outputs", *, version: str | None = None, allow_empty: bool = False
 ) -> dict[str, str]:
     """{rel-path-under-repo: content} for the whole ``results/<version>/`` bundle. Pure +
     deterministic (no timestamps, sorted) so the freshness gate byte-compares it like the rest.
@@ -222,6 +228,12 @@ def build_results_bundle(
     ``results/<v>/`` trees are frozen pre-revision bundles the gate never regenerates."""
     out = Path(outputs)
     rows = scan_results(out) if out.is_dir() else []
+    if not rows and not allow_empty:
+        raise FileNotFoundError(
+            f"no result records under {str(out)!r}: the bundle is rebuilt from the per-run outputs "
+            "(outputs/<version>/.../result.json), which are not part of the public release. "
+            "Nothing was written; the committed results/ files are the published bundle."
+        )
     records = aggregated_records(rows, version=version)
     n_cells = len(
         {
@@ -249,8 +261,16 @@ def main(argv: list[str] | None = None) -> None:
     ap = argparse.ArgumentParser(description="Build the public results/<version>/ bundle.")
     ap.add_argument("--outputs", default="outputs")
     ap.add_argument("--out", default=".", help="repo root under which results/ is written")
+    ap.add_argument(
+        "--allow-empty",
+        action="store_true",
+        help="development only: write a bundle even when --outputs holds no result records",
+    )
     args = ap.parse_args(argv)
-    bundle = build_results_bundle(args.outputs)
+    try:
+        bundle = build_results_bundle(args.outputs, allow_empty=args.allow_empty)
+    except FileNotFoundError as e:
+        raise SystemExit(f"error: {e}") from None
     root = Path(args.out)
     for rel, content in sorted(bundle.items()):
         dest = root / rel

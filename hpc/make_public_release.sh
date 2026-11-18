@@ -123,7 +123,7 @@ REQUIRED=(
   src/evemtbench/version.py src/evemtbench/splits/v1.0 src/evemtbench/splits/v1.1
   RESULTS.md leaderboard.html leaderboard_full.html coverage_snapshot.json
   "results/$VERSION" audit/index.html "audit/provenance/$VERSION/index.json"
-  .github/workflows/ci.yml .github/workflows/nightly.yml
+  .github/workflows/ci.yml
   index.html .nojekyll
   docs/quickstart.md docs/protocol.md docs/DATA_LAYOUT.md
   hpc/sweep.sh hpc/submit.sh hpc/make_results.py hpc/make_results_bundle.py hpc/make_audit.py

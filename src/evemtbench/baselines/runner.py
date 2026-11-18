@@ -22,6 +22,7 @@ import importlib.metadata
 import json
 import os
 import platform
+import shutil
 import subprocess
 import sys
 import time
@@ -354,6 +355,11 @@ def _agg_compute(per_seed: list[dict], n_params: int | None) -> dict:
     }
 
 
+#: Per-attempt staging directory inside a cell: predictions are written here and moved into
+#: place only at the write stage, so a failed re-run cannot mix generations.
+_ATTEMPT_DIR = ".attempt"
+
+
 def main(argv: list[str] | None = None) -> None:
     p = argparse.ArgumentParser(description="Train + evaluate a benchmark baseline over seeds.")
     p.add_argument("--task", default="fault_detection_local")
@@ -495,6 +501,7 @@ def _run_cell(args, normalize: str, stage: dict) -> None:
     # maps 1:1 to this cell; its deterministic id/url is recorded in run_record.json below for the
     # offline<->online cross-link. Both hooks no-op safely when W&B is disabled/unavailable. ---
     base_dir.mkdir(parents=True, exist_ok=True)
+    shutil.rmtree(base_dir / _ATTEMPT_DIR, ignore_errors=True)  # leftovers of a failed attempt
     from . import _tracking
     from ._log import set_log_file
 
@@ -633,16 +640,20 @@ def _run_cell(args, normalize: str, stage: dict) -> None:
         # multi_grid_pretrain persists the transferable bundle; other protocols keep the plain
         # best-val state_dict. Zero-shot trains nothing, so it writes no checkpoint.
         if is_pretrain:
-            ckpt = _save_transfer_bundle(model, base_dir, seed)
+            ckpt = _save_transfer_bundle(model, base_dir / _ATTEMPT_DIR, seed)
         elif is_zeroshot:
             ckpt = None
         else:
-            ckpt = _save_checkpoint(model, base_dir, seed)  # deep baselines only; None otherwise
+            ckpt = _save_checkpoint(
+                model, base_dir / _ATTEMPT_DIR, seed
+            )  # deep baselines only; None otherwise
         if ckpt is not None:
             checkpoints[str(seed)] = ckpt
         for ts in test_sets:
             stage["name"] = f"predict (seed {seed}, {ts})"
-            out_dir = base_dir / ts
+            # Staged, not published: a re-run that fails later must leave the previous complete
+            # generation (predictions + result + record) untouched. Published at the write stage.
+            out_dir = base_dir / _ATTEMPT_DIR / ts
             out_dir.mkdir(parents=True, exist_ok=True)
             preds = model.predict(task.view(ts))
             pred_path = out_dir / f"predictions_seed{seed}.parquet"
@@ -793,6 +804,18 @@ def _run_cell(args, normalize: str, stage: dict) -> None:
     stage["name"] = "write"
     # A validation re-score belongs to the checkpoints it scored: drop it when the cell is re-run.
     (base_dir / "val" / "result.json").unlink(missing_ok=True)
+    # Publish the staged checkpoints and predictions of this attempt, then the record, then
+    # result.json. The recorded checkpoint paths are relative to the cell, so they are unchanged.
+    staged_ckpts = sorted((base_dir / _ATTEMPT_DIR / "checkpoints").glob("seed*.pt"))
+    if staged_ckpts:
+        (base_dir / "checkpoints").mkdir(parents=True, exist_ok=True)
+    for staged in staged_ckpts:
+        atomic_replace(staged, base_dir / "checkpoints" / staged.name)
+    for ts in test_sets:
+        (base_dir / ts).mkdir(parents=True, exist_ok=True)
+        for staged in sorted((base_dir / _ATTEMPT_DIR / ts).glob("predictions_seed*.parquet")):
+            atomic_replace(staged, base_dir / ts / staged.name)
+    shutil.rmtree(base_dir / _ATTEMPT_DIR, ignore_errors=True)
     # Provenance first, result.json last: a valid result.json is what marks the cell ``done``
     # (coverage.cell_status), so a job that dies in between leaves a cell that re-runs instead of
     # a "done" cell without its run record. Both writes are atomic (temporary sibling + rename).

@@ -56,8 +56,10 @@ def _write_cell(root: Path, task, grid, baseline, mean, *, version=HO_VER, ci95=
 @needs_manuscript
 def test_builder_deterministic_and_wellformed_without_outputs(tmp_path, monkeypatch):
     monkeypatch.chdir(tmp_path)  # no outputs/ -> empty aggregate; tables are copied, not rendered
-    a = MRB.build_results_bundle("outputs")
-    b = MRB.build_results_bundle("outputs")
+    with pytest.raises(FileNotFoundError, match="no result records"):
+        MRB.build_results_bundle("outputs")  # a public rebuild without inputs must not write
+    a = MRB.build_results_bundle("outputs", allow_empty=True)
+    b = MRB.build_results_bundle("outputs", allow_empty=True)
     assert a == b, "build_results_bundle is not deterministic"
     # expected members
     assert f"{BASE}/aggregated_results.csv" in a
@@ -125,7 +127,7 @@ def test_tables_are_a_byte_copy_of_the_committed_fragments(tmp_path, monkeypatch
     monkeypatch.chdir(tmp_path)
     from paper_lib import GEN_DIR
 
-    bundle = MRB.build_results_bundle("outputs")
+    bundle = MRB.build_results_bundle("outputs", allow_empty=True)
     frags = sorted(GEN_DIR.glob("*.tex"))
     assert frags, "no committed fragments to bundle"
     for frag in frags:

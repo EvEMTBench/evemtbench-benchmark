@@ -37,8 +37,25 @@ def _self_hash() -> str:
     return hashlib.sha256(Path(__file__).read_bytes()).hexdigest()
 
 
-def _digest_one(grid: str, family: str, root=None) -> dict | None:
-    """The digest entry for one (grid, family) partition, or None when it has no windows."""
+#: Payload files a table entry may pin byte-for-byte under ``file_sha256`` (name -> key of
+#: :func:`find_window_files`). ``x`` is the waveform array (tens to hundreds of GB), ``y`` the
+#: label table, ``meta`` the channel descriptor.
+_PAYLOAD_FILES = {"x": "x_path", "y": "y_path", "meta": "meta_path"}
+
+
+def _sha256_file(path: Path, chunk: int = 1 << 24) -> str:
+    h = hashlib.sha256()
+    with open(path, "rb") as fh:
+        while block := fh.read(chunk):
+            h.update(block)
+    return h.hexdigest()
+
+
+def _digest_one(grid: str, family: str, root=None, *, payload: tuple[str, ...] = ()) -> dict | None:
+    """The digest entry for one (grid, family) partition, or None when it has no windows.
+
+    ``payload`` names the payload files to hash byte-for-byte (see :data:`_PAYLOAD_FILES`); the
+    default hashes only the manifest sidecar."""
     try:
         files = find_window_files(
             windows_dir(GRIDS[grid], family, root),
@@ -48,19 +65,26 @@ def _digest_one(grid: str, family: str, root=None) -> dict | None:
     except FileNotFoundError:
         return None
     manifest = json.loads(files["manifest_path"].read_text())
-    return {
+    entry = {
         "x_file": files["x_path"].name,
         "manifest_sha256": hashlib.sha256(files["manifest_path"].read_bytes()).hexdigest(),
         "feature_hash": manifest.get("feature_hash"),
         "shape": manifest.get("shape"),
     }
+    if payload:
+        entry["file_sha256"] = {
+            name: _sha256_file(files[key])
+            for name, key in _PAYLOAD_FILES.items()
+            if name in payload
+        }
+    return entry
 
 
-def build_table(root=None) -> dict:
+def build_table(root=None, *, payload: tuple[str, ...] = ()) -> dict:
     entries: dict[str, dict] = {}
     for grid in sorted(GRIDS):
         for family in sorted(FAMILIES):
-            e = _digest_one(grid, family, root)
+            e = _digest_one(grid, family, root, payload=payload)
             if e is not None:
                 entries[f"{grid}/{family}"] = e
     return {
@@ -74,18 +98,31 @@ def build_table(root=None) -> dict:
     }
 
 
-def verify(root=None) -> list[str]:
-    """Problems between the committed table and the sidecar manifests on disk."""
+def verify(root=None, *, deep: bool = False) -> list[str]:
+    """Problems between the committed table and the files on disk.
+
+    Always checked: the manifest sidecar (sha256, ``feature_hash``, file name) and every pinned
+    label (``y``) and channel-descriptor (``meta``) file, byte for byte. ``deep=True`` also streams
+    the pinned waveform arrays (``x``), which takes minutes to hours. An entry without a
+    ``file_sha256`` pin for a file is verified at manifest level only for that file."""
     table = load_table().get("entries", {})
     if not table:
         return ["input_digests.json is empty/missing — run --write on the data host first"]
     problems: list[str] = []
     for key, expected in sorted(table.items()):
         grid, family = key.split("/")
-        actual = _digest_one(grid, family, root)
+        pinned = expected.get("file_sha256", {})
+        want = tuple(n for n in pinned if (deep or n != "x"))
+        actual = _digest_one(grid, family, root, payload=want)
         if actual is None:
             problems.append(f"{key}: windows not found on disk (table has an entry)")
             continue
+        for name in want:
+            if actual["file_sha256"][name] != pinned[name]:
+                problems.append(
+                    f"{key}: {name} file sha256 mismatch — disk {actual['file_sha256'][name]!r} != "
+                    f"committed {pinned[name]!r} (payload bytes changed under a fixed manifest?)"
+                )
         for field in ("manifest_sha256", "feature_hash", "x_file"):
             if actual[field] != expected[field]:
                 problems.append(
@@ -101,19 +138,32 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument("--write", action="store_true", help="regenerate the committed table")
     mode.add_argument("--verify", action="store_true", help="re-hash disk vs the table")
     p.add_argument("--root", default=None, help="data root override")
+    p.add_argument(
+        "--deep",
+        action="store_true",
+        help="--verify: also hash the pinned waveform arrays (slow); "
+        "--write: also pin the waveform arrays",
+    )
     args = p.parse_args(argv)
 
     print(f"input_digests generator sha256: {_self_hash()}")
     if args.write:
-        table = build_table(args.root)
+        table = build_table(args.root, payload=("x", "y", "meta") if args.deep else ("y", "meta"))
         TABLE_PATH.write_text(json.dumps(table, indent=2, sort_keys=True) + "\n")
         print(f"wrote {TABLE_PATH} ({len(table['entries'])} partitions pinned)")
         return 0
-    problems = verify(args.root)
+    problems = verify(args.root, deep=args.deep)
     for problem in problems:
         print(f"PROBLEM: {problem}")
-    n = len(load_table().get("entries", {}))
-    print(f"input digests: {'OK' if not problems else 'FAILED'} — {n} pinned partitions checked")
+    entries = load_table().get("entries", {})
+    n = len(entries)
+    n_x = sum("x" in e.get("file_sha256", {}) for e in entries.values())
+    scope = (
+        f"manifest + label + channel-descriptor bytes; waveform bytes pinned for {n_x}/{n} "
+        f"partitions and {'checked' if args.deep else 'not checked (pass --deep)'}"
+    )
+    status = "OK" if not problems else "FAILED"
+    print(f"input digests: {status} — {n} pinned partitions checked ({scope})")
     return 0 if not problems else 1
 
 

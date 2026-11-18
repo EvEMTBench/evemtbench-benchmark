@@ -12,6 +12,7 @@ from __future__ import annotations
 import collections
 import glob
 import json
+import math
 import sys
 from pathlib import Path
 
@@ -163,7 +164,12 @@ def mean_val(doc, metric):
     if not doc:
         return None
     a = doc.get("aggregate", {}).get(metric)
-    return None if not a else a.get("mean")
+    v = None if not a else a.get("mean")
+    # A non-numeric or non-finite mean (NaN, ±Inf) is no usable score: returning it would let a NaN
+    # win a validation argmax, because every later comparison against it is false.
+    if isinstance(v, bool) or not isinstance(v, (int, float)) or not math.isfinite(v):
+        return None
+    return v
 
 
 def ci_val(doc, metric):

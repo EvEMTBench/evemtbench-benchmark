@@ -755,6 +755,16 @@ class _WindowsCache:
     def get(self, grid: str, family: str) -> WindowSet:
         key = (grid, family)
         if key not in self._cache:
+            if self._directory is not None and self._cache:
+                # One explicit directory holds ONE partition. Serving a second (grid, family) from
+                # it would alias two families onto the same files, e.g. the benchmark view onto
+                # the training waveforms.
+                loaded = ", ".join(f"{g}/{f}" for g, f in sorted(self._cache))
+                raise ValueError(
+                    f"directory={str(self._directory)!r} already serves {loaded}; it cannot also "
+                    f"serve {grid}/{family}. This task reads more than one partition: pass the "
+                    "data root (root= / --root / $EVEMTBENCH_DATA_ROOT) instead of a directory."
+                )
             gspec = self._resolver.get(grid) or get_grid(grid)
             ws = load_windows(gspec, family, root=self._root, directory=self._directory)
             if self._patch_function is not None:
@@ -823,6 +833,16 @@ def _build_view(name, triples, td, cache: _WindowsCache) -> TaskView:
     sources, label_parts, meta_parts = [], [], []
     for (family, grid), sids in by_group.items():
         ws = cache.get(grid, family)
+        # Every listed episode must exist in the partition BEFORE any task mask is applied: a
+        # split that names an absent episode would otherwise be scored on a silently smaller set.
+        present = set(map(int, pd.unique(ws.y["sample_id"])))
+        absent = sorted(sids - present)
+        if absent:
+            raise ValueError(
+                f"split {name!r}: {len(absent)} of {len(sids)} listed episodes are not in the "
+                f"{family}/{grid} partition (first ids: {absent[:10]}). The split and the windowed "
+                "data do not belong together."
+            )
         # episode membership AND task-specific valid-sample rule (e.g. fault-active only)
         mask = np.isin(ws.y["sample_id"].to_numpy(), list(sids)) & valid_sample_mask(ws.y, td)
         rows = np.flatnonzero(mask)

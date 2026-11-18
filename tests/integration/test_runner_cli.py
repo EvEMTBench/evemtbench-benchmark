@@ -256,3 +256,45 @@ def test_rerun_drops_the_stale_validation_rescore(fixture_root, held_out_splits,
     _run("random_forest", "fault_detection_local", fixture_root, held_out_splits, out)
     assert not (base / "val" / "result.json").exists()
     assert (base / "test" / "result.json").is_file()
+
+
+def test_failed_rerun_leaves_the_previous_generation_intact(
+    fixture_root, held_out_splits, tmp_path, monkeypatch
+):
+    """A re-run that fails midway must not replace any file of the completed cell (git5 #47):
+    predictions are staged per attempt and published only after every check has passed."""
+    import hashlib
+
+    out = tmp_path / "out"
+    _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
+    base = out / HO_VER / "fault_detection_local" / "held_out" / "double_line" / "majority"
+
+    def digests():
+        return {
+            str(p.relative_to(base)): hashlib.sha256(p.read_bytes()).hexdigest()
+            for p in sorted(base.rglob("*"))
+            if p.is_file()
+        }
+
+    before = digests()
+    assert "test/predictions_seed0.parquet" in before and "test/result.json" in before
+
+    real = runner.evaluate
+
+    def fails_on_benchmark(task, preds, *, test_set="test"):
+        if test_set == "benchmark":
+            raise RuntimeError("injected failure after the first test set")
+        return real(task, preds, test_set=test_set)
+
+    monkeypatch.setattr(runner, "evaluate", fails_on_benchmark)
+    with pytest.raises(RuntimeError, match="injected failure"):
+        _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
+    # failure.json is the intended record of the failed attempt; .attempt/ is its staging area.
+    after = {
+        k: v for k, v in digests().items() if k != "failure.json" and not k.startswith(".attempt/")
+    }
+    assert after == before, "a failed re-run changed files of the completed cell"
+
+    monkeypatch.setattr(runner, "evaluate", real)
+    _run("majority", "fault_detection_local", fixture_root, held_out_splits, out)
+    assert not (base / ".attempt").exists(), "a successful run leaves no staging directory"

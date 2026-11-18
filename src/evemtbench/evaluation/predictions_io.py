@@ -67,6 +67,17 @@ def align_to_view(
     if predictions.duplicated(subset=KEY_COLS).any():
         raise ValueError("predictions contain duplicate (sample_id, window_idx) keys")
     left = metadata[KEY_COLS].reset_index(drop=True)
+    # The reference side must be a key too: a null or repeated (sample_id, window_idx) in the view
+    # would let N predictions be scored as more than N windows.
+    if left.isna().any().any():
+        raise ValueError("the test set has null (sample_id, window_idx) keys")
+    dup = left[left.duplicated(keep=False)]
+    if len(dup):
+        first = [tuple(r) for r in dup.drop_duplicates().head(3).itertuples(index=False)]
+        raise ValueError(
+            f"the test set has {len(dup)} rows with duplicate (sample_id, window_idx) keys "
+            f"(first: {first}); the reference labels are not one row per window"
+        )
     if not allow_extra:
         # Checked as a key-set difference rather than via an outer merge, so the left merge below
         # keeps its exact row order/count semantics.

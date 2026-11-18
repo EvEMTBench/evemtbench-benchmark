@@ -22,6 +22,18 @@ comparable across versions.
   "EvEMTBench Benchmark", lists all six paper authors with affiliations, dates the release
   2026-11-18, adds keywords and an abstract, and cites dataset v0.1 by its DOI and the
   data-generation code (doi:10.5281/zenodo.21624649); `pyproject.toml` matches.
+- **Paper names.** The README and `reproduce/` map the paper's names (`eval_grid`, Protection Reference
+  grid) to the identifiers used here (`benchmark`, `testgrid_110kv`). The scheduled `nightly` workflow is
+  removed; the push-triggered `ci` runs the same checks.
+- **Input and output guards (external code review; no result changes).** `load_task` rejects a single
+  `directory` override for a task that reads more than one partition, and a split that lists an
+  episode absent from the partition. The evaluator rejects null or duplicate reference keys.
+  `input_digests --verify` checks the label and channel-descriptor files byte for byte (`--deep`:
+  the waveform arrays too, where pinned). The runner stages predictions per attempt, so a failed
+  re-run leaves the previous predictions, result and record intact. A non-finite validation mean
+  blocks model selection. `make_results_bundle.py` refuses to write without result records. The
+  evaluator JSON names the transfer source; the table preamble defines every macro the tables use;
+  the quickstart activates its environment and has a data-free example.
 
 ## 1.3.0 — faulted phase of `flt_1phg_hif_w_arc` restored by a label patch (scoped revision, by cell)
 

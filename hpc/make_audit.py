@@ -1333,10 +1333,6 @@ def build_provenance() -> str:
             "ruff + mypy + pytest (torch-free) on 3.10/3.12; the "
             "leakage audit re-runs as a named step so a leaky split fails legibly",
         ),
-        (
-            ".github/workflows/nightly.yml",
-            "the same gate on fresh runners nightly — catches dependency/runner drift",
-        ),
     ]
     ci = "".join(f"<tr><td>{_src(p)}</td><td>{_esc(d)}</td></tr>" for p, d in ci_rows)
     hooks = [

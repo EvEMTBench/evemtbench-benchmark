@@ -22,7 +22,8 @@ The recorded run state is in `coverage_snapshot.json`.
 ## Quickstart
 
 ```bash
-uv venv && uv pip install -e ".[dev]"
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"
 export EVEMTBENCH_DATA_ROOT=/path/to/EvEMTBench
 ```
 ```python
@@ -49,7 +50,9 @@ Its DOI, `10.48742/fau.1fkx-ef11`, is reserved but not yet active. The newer dat
 The share holds the raw simulation exports. The benchmark reads windowed partitions; the tool that
 builds them is not public yet. Until it is, build windows to the contract in
 `src/evemtbench/contract/`: the loader rejects partitions that do not match it, and
-`python -m evemtbench.data.input_digests --verify` checks them against the reference digests.
+`python -m evemtbench.data.input_digests --verify` checks them against the reference digests
+(manifest, label and channel-descriptor files byte for byte; `--deep` also hashes the waveform
+arrays where a pin is committed).
 Layout: [docs/DATA_LAYOUT.md](docs/DATA_LAYOUT.md); provenance: [docs/datasheet.md](docs/datasheet.md).
 
 ## Grids and protocols
@@ -66,6 +69,18 @@ simulation episode. Details: [docs/grids.md](docs/grids.md), [docs/protocol.md](
 | `transfer_finetune` | pre-trained checkpoint, fine-tuned on the target grid | the target grid's test sets |
 
 Pre-training and transfer use the fixed-width `local` and `line` views only.
+
+### Names in the paper and in this repository
+
+| Paper | Repository and result files | Dataset archive |
+|---|---|---|
+| `eval_grid` family | `benchmark` (test set `benchmark`) | `benchmark-*.tar.gz` |
+| `adapt_grid` family | `adapt_grid` (test set `test`) | `adapt_grid-*.tar.gz` |
+| `multi_grid` family | `multi_grid` | `multigrid-*.tar.gz` |
+| CIGRÉ MV grid (20 kV) | `cigre_mv` | `CigreMVGrid` |
+| Double Line grid (110 kV) | `double_line` | `DoubleLine` |
+| Protection Reference grid (110 kV) | `testgrid_110kv` | `TestGrid110kV` |
+| IEEE-39 (345 kV) | `ieee39` | `IEEE39BusSystem` |
 
 ## Tasks
 

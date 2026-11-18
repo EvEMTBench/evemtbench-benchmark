@@ -162,6 +162,7 @@ def rescore_cell(
     normalize, zero_seq = _run_config(cell)
     device = _device()
     per_seed_val: list[dict] = []
+    n_val: int | None = None
     for seed in sorted(committed):
         model = _make_baseline(
             baseline,
@@ -202,10 +203,9 @@ def rescore_cell(
                 f"FAIL positive-control seed{seed}: test {headline} reloaded={m_test} "
                 f"committed={committed[seed]} (|Δ|>{tol_eff:g})"
             )
-        val_metrics = {
-            k: _nan_to_none(v)
-            for k, v in evaluate(task, model.predict(task.val), test_set="val").metrics.items()
-        }
+        val_result = evaluate(task, model.predict(task.val), test_set="val")
+        n_val = val_result.n_samples
+        val_metrics = {k: _nan_to_none(v) for k, v in val_result.metrics.items()}
         per_seed_val.append({"seed": seed, "metrics": val_metrics})
     # write val/result.json (mirrors the test/benchmark schema; load_rows picks it up by glob)
     out_dir = cell / "val"
@@ -219,6 +219,7 @@ def rescore_cell(
         "grid": grid,
         "baseline": baseline,
         "test_set": "val",
+        "n_test": n_val,  # validation support (windows scored), identical for every seed
         "seeds": [r["seed"] for r in per_seed_val],
         "aggregate": _aggregate(per_seed_val),
         "per_seed": per_seed_val,

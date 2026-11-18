@@ -6,7 +6,8 @@ Evaluate your own model on an official EvEMTBench task in three calls — using 
 ## Install
 
 ```bash
-uv venv && uv pip install -e ".[dev]"      # core (evaluation layer, no torch)
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev]"      # core (evaluation layer, no torch)
 # for the deep-learning baselines / runner:
 uv pip install -e ".[baselines]"
 ```
@@ -21,6 +22,21 @@ The root must hold the **windowed** partitions ([DATA_LAYOUT.md](DATA_LAYOUT.md)
 download currently contains only the raw simulation exports, and the producer windowing pipeline
 is not public yet — see the note under *Dataset* in the [README](../README.md#dataset) for how to
 build and verify windows against the pinned contract.
+
+## Try it without the dataset
+
+The repository ships a small synthetic fixture. This runs the whole path (splits, baseline,
+independent re-scoring) in a few seconds; the numbers mean nothing, the mechanics are the real ones.
+
+```bash
+export EVEMTBENCH_DATA_ROOT="$PWD/tests/fixtures/synthetic"
+evemtbench-splits --grid double_line --out /tmp/evemt-splits
+evemtbench-run --task fault_detection_local --protocol held_out --grid double_line \
+    --baseline majority --seeds 0 1 2 --splits-root /tmp/evemt-splits --out /tmp/evemt-out
+evemtbench-evaluate --task fault_detection_local --protocol held_out --grid double_line \
+    --splits-root /tmp/evemt-splits --test-set test \
+    --predictions /tmp/evemt-out/1.0.0/fault_detection_local/held_out/double_line/majority/test/predictions_seed0.parquet
+```
 
 ## Evaluate a model (library)
 

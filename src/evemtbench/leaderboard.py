@@ -49,7 +49,7 @@ class Row:
     baseline: str
     test_set: str
     version: str
-    n_test: int
+    n_test: int | None
     seeds: int
     metrics: dict[str, dict[str, float]]  # metric -> {mean, std, ci95}
     n_params: int | None = None  # trainable params (capacity, reported not equalized)
@@ -151,7 +151,9 @@ def scan_results(outputs_dir: str | Path) -> list[Row]:
                 baseline=doc.get("baseline", "?"),
                 test_set=doc.get("test_set", "test"),
                 version=doc.get("benchmark_version", "?"),
-                n_test=int(doc.get("n_test", 0)),
+                # None = not recorded (validation re-scores written before the support was stored);
+                # never 0, which would read as an empty evaluation set.
+                n_test=(int(doc["n_test"]) if doc.get("n_test") is not None else None),
                 seeds=len(doc.get("seeds", []) or []),
                 metrics=metrics,
                 n_params=doc.get("n_params"),

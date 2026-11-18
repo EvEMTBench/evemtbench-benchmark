@@ -13,6 +13,18 @@ of the paper.
 | [4. Diagnostics](4_diagnostics.md) | SI Tables S11–S15, Fig. S6 |
 | [5. Benchmark configuration](5_configuration.md) | Tables 2–4; SI Tables S16–S24 |
 
+
+### Names in the paper and in this repository
+
+| Paper | Repository and result files | Dataset archive |
+|---|---|---|
+| `eval_grid` family | `benchmark` (test set `benchmark`) | `benchmark-*.tar.gz` |
+| `adapt_grid` family | `adapt_grid` (test set `test`) | `adapt_grid-*.tar.gz` |
+| `multi_grid` family | `multi_grid` | `multigrid-*.tar.gz` |
+| CIGRÉ MV grid (20 kV) | `cigre_mv` | `CigreMVGrid` |
+| Double Line grid (110 kV) | `double_line` | `DoubleLine` |
+| Protection Reference grid (110 kV) | `testgrid_110kv` | `TestGrid110kV` |
+| IEEE-39 (345 kV) | `ieee39` | `IEEE39BusSystem` |
 ## Before you start
 
 **Saved results.** You need nothing below to read the numbers: every result table is in
@@ -27,7 +39,8 @@ every cell with the exact command that produced it.
 ```bash
 git clone https://github.com/EvEMTBench/evemtbench-benchmark.git
 cd evemtbench-benchmark
-uv venv && uv pip install -e ".[dev,baselines]"   # torch; the deep baselines need a CUDA GPU
+uv venv && source .venv/bin/activate
+uv pip install -e ".[dev,baselines]"   # torch; the deep baselines need a CUDA GPU
 ```
 
 `env/results-v1.3.0.lock` pins the environment the published results ran in.
