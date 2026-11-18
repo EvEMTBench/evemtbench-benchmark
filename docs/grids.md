@@ -52,17 +52,10 @@ with topology. A **bus fault** (`MainBus*`) has no single line; by convention it
 bays physically at that bus (the relays electrically adjacent to the fault) — revisable, defined in
 `line_view.py`.
 
-## Grid-restricted events (see taxonomy.md for the full matrix)
+## Grid-restricted events
 
-- **MV-only (`cigre_mv`):** high-impedance faults (`flt_1phg_hif*`), cable switching, motor start.
-- **EHV-only (`ieee39`):** generator trip; and HV-transformer inrush is *absent* on EHV.
-- **IBR trip:** only grids with inverter-based resources (`cigre_mv`, `testgrid_110kv`).
-- **`no_event` (quiescent background):** only the HV grids (`double_line`, `testgrid_110kv`).
+Which event occurs on which grid: [taxonomy.md](taxonomy.md#grid--event-availability-matrix).
 
 ## How a new grid is added
 
-Register a `GridSpec` in [`data/roots.py`](../src/evemtbench/data/roots.py) (key, topology id, raw
-folder, voltage, frequency, level); the observability oracle then derives automatically from that
-grid’s `feature_names` — no per-grid topology file. Generate its `held_out` split with
-`python -m evemtbench.splits.generator --grids <key>` (a not-yet-windowed benchmark family yields
-an empty benchmark partition → in-distribution test only). See [extending.md](extending.md).
+See [extending.md](extending.md#add-a-grid).

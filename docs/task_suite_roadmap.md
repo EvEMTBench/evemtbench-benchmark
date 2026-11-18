@@ -6,7 +6,7 @@ adding realism (noise, sensor loss, sim-to-real) — through a **hard frontier**
 on ideal data, where the frontier is better *models*.
 
 This document is the living catalog: what is scored, what is derivable-but-not-yet-scored, the
-difficulty tiers (with empirical evidence), and the deferred difficulty *axes*. The mechanical
+difficulty tiers, and the deferred difficulty *axes*. The mechanical
 "how to add a task" checklist lives in [extending.md](extending.md); per-task contracts live in
 [task_cards/](task_cards/).
 
@@ -22,30 +22,31 @@ difficulty tiers (with empirical evidence), and the deferred difficulty *axes*. 
 
 Observability: `local ⊂ line ⊂ global` (oracle keyed on the faulted line). Objectives scored on
 switching/normal windows are **global-only** (no faulted line to center the local/line view on).
+Current numbers per task: [RESULTS.md](../RESULTS.md).
 
 ### Tier 1 — easy anchors (near-solved on ideal data → community adds realism)
-| Task | id(s) | kind | obs | evidence |
+| Task | id(s) | kind | obs | note |
 |---|---|---|---|---|
-| Fault detection (FD) | `fault_detection_{local,line,global}` | binary | 3 | **0.89–0.91** bal-acc in-dist → **0.99** transfer (resnet) |
+| Fault detection (FD) | `fault_detection_{local,line,global}` | binary | 3 | near-solved in-distribution |
 | Event detection (ED) | `event_detection_global` | binary | global | expected easy (broadest positive set) |
 | Switch detection | `switch_detection_global` | binary | global | expected easy |
 | Grounded vs ungrounded | `fault_grounded_{local,line,global}` | binary | 3 | strong residual-current signal |
 
 ### Tier 2 — medium (learnable in-dist on HV; harder on MV / under transfer)
-| Task | id(s) | kind | obs | evidence |
+| Task | id(s) | kind | obs | note |
 |---|---|---|---|---|
-| Event-state (ES) | `event_state_global` | 3-class | global | best `test` bal-acc **0.73** (gru), floor 0.33; transfer 0.80–0.84 |
-| Fault classification (FC) | `fault_classification_{local,line,global}` | 9-class | 3 | HV **~0.86**, MV/HIF **0.59–0.67** |
+| Event-state (ES) | `event_state_global` | 3-class | global | coarse grid state over every window |
+| Fault classification (FC) | `fault_classification_{local,line,global}` | 9-class | 3 | HIF makes MV hard |
 | Faulted-phase | `fault_phase_{local,line,global}` | 7-class | 3 | phase selection; medium |
 | Fault-category | `fault_category_{local,line,global}` | 3-class | 3 | shc/incipient/hif; HIF makes MV hard |
 | Switch-type | `switch_type_global` | 8-class | global | benign-event subtyping |
 | Fault origin | `fault_origin_global` | binary | global | line vs bus (busbar vs line protection); global-only |
 
 ### Tier 3 — hard frontier (hard even on ideal data → community finds better models)
-| Task | id(s) | kind | obs | evidence |
+| Task | id(s) | kind | obs | note |
 |---|---|---|---|---|
 | Full event classification (EC) | `event_classification_global` | 23-class | global | fine-grained + heavily imbalanced |
-| Fault location (FL) | `fault_location_{local,line,global}` | regression | 3 | `line`/`global` MAE 16%→R²>0.9, but **`local` on MV/TestGrid ties the mean predictor** (unsolved) |
+| Fault location (FL) | `fault_location_{local,line,global}` | regression | 3 | `local` view is the hard case |
 
 **HIF as a hard subproblem:** high-impedance faults exist only on the MV grid; `fault_category`
 and FC both expose them (zero-support NaN per-class F1 elsewhere). HIF detection/discrimination is a
@@ -55,44 +56,26 @@ possible future addition.
 ## Difficulty axes (deferred — the roadmap's next phases)
 
 - **Noise / perturbation robustness** (the "community adds noise" axis): a post-hoc evaluation that
-  degrades the ideal inputs (additive noise / SNR sweep, channel dropout / sensor loss, amplitude
-  quantization, timing jitter) and reports metric-vs-degradation curves per task on saved
-  checkpoints — no retraining. Turns the Tier-1 anchors into live research targets.
+  degrades the ideal inputs with the benchmark-owned perturbation taxonomy
+  ([design/robustness.md](design/robustness.md): noise/SNR, harmonics, CT saturation, sensor
+  dropout, time skew, sampling-rate mismatch) and reports metric-vs-degradation curves per task on
+  saved checkpoints — no retraining. Turns the Tier-1 anchors into live research targets.
 - **`cross_topology` protocol + `gnn` baseline** *(planned, not implemented)*: train on the
-  diverse-topology `multi_grid` family (formerly `train`; e.g. `Template20kV` — **105+ varied
-  networkx topologies** already on disk under `multi_grid/.../graphs/`), test on each unseen grid —
-  true topology transfer, beyond the current operating-point shift. The graph artifacts exist (see
-  "Auxiliary artifacts" below), and the `multi_grid` family is already windowed and used for
-  pre-training by the built `multi_grid_pretrain` / `transfer_*` protocols — but it is
-  stored in the portable 12-channel double-line view, which yields only the `local` / `line` inputs ([design/pretrain_transfer.md](design/pretrain_transfer.md)).
-  Still needed: the `cross_topology` protocol itself, a variable-channel (cubicle-set) view, and
-  the `gnn`.
-- **Fault-resistance stratification / regression**: fault resistance is a physical difficulty knob
-  and is **available per-episode** in each grid's `labels/settings.csv`
-  (`events/event_flt_shc_resistance`, `event_flt_hif_resistance`; `grounding/*_resistance` on MV),
-  joinable to windows by `general/sim_idx` ↔ `sample_id`. So it is a near-term data-plumbing task
-  (surface it into `y`), not blocked — enables resistance-binned FD/HIF/FL difficulty curves and a
-  resistance-regression task.
+  diverse-topology `multi_grid` family, test on each unseen grid — true topology transfer, beyond
+  the current operating-point shift. The graph artifacts exist, and `multi_grid` is already used
+  for pre-training, but only in the portable 12-channel view (`local` / `line` inputs;
+  [design/pretrain_transfer.md](design/pretrain_transfer.md)). Still needed: the `cross_topology`
+  protocol itself, a variable-channel (cubicle-set) view, and the `gnn`
+  ([design/cross_topology.md](design/cross_topology.md)).
+- **Fault-resistance regression**: the per-episode fault resistance is in each grid's
+  `settings.csv` and already feeds the `resistance_bin` breakdown. A resistance-regression task is
+  not built.
 
 ## Auxiliary artifacts (topology graphs + simulator settings)
 
-Beyond the windowed `X`/`y`, every family archive carries two extra artifact types (confirmed in
-`benchmark/DoubleLine_benchmark.tar.gz` → `DoubleLine/{graphs,labels}/`; `adapt_grid` symmetric;
-`multi_grid` slices have them uncompressed):
-
-- **`graphs/graph_<family>.pickle`** — a networkx `MultiGraph` of the grid. Nodes = buses/elements
-  (ExtGrid/slack, loads, IBRs, switches) with per-element `param_dict`s; edges = transformers/lines
-  with electrical `param_dict` + `typ_param_dict` (ratings, vector group, sequence impedances,
-  saturation curves); graph-level attrs = neutral-grounding treatment (Petersen coil / resistive /
-  solid). The **reference grids have ONE fixed topology** (the sweep varies the fault, not the
-  topology); **`multi_grid` has many varied topologies** — the cross-topology training ground. Enables
-  GNN node/edge features, and structural labels (IBR penetration/count, grid size, grounding scheme).
-- **`labels/settings.csv`** — the per-episode simulator parameter table, keyed by `general/sim_idx`.
-  Reference-grid schema (~19 cols): `event_type`, `event_target` (faulted element), fault
-  `location`/`resistance`, phase-select, arc params. `multi_grid` schema (~90 cols) additionally
-  carries `grounding/*` (type + resistances), `arc/*`, per-load P/Q operating point, `ExtGrid` V
-  setpoint, and component types. Source of many candidate labels not yet in `y` (grounding-type
-  classification, resistance/arc/duration regression, operating-point regression).
+Layout and join keys: [DATA_LAYOUT.md](DATA_LAYOUT.md#auxiliary-overlay-additive-never-writes-the-data-root).
+The `multi_grid` settings (~90 columns) carry many candidate labels not yet in `y`: grounding type,
+arc parameters, operating point.
 
 ## Derivable but not scored (candidate future tasks)
 

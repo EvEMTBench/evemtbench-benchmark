@@ -21,14 +21,14 @@ specified in their [task cards](task_cards/).
 |---|---|---|---|---|
 | Fault **detection** (FD) | `fault_detection` | binary | 2 | all windows of fault episodes (`y_fault_line` defined): pre-fault negatives + fault-active positives |
 | Fault **classification** (FC) | `fault_classification` | multiclass | **9** | fault-active windows whose fault type is in the 9-class vocab |
-| Fault **location** (FL) | `fault_location` | regression | — | fault-active windows of **line** faults (`y_fault_line` = `MainLn*`) with a defined `y_fault_location`. Bus-target episodes are excluded since v1.2.0; the v1.0/v1.1 rule admitted them in `adapt_grid` (see [known_issues.md](known_issues.md) §2) |
+| Fault **location** (FL) | `fault_location` | regression | — | fault-active windows of **line** faults (`y_fault_line` = `MainLn*`) with a defined `y_fault_location`. Bus-target episodes are excluded ([known_issues.md](known_issues.md) §2) |
 
 > **The fault tasks are ORACLE tasks — read the "valid samples" column as part of the task
 > definition, not as a filtering detail.** Only fault episodes are scored, so FD's negatives are the
 > *pre-onset windows of episodes that do fault*; and at `local`/`line` the input cubicles are chosen
 > by the ground-truth faulted line (`y_fault_line`). FD is therefore **line-conditioned onset
 > detection**, not grid-wide detection, and FL presupposes a correctly identified faulted line. This
-> is intentional — it holds information constant so representations can be compared (§2.4) — but it
+> is intentional — it holds information constant so representations can be compared — but it
 > means deployed performance is **overstated** by construction: a model that trips on any disturbance
 > scores near-perfectly on `fault_detection_local` and would be unusable as a relay. See
 > [task_cards/fault_detection.md](task_cards/fault_detection.md) and
@@ -62,9 +62,9 @@ switch detection/type and fault origin ([task_cards/event_state.md](task_cards/e
   `family:grid:sim_idx` triples + `meta.json`).
 
 **Pre-training / cross-grid transfer** (`multi_grid_pretrain`, `transfer_zeroshot`,
-`transfer_finetune`). Train on the diverse **`multi_grid`** pre-training corpus (formerly `train`;
-`template_20kv`/`template_110kv`/`template_345kv`) and generalize to the reference grids — the cross-grid-generalization track
-(paper goals G2/G3). Scored at the **portable `local`/`line` views only** (fixed 6/12 channels):
+`transfer_finetune`). Train on the diverse **`multi_grid`** pre-training corpus
+(`template_20kv`/`template_110kv`/`template_345kv`) and generalize to the reference grids.
+Scored at the **portable `local`/`line` views only** (fixed 6/12 channels):
 `multi_grid`'s windows are stored in a 12-channel `EndA/EndB` "double-line" view (grid/line identity
 in `y`, not the channel axis), which equals the reference grids' `line` view (and `EndA` = `local`),
 so a model transfers without reshape. `global` is grid-specific width and out of scope (needs the GNN).
@@ -78,36 +78,11 @@ Design: [design/pretrain_transfer.md](design/pretrain_transfer.md).
   machine-readable `audit.json` (per-partition topology/simulation/episode/fault counts, class
   support, pairwise topology/simulation/episode overlap counts — all zero — partition hashes,
   grouping strategy + seed).
-
-  > **History — the v1.0 split-granularity deviation, fixed in v1.1.** A `multi_grid` episode is
-  > *one line of one simulation* (the portable two-terminal view; `sample_id = sim_idx × 10⁴ +
-  > line_idx`; see [design/pretrain_transfer.md](design/pretrain_transfer.md)). Corpus structure,
-  > measured from the window metadata (`result_id` = simulation, `graph_id` = generated topology):
-  >
-  > | template | simulations | episodes | mean lines/sim | topologies |
-  > |---|---|---|---|---|
-  > | `template_20kv`  | 9 753 | 119 153 | 12.2 | 104 |
-  > | `template_110kv` | 9 879 | 138 512 | 14.0 | 105 |
-  > | `template_345kv` | 9 895 | 173 407 | 17.5 | 104 |
-  >
-  > The v1.0 split was a random 70/15/15 **episode** split, which put sibling lines of the same
-  > simulation — same event, same operating state, same 0.5 s of grid history seen at other
-  > terminals — into different partitions, and reused every topology across all three. No reported
-  > benchmark number was contaminated (every scored metric lives on a reference grid whose
-  > topology and simulations never appear in `multi_grid`, and whose own splits are
-  > simulation-level as the dataset paper recommends), but the pre-training early-stopping and the
-  > zero-shot *checkpoint selection* read that leaky `val`. The v1.1 splits group by **generated
-  > topology** (`graph_id`; the dataset paper's recommendation for `multi_grid`), so no topology —
-  > and therefore no simulation and no sibling line — crosses a partition boundary; a
-  > simulation-grouped (`result_id`) variant is implemented as the documented fallback
-  > (`evemtbench-splits --grouping {simulation,topology}`). Topology grouping shipped because the
-  > metadata identifies topologies reliably (0 inconsistencies across all 431 072 episodes; both
-  > ids live in the y-parquet, no aux overlay needed) and every event class spans 87–104 of ~104
-  > topologies per corpus, so per-class support survives grouping. Leakage gates:
-  > `splits.leakage.assert_group_disjoint`, `verify_protocol_regenerates`, and the committed
-  > per-grid `audit.json`. Adopting the grouped splits invalidated the v1.0 pre-trained
-  > checkpoints and transfer results (every pre-training and transfer cell → re-run under
-  > `outputs/1.1.0/`; see `docs/versioning.md` and the committed `coverage_snapshot.json`).
+  Grouping by topology keeps every simulation and every sibling line in one partition. A
+  simulation-grouped variant exists (`evemtbench-splits --grouping simulation`). Leakage gates:
+  `splits.leakage.assert_group_disjoint`, `verify_protocol_regenerates` and the per-grid
+  `audit.json`. Corpus sizes: [design/pretrain_transfer.md](design/pretrain_transfer.md); why the
+  splits changed in v1.1: [CHANGELOG](../CHANGELOG.md).
 - **`transfer_zeroshot`** — initialise from that checkpoint and evaluate a reference grid's
   `adapt_grid` `test` and `benchmark` families with **no target training** (target topology unseen).
 - **`transfer_finetune`** — initialise from the checkpoint, fine-tune on the reference grid's

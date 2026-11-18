@@ -5,10 +5,11 @@
 %   outputs/<fl version>/fault_location_{line,local}/held_out/<grid>/<impedance|selected>/{test,benchmark}/{result.json,predictions_seed*.parquet}
 %   outputs/<fl version>/fault_location_{line,local}/held_out/<grid>/<baseline>/val/result.json  (selection)
 %   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/y_*.parquet  (released dataset: overlap_ratio, y_fault_line)
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{5pt}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
 \caption{Fault-location error of the impedance-based locator and of the validation-selected learned reference by window position. \ac{mae} in \% of line length, five-seed mean for the learned reference (the locator is deterministic). \emph{Full} windows lie entirely inside the fault interval; \emph{partial} windows also contain samples before fault inception or after clearing, which can enter the one-cycle phasor estimate. \emph{Partial \%} is the share of partial windows in the evaluated set. The lower block splits the CIGR\'E \ac{mv} line view into line 8--14, whose line view repeats its single measured terminal so that the locator falls back to the one-terminal method, and all other lines. Computed from the stored per-seed predictions of the reported cells; the per-seed totals reproduce the reported values.}
 \label{tab:supp_fl_locator_breakdown}
 \begin{tabular}{ll r rr rr l}
@@ -45,4 +46,4 @@ IEEE 39-Bus (345\,kV) & \texttt{adapt\_grid} test & 68 & 16.7 & 16.3 & 34.9 & 21
  & \texttt{eval\_grid} & 7 & 23.2 & 35.1 & 4.6 & 19.1 & \acs{resnet} \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

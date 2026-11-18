@@ -28,5 +28,5 @@ The dataset was generated with **DIgSILENT PowerFactory**, a proprietary EMT sim
 - Committed **split files** (`src/evemtbench/splits/`) — lists of simulation IDs, derived from
   dataset metadata. These are released under MIT as code-adjacent artifacts.
 - A tiny **synthetic fixture** (`tests/fixtures/`) — fabricated, not real grid data — for testing.
-- **SHA-256 manifests** of dataset files (`src/evemtbench/data/manifests/`) — checksums only,
-  no waveform content.
+- **SHA-256 input digests** of the windowed partitions (`src/evemtbench/data/input_digests.json`) —
+  checksums only, no waveform content.

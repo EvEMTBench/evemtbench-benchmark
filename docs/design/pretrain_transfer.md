@@ -8,7 +8,7 @@ The `global`-view / variable-topology track (a GNN over cubicle sets) stays open
 
 ## The representation that makes transfer well-posed
 
-The `multi_grid` family (renamed from `train`; producer's on-disk `multi_grid/`) stores windows in a
+The `multi_grid` family (the producer's on-disk `multi_grid/`) stores windows in a
 portable **12-channel double-line view**: `EndA/EndB × [Isec L1,L2,L3, Usec L1,L2,L3]`, with the
 line/grid identity factored into `y` (`graph_id, line_id, bus_a, bus_b`) instead of the channel axis
 (`meta.extra.view == "double_line"`). That layout is byte-identical to a reference grid's **`line`**
@@ -24,20 +24,18 @@ voltage level, as the dataset paper states) expand to 119 153 / 138 512 / 173 40
 20 / 110 / 345 kV — a mean of 12.2 / 14.0 / 17.5 observed lines per simulation, rising with
 generated grid size. Quote the right unit when comparing corpus sizes with the dataset paper.
 
-**Source-corpus splits are topology-grouped (v1.1).** The v1.0 in-corpus split was episode-level,
-so sibling lines of one simulation — and every generated topology — straddled train/val/test
-(the split-granularity deviation the v1.0 release documented in
-[../protocol.md](../protocol.md)). The v1.1 splits (`splits/v1.1/multi_grid_pretrain/`) group by
-`graph_id` (generated topology; ~104 per corpus, `result_id` = simulation nested inside), via
-`splits/generator.py::split_grouped_episodes`: groups are stratified by the rarest event class
+**Source-corpus splits are topology-grouped.** The splits (`splits/v1.1/multi_grid_pretrain/`)
+group by `graph_id` (generated topology; ~104 per corpus, `result_id` = simulation nested inside),
+via `splits/generator.py::split_grouped_episodes`: groups are stratified by the rarest event class
 they contain and each stratum is split 70/15/15 on episode counts by a largest-group-first
 proportional greedy. Every fault class spans 87–104 topologies per corpus, so class support
 survives grouping (committed per-grid `audit.json` verifies: zero topology/simulation/episode
 overlap, class support per partition). A simulation-grouped variant is implemented
 (`--grouping simulation`) and audited (`docs/design/split_audits_v1.1_simulation_variant/`) as
 the fallback; topology grouping shipped because the metadata identifies topologies reliably
-(0 inconsistencies across all 431 072 episodes). Pretrain early-stopping and zero-shot checkpoint
-selection therefore now read a leakage-free validation signal.
+(0 inconsistencies across all 431 072 episodes). Pre-training early stopping and zero-shot
+checkpoint selection therefore read a leakage-free validation signal. Why the split changed in
+v1.1: [CHANGELOG](../../CHANGELOG.md).
 
 - Projection: `tasks/line_view.py::project_double_line` (slice, no oracle). Terminals are
   **bus-canonicalized** (`_double_line_near_end` in `task.py`, using `y.bus_a/bus_b`) so channel *k*
@@ -95,14 +93,3 @@ table has one row per (protocol, pre-training source) across the reference grids
   keeps the legacy source-less output path.
 - `fault_location` reference terminal: `y_fault_location` is % on both sides (verified ~1..99); the
   bus-canonicalization aligns the 0%-end. If FL transfer looks degenerate, re-check that convention.
-
-## Acceptance criteria (met — kept for the record)
-
-- [x] Three transfer protocols in the registry; applicability rules in `coverage.py` (deep
-      baselines only) render as N/A, not gaps.
-- [x] `tests/integration/test_transfer_protocols.py` covers pretrain → zero-shot → fine-tune
-      round-trip and the zero-shot no-target-training invariant.
-- [x] Transfer cells appear in `coverage_snapshot.json` / the audit matrix with reproduce
-      arg-lines.
-- [x] Transfer matrix complete (all transfer cells, over all 3 sources, done — see
-      `coverage_snapshot.json` / `python -m evemtbench.coverage --summary` for the counts).

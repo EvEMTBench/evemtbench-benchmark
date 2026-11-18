@@ -27,7 +27,7 @@ Binary set + the selectivity pair:
 - in-zone `missed_fault_rate` — dependability must not be traded silently for security.
 
 Report stratified by electrical distance vantage→fault (the difficulty axis) — the aux topology
-graph (M2) provides the distance.
+graph provides the distance.
 
 ## Why it matters
 

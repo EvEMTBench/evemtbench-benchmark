@@ -79,10 +79,6 @@ class _MultiEpochBatchDataset(Dataset):
         n = len(view)
         self._nb = -(-n // batch_size) if n else 0
 
-    @property
-    def batches_per_epoch(self) -> int:
-        return self._nb
-
     def __len__(self) -> int:
         return self._nb * len(self._orders)
 

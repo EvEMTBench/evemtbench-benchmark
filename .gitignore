@@ -47,7 +47,7 @@ paper/reference/*.xlsx
 # Python
 __pycache__/
 *.py[cod]
-# torch/tempfile scratch dirs if a job ever runs without TMPDIR set (backstop; see docs/lessons.md)
+# torch/tempfile scratch dirs if a job ever runs without TMPDIR set (backstop; see docs/internal/lessons.md)
 /tmp*/
 *.egg-info/
 .eggs/
@@ -100,3 +100,5 @@ hpc/clusters/local.env
 # Derived LaTeX build source: hpc/build_paper.py compiles a shimmed COPY of main.tex so the
 # committed file stays a byte-faithful Overleaf mirror. Never committed; removed after a build.
 /paper/manuscript/_offline_build.*
+# untracked symlink to the archived outputs on the vault; never commit it
+/outputs_archive

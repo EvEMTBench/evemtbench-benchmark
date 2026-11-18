@@ -5,11 +5,12 @@
 %   outputs/1.1.0/fault_classification_{local,line}/transfer_{zeroshot,finetune}/<grid>/<baseline>/[pretrain-<source>/]benchmark/result.json
 %   outputs/1.1.0/fault_classification_{local,line}/multi_grid_pretrain/<source>/<baseline>/val/result.json  (zero-shot selection)
 %   outputs/1.1.0/fault_classification_{local,line}/transfer_finetune/<grid>/<baseline>/[pretrain-<source>/]val/result.json  (fine-tune selection)
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{4.5pt}
-\caption{Fault-type classification (\ac{fc}, 9-class) --- cross-grid transfer reference baseline (best of MLP/GRU/CNN/ResNet/TST, selected on the validation split, never on the reported \texttt{eval\_grid} set: \emph{fine-tune} on the target grid's validation split, \emph{zero-shot} on the pre-training source's \texttt{multi\_grid} validation --- so the zero-shot choice is grid-independent), headline metric (balanced accuracy $\uparrow$), pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) then \emph{zero-shot} vs.\ \emph{fine-tuned} on each target grid, scored on the never-trained \texttt{eval\_grid} family per observability view. Cells are mean\,$\pm$\,95\% CI; \oos{}~= out of scope (fixed-width transfer cannot use the grid-dependent \emph{global} width).}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Fault-type classification (FC, 9-class) --- cross-grid transfer reference baseline selected from MLP/GRU/CNN/ResNet/TST using validation data only: zero-shot selection uses the source \texttt{multi\_grid} validation split, while fine-tuned selection uses the target-grid validation split; the reported \texttt{eval\_grid} family is not used for selection. The headline metric is balanced accuracy ($\uparrow$). Models are pre-trained on each \texttt{multi\_grid} source (20/110/345\,kV) and evaluated zero-shot or after fine-tuning on each target grid's never-trained \texttt{eval\_grid} family. Cells are mean\,$\pm$\,95\% CI; \oos{} denotes the grid-dependent global view, which is outside the fixed-width transfer protocol.}
 \label{tab:transfer_fc}
 \begin{tabular}{ll ccc ccc}
 \toprule
@@ -34,4 +35,4 @@ IEEE 39-Bus (345\,kV)  & 20\,kV   & 0.420 $\pm$ 0.024 & 0.463 $\pm$ 0.010 & \oos
                        & 345\,kV  & 0.594 $\pm$ 0.010 & 0.622 $\pm$ 0.002 & \oos & 0.711 $\pm$ 0.042 & 0.695 $\pm$ 0.006 & \oos \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

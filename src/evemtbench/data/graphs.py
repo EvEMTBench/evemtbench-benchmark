@@ -113,23 +113,3 @@ def graph_node_features(g: nx.Graph) -> dict[Any, dict[str, float]]:
 def graph_edge_features(g: nx.Graph) -> dict[Any, dict[str, float]]:
     """Per-edge scalar feature dict, keyed by the edge endpoints tuple."""
     return {(u, v): _flatten_scalars(data) for u, v, data in g.edges(data=True)}
-
-
-def list_topologies(
-    family: str = "multi_grid",
-    grid: str | GridSpec | None = None,
-    root: str | os.PathLike | None = None,
-) -> list[Path]:
-    """List all graph pickles in a family's aux dir (e.g. the varied ``multi_grid`` corpus).
-
-    For the reference grids this is just the single ``graph.pickle``; for ``multi_grid`` it is the
-    per-topology corpus used by the (planned) cross-topology protocol.
-    """
-    if grid is None:
-        # multi_grid graphs live outside the per-grid layout; glob the family root recursively.
-        from .roots import resolve_aux_root
-
-        base = resolve_aux_root(root) / family
-    else:
-        base = aux_dir(grid, family, root)
-    return sorted(base.rglob("*.pickle")) if base.exists() else []

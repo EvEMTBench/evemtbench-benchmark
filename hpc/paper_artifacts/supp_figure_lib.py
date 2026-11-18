@@ -93,14 +93,14 @@ _TEST_SET_STYLE = {
 #: Vertical offset of the two markers about their shared baseline row, in row units.
 _PAIR_OFFSET = 0.17
 
-# Type sizes. The floor across every SI figure is 7 pt, matching the tables' enforced floor and
-# sitting inside the 6.8-9.0 pt band of the two main-text figures.
-_TICK_FONTSIZE = 7.0
-_BASELINE_FONTSIZE = 7.2
-_PANEL_TITLE_FONTSIZE = 7.8
+# Type sizes. The floor across every SI figure is 8 pt at the printed size (the figure is placed at
+# width=\\linewidth), matching the minimum table font of the SI.
+_TICK_FONTSIZE = 8.0
+_BASELINE_FONTSIZE = 8.0
+_PANEL_TITLE_FONTSIZE = 8.0
 _ROW_LABEL_FONTSIZE = 8.0
-_LEGEND_FONTSIZE = 7.4
-_MIN_FONTSIZE = 7.0
+_LEGEND_FONTSIZE = 8.0
+_MIN_FONTSIZE = 8.0
 
 
 def _panel_rows(key: str) -> tuple[str, ...]:
@@ -257,21 +257,26 @@ def build_per_baseline_figure(key: str, out_dir: Path | None = None):
 
 
 def _assert_type_floor(fig, floor: float = _MIN_FONTSIZE) -> None:
-    """Fail the build if any text in the figure is set below the SI legibility floor.
+    """Fail the build if any text in the figure prints below the SI legibility floor.
 
-    The S2 tables reached 3.76 pt precisely because nothing checked. This makes the floor a
-    build-time property of every figure this module draws rather than a convention.
+    The figure is placed at width=\\linewidth (= style.SI_FIG_WIDTH) from its tight bounding box, so
+    the printed size of a text is its font size times SI_FIG_WIDTH / saved width. Every visible
+    text counts: tick labels, titles, axis and figure labels, legend entries.
     """
+    from matplotlib.text import Text
+
+    fig.canvas.draw()
+    bbox = fig.get_tightbbox(fig.canvas.get_renderer())
+    scale = style.SI_FIG_WIDTH / (bbox.width + 2 * style._PAD_INCHES)
     small = sorted(
         {
-            round(t.get_fontsize(), 2)
-            for ax in fig.get_axes()
-            for t in [*ax.get_xticklabels(), *ax.get_yticklabels(), ax.title]
-            if t.get_text() and t.get_fontsize() < floor - 1e-9
+            round(t.get_fontsize() * scale, 2)
+            for t in fig.findobj(Text)
+            if t.get_visible() and t.get_text().strip() and t.get_fontsize() * scale < floor - 1e-9
         }
     )
     if small:
-        raise AssertionError(f"figure text below the {floor} pt SI floor: {small}")
+        raise AssertionError(f"figure text prints below the {floor} pt SI floor: {small}")
 
 
 #: Pre-training source labels — the voltage template, named by its level.

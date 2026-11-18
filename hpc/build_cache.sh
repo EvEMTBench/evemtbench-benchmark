@@ -7,7 +7,7 @@
 # ============================================================================
 # I/O prep job — build the persistent projection cache OFF the training GPUs.
 #
-# Stage a grid's raw windows to node-local /scratch (sequential, bandwidth-limited, locked), build
+# Stage a grid's raw windows to node-local $TMPDIR (sequential, bandwidth-limited, locked), build
 # the small content-addressed projection cache ONCE for every view, and publish it to the persistent
 # cache root on $WORK. After this, GPU training jobs read the small cache read-only and never touch
 # raw — so GPUs are never held idle for I/O (the #1 thing cluster admins flag). See the plan /
@@ -51,7 +51,7 @@ export EVEMTBENCH_PROJECTION_CACHE_ROOT="${EVEMTBENCH_PROJECTION_CACHE_ROOT:-$WO
 SCRATCH="${TMPDIR:-/tmp}"
 echo "build_cache ${SLURM_JOB_ID:-$$} on $(hostname) | GRID=$GRID | GPUs=${CUDA_VISIBLE_DEVICES:-none} | start $(date)"
 
-# 1) Stage raw to local scratch so the projection's random reads hit local SSD, not GlusterFS.
+# 1) Stage raw to local scratch so the projection's random reads hit local SSD, not the shared FS.
 #    Stage the family the protocol reads (mirrors sweep.sh): multi_grid for multi_grid_pretrain,
 #    else adapt_grid+benchmark (held_out). Without this, pretrain-grid cache builds fail (no
 #    adapt_grid/benchmark family exists for the multi_grid template grids).
@@ -95,7 +95,7 @@ for t in tasks:
 print(f"total {len(built)} cache file(s) ({skipped} view(s) absent for {proto})", flush=True)
 PY
 
-# 3) Publish caches to the persistent root on /cluster (one sequential, bandwidth-limited write).
+# 3) Publish caches to the persistent cache root (one sequential, bandwidth-limited write).
 CROOT="$($PY -m evemtbench.data.staging cache-root)"
 BW="$($PY -m evemtbench.data.staging bwlimit)"
 mkdir -p "$CROOT"

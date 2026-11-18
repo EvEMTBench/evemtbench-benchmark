@@ -217,6 +217,8 @@ def test_ci_bounds_is_the_tables_own_truncation_rule():
 def test_si_fl_figure_draws_the_locator_at_local_and_line_only():
     """The SI per-baseline FL figure includes the impedance locator (the SI text says the figures
     show the complete suite); it is defined only at the local and line views."""
+    if not _outputs_populated():
+        pytest.skip("outputs/ not populated on this host")
     _, _, stem, metric, _ = _PF_BY_KEY["fl"]
     cells = paper_lib.per_baseline_matrix(
         stem, metric, per_grid=held_out_rows(), baselines=paper_lib.FIGURE_BASELINES

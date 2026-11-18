@@ -13,7 +13,7 @@
 set -uo pipefail
 
 staged="$(git diff --cached --name-only 2>/dev/null || true)"
-if ! grep -qE '^(RESULTS\.md|leaderboard\.html|coverage_snapshot\.json|audit/.*|results/.*|paper/manuscript/.*|CITATION\.cff|pyproject\.toml|env/.*|requirements[^/]*\.lock|src/.*|hpc/.*|tests/.*)$' <<<"$staged"; then
+if ! grep -qE '^(RESULTS\.md|leaderboard(_full)?\.html|coverage_snapshot\.json|audit/.*|results/.*|paper/manuscript/.*|CITATION\.cff|pyproject\.toml|env/.*|requirements[^/]*\.lock|src/.*|hpc/.*|tests/.*)$' <<<"$staged"; then
   exit 0
 fi
 

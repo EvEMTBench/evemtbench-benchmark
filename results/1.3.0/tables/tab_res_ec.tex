@@ -3,11 +3,12 @@
 % Benchmark: EvEMTBench v1.3.0
 % Inputs:
 %   outputs/1.0.0/event_classification_{local,line,global}/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{4.1pt}
-\caption{Event classification (\ac{ec}) --- reference baseline (best of RF/MLP/GRU/CNN/ResNet/TST, selected on the validation split; a beatable reference, full per-baseline breakdown in the Supplementary), headline metric (balanced accuracy $\uparrow$) per grid and observability view, for the two \texttt{held\_out} test sets (in-distribution vs.\ never-trained \texttt{eval\_grid} family). Cells are mean\,$\pm$\,95\% CI (Student's $t$); an interval exceeding the metric's $[0,1]$ range is shown truncated as $[\text{lo},\text{hi}]$. \notapp{}~= not defined for this view. Full per-baseline tables in the Supplementary.}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Event classification (\ac{ec}) --- reference baseline selected from RF/MLP/GRU/CNN/ResNet/TST using the validation split, headline metric (balanced accuracy $\uparrow$) per grid and observability view, on the in-distribution test split and the never-trained \texttt{eval\_grid} family. Cells are mean\,$\pm$\,95\% CI (Student's $t$); an interval exceeding the metric's $[0,1]$ range is shown truncated as $[\text{lo},\text{hi}]$. \notapp{}~= not defined for this view. Full per-baseline results are shown in Supplementary Section~\ref{sec:supp_full_baselines}.}
 \label{tab:res_ec}
 \begin{tabular}{l ccc ccc}
 \toprule
@@ -21,4 +22,4 @@ Prot.\ Ref.\ (110\,kV)     & \notapp & \notapp & 0.782 $\pm$ 0.006 & \notapp & \
 IEEE 39-Bus (345\,kV)      & \notapp & \notapp & 0.762 $\pm$ 0.002 & \notapp & \notapp & 0.553 $\pm$ 0.018 \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

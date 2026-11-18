@@ -662,6 +662,7 @@ def render_html(
     generated_at: str | None = None,
     docs_base: str = DOCS_BASE,
     citation: str = "",
+    nav_extra: tuple[tuple[str, str], ...] = (("audit/index.html", "audit"),),
 ) -> str:
     """Render a self-contained HTML leaderboard string.
 
@@ -802,7 +803,7 @@ def render_html(
     # --- page chrome (head/nav/legend/cta/footer) ---
     favicon = FAVICON
 
-    nav = nav_html(docs_base, extra=(("audit/index.html", "audit"),))
+    nav = nav_html(docs_base, extra=nav_extra)
     cta = f'<a class=cta href="{html.escape(docs_base)}/docs/submission.md">How to submit results →</a>'
     legend = (
         "<details class=legend><summary>Legend &amp; metric conventions</summary><ul>"
@@ -881,12 +882,48 @@ def _bibtex_from_cff(path: Path | None = None) -> str:
     return "@software{evemtbench,\n" + lines + "\n}"
 
 
+FULL_TITLE = "EvEMTBench full results"
+FULL_NAV = (("leaderboard.html", "leaderboard"), ("audit/index.html", "audit"))
+
+
+def full_path(out: str | Path) -> Path:
+    """Where the full-results page goes: next to the leaderboard, ``<stem>_full.html``."""
+    out = Path(out)
+    return out.with_name(f"{out.stem}_full{out.suffix}")
+
+
+def render_pages(
+    rows: list[Row], *, generated_at: str | None, full_href: str = "leaderboard_full.html"
+) -> tuple[str, str]:
+    """The user-facing leaderboard and the full-results page, from the same rows."""
+    from .leaderboard_summary import render_summary_html
+
+    summary = render_summary_html(
+        rows, version=BENCHMARK_VERSION, generated_at=generated_at, full_href=full_href
+    )
+    full = render_html(
+        rows,
+        version=BENCHMARK_VERSION,
+        title=FULL_TITLE,
+        generated_at=generated_at,
+        citation=_bibtex_from_cff(),
+        nav_extra=FULL_NAV,
+    )
+    return summary, full
+
+
 def main(argv: list[str] | None = None) -> None:
     from datetime import datetime, timezone
 
-    p = argparse.ArgumentParser(description="Render an internal HTML leaderboard from outputs/.")
+    p = argparse.ArgumentParser(
+        description="Render the leaderboard (and the full-results page next to it) from outputs/."
+    )
     p.add_argument("--outputs", default="outputs", help="directory tree of result.json files")
-    p.add_argument("--out", default="leaderboard.html", help="output HTML path")
+    p.add_argument(
+        "--out",
+        default="leaderboard.html",
+        help="leaderboard HTML path; the full-results page is written next to it as <stem>_full.html",
+    )
     p.add_argument(
         "--submissions",
         default="submissions",
@@ -896,14 +933,14 @@ def main(argv: list[str] | None = None) -> None:
 
     rows = scan_results(args.outputs) + scan_submissions(args.submissions)
     generated_at = datetime.now(timezone.utc).strftime("%Y-%m-%d %H:%M UTC")
-    html_str = render_html(
-        rows, version=BENCHMARK_VERSION, generated_at=generated_at, citation=_bibtex_from_cff()
-    )
+    full_out = full_path(args.out)
+    summary, full = render_pages(rows, generated_at=generated_at, full_href=full_out.name)
     from ._io import write_view_if_changed
 
     # unchanged apart from the timestamp -> leave the file (and its old timestamp) alone
-    wrote = write_view_if_changed(args.out, html_str)
-    print(f"leaderboard: {len(rows)} runs -> {args.out}{'' if wrote else ' (unchanged)'}")
+    for path, text in ((args.out, summary), (full_out, full)):
+        wrote = write_view_if_changed(path, text)
+        print(f"leaderboard: {len(rows)} runs -> {path}{'' if wrote else ' (unchanged)'}")
 
 
 if __name__ == "__main__":

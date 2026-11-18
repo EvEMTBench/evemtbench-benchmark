@@ -6,11 +6,12 @@
 %   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/X_*.raw  (released dataset, raw physical units)
 %   src/evemtbench/baselines/threshold.py::_current_statistic  (the statistic)
 %   src/evemtbench/tasks/valid_samples.py  (fault-detection valid-sample mask)
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{5pt}
-\caption{Raw current scale of the fitting distribution versus the never-trained \texttt{eval\_grid} family. The per-window statistic is the \emph{phase-maximum \ac{rms} current}: the root-mean-square of each phase current over the $480$ samples of a $50\,$ms window, maximised over the three phases --- the decision variable of the shipped overcurrent baseline and the same primitive as the random forest's per-channel \ac{rms} feature. It is evaluated on the six channels of the \emph{local} observability view (the faulted line's near-end cubicle), in \textbf{raw simulated amperes, before any standardisation}. Windows are the \emph{non-active} (steady-state) windows of the fault-detection valid-sample set, i.e.\ the pre-/post-fault windows of fault episodes --- the operating point of the set, and exactly the windows on which a collapsed detector raises its false alarms. Aggregation is the median over windows, with the interquartile range in brackets; \emph{ratio} is median(\texttt{eval\_grid})\,/\,median(train). $n$ is the number of windows entering each statistic. The statistic, view, window subset and aggregation are fixed by committed benchmark code and were specified before the values were computed.}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Raw-current distributions in the \texttt{adapt\_grid} training partition and the never-trained \texttt{eval\_grid} family. The per-window statistic is the maximum phase-current \ac{rms} over the three current channels of the \emph{local} view, using raw simulated currents before standardization. The analysis includes non-active windows from the \ac{fd} valid-sample set, corresponding to pre- and post-fault windows of fault episodes. Each row reports the median, interquartile range, number of windows \(n\), and the ratio median(\texttt{eval\_grid})\,/\,median(\texttt{adapt\_grid} train).}
 \label{tab:supp_current_shift}
 \begin{tabular}{l rlr rlr r}
 \toprule
@@ -24,4 +25,4 @@ Prot.\ Ref.\ (110\,kV) & 334.8 & [258.1, 408.7] & 18,995 & 339.7 & [326.9, 343.8
 IEEE 39-Bus (345\,kV) & 433.3 & [222.6, 691.4] & 21,481 & 333.9 & [211.7, 525.3] & 68,789 & 0.8$\times$ \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

@@ -128,5 +128,5 @@ def test_prune_set_paths_exist_and_cover_the_private_trees():
     assert prune, "--print-prune returned nothing"
     for p in prune:
         assert (REPO / p).exists(), f"prune set names a missing path (renamed?): {p}"
-    must_prune = {"paper", "docs/internal", "CLAUDE.md", ".claude", "ONBOARDING.md"}
+    must_prune = {"paper", "docs/internal", "AGENTS.md", ".claude", "ONBOARDING.md"}
     assert must_prune <= set(prune), f"missing critical prune entries: {must_prune - set(prune)}"

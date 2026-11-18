@@ -4,11 +4,12 @@
 % Inputs:
 %   outputs/1.0.0/{fault_detection,fault_classification,fault_location}_{local,line,global}/held_out/<grid>/<baseline>/{test,benchmark}/result.json  (n_test)
 %   outputs/1.0.0/{event_detection,event_classification}_global/held_out/<grid>/<baseline>/{test,benchmark}/result.json  (n_test)
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{6pt}
-\caption{Evaluated sample counts for the five primary functions: the number of \emph{windows} (not episodes) admitted by each function's frozen valid-sample mask, per grid and evaluation family. This is the $n$ behind every mean and confidence interval in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, read from the committed result artefacts. The mask is a function of the window label frame only, so it is identical across the three observability views of a function and across baselines --- one count per (function, grid, family). Counts are far below episodes\,$\times\,23$ (the per-episode window count under the frozen contract) wherever the mask restricts scoring: \ac{fd} scores windows of fault episodes; \ac{fc} and \ac{fl} score fault-active windows (\ac{fl} additionally only line-fault episodes); \ac{ed} and \ac{ec} score every window with an in-vocabulary event type.}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Evaluated sample counts for the five primary functions: the number of \emph{windows} (not episodes) admitted by each function's frozen valid-sample mask, per grid and evaluation family. It is the number of windows scored in each seed's evaluation in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, read from the committed result artifacts; the reported means and 95\% confidence intervals are computed across the five seed-level scores, not across windows. The mask depends only on the window labels and is therefore identical across baselines and all defined observability views --- one count per (function, grid, family). Counts are far below episodes\,$\times\,23$ (the per-episode window count under the frozen contract) wherever the mask restricts scoring: \ac{fd} scores windows of fault episodes; \ac{fc} and \ac{fl} score fault-active windows (\ac{fl} additionally only line-fault episodes); \ac{ed} and \ac{ec} score every window with an in-vocabulary event type.}
 \label{tab:supp_primary_valid_counts}
 \begin{tabular}{ll rr}
 \toprule

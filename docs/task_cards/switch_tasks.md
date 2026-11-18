@@ -1,4 +1,4 @@
-# Task card: switching-event tasks (detection / type) — **SHIPPED**
+# Task card: switching-event tasks (detection / type)
 
 The benign-disturbance counterparts of the fault tasks. Both are **global-only** (switching windows
 have no faulted line for the local/line oracle).

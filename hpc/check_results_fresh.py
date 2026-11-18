@@ -6,9 +6,10 @@ This is the cure for "rendered views drift from the data" (e.g. the absent-class
 truth, and the committed artifacts must equal their output. The one volatile field (the
 "updated <ts>[ · git <sha>]" line) is normalized away before comparison.
 
-Covered views: ``RESULTS.md``, ``coverage_snapshot.json``, ``leaderboard.html``, ``audit/*.html``,
-the committed provenance index ``audit/provenance/<version>/index.json``, and the public results
-bundle ``results/<version>/`` (aggregated CSV+JSON + the LaTeX tables).
+Covered views: ``RESULTS.md``, ``coverage_snapshot.json``, ``leaderboard.html``,
+``leaderboard_full.html``, ``audit/*.html``, the committed provenance index
+``audit/provenance/<version>/index.json``, and the public results bundle
+``results/<version>/`` (aggregated CSV+JSON + the LaTeX tables).
 
 Behaviour:
 * Exit 0 if every committed view matches a fresh build.
@@ -106,21 +107,14 @@ def _fresh_results() -> str:
     return build_results()
 
 
-def _fresh_leaderboard() -> str:
-    from evemtbench.leaderboard import (
-        _bibtex_from_cff,
-        render_html,
-        scan_results,
-        scan_submissions,
-    )
-    from evemtbench.version import BENCHMARK_VERSION
+def _fresh_leaderboard() -> tuple[str, str]:
+    """(leaderboard.html, leaderboard_full.html) as a fresh build would write them."""
+    from evemtbench.leaderboard import render_pages, scan_results, scan_submissions
 
     # the same inputs as `evemtbench-leaderboard` defaults: outputs/ + committed submissions/
     rows = scan_results("outputs") + scan_submissions(_repo() / "submissions")
     # generated_at=None => no timestamp line: the comparison is against deterministic content.
-    return render_html(
-        rows, version=BENCHMARK_VERSION, generated_at=None, citation=_bibtex_from_cff()
-    )
+    return render_pages(rows, generated_at=None)
 
 
 # Audit pages that are committed but deliberately NOT byte-checked: they derive from git
@@ -299,14 +293,18 @@ def main(argv: list[str] | None = None) -> int:
             print(f"check_results_fresh: removed stray results file {rel}")
         print(
             "check_results_fresh: regenerated RESULTS.md + coverage_snapshot.json + "
-            "leaderboard.html + audit/ + results/."
+            "leaderboard.html + leaderboard_full.html + audit/ + results/."
         )
         return 0
 
     checks: list[tuple[str, Path, str]] = [
         ("RESULTS.md", (repo / "RESULTS.md"), _fresh_results()),
         ("coverage_snapshot.json", (repo / "coverage_snapshot.json"), snapshot_fresh),
-        ("leaderboard.html", (repo / "leaderboard.html"), _fresh_leaderboard()),
+    ]
+    lb_fresh, lb_full_fresh = _fresh_leaderboard()
+    checks += [
+        ("leaderboard.html", repo / "leaderboard.html", lb_fresh),
+        ("leaderboard_full.html", repo / "leaderboard_full.html", lb_full_fresh),
     ]
     checks += [
         (f"audit/{name}", audit_dir / name, content)
@@ -342,7 +340,7 @@ def main(argv: list[str] | None = None) -> int:
         )
         return 1
     print(
-        "check_results_fresh: RESULTS.md + coverage_snapshot.json + leaderboard.html + audit/ + "
+        "check_results_fresh: RESULTS.md + coverage_snapshot.json + leaderboard pages + audit/ + "
         "results/ match a fresh rebuild. ✓"
     )
     return 0

@@ -3,12 +3,12 @@
 Dataset and scoring properties that affect published numbers. Each sits in an artifact that is
 frozen within the major version (the valid-sample rules, the line-view oracle and the metric
 definitions, see [versioning.md](versioning.md)).
-Issues 1, 3 and 5 are flagged only: v1.x keeps the published behaviour, and a behavioural fix
+Issues 1, 3, 5 and 6 are flagged only: v1.x keeps the published behaviour, and a behavioural fix
 belongs to the next major contract version. Issue 2 was corrected by the scoped revision v1.2.0,
 for the fault-location tasks alone, and issue 4 by the scoped revision v1.3.0, for the
 faulted-phase cells that read the repaired labels alone. Each is documented here so a method author can account for them.
 Numbers below were measured on the released windows on 2026-10-01 (issues 1–3) and 2026-11-13
-(issues 4–5).
+(issues 4–6).
 
 ## 1. One-ended line in the CIGRE MV `line` view
 
@@ -119,8 +119,7 @@ single-phase-to-ground fault with arc) has `y_phase_A = y_phase_B = y_phase_C = 
 `fault_phase` valid-sample rule keeps fault-active windows with at least one phase bit, so it
 silently dropped the whole class: the published faulted-phase numbers on CIGRE MV and the
 Template20kV corpus measured the task without it. The producer's one-phase rule
-(`psp_helper` `windows_helper._phases_from_select`) lists every other `flt_1phg*` type but not this
-one, and an unlisted type falls through to "no phase" without an error. The source label
+lists every other `flt_1phg*` type but not this one, and an unlisted type falls through to "no phase" without an error. The source label
 `events/event_phase_select_1ph` names exactly one phase for every affected episode.
 
 **Scope.** Only this event type, only on the MV grids that simulate it:
@@ -144,12 +143,12 @@ in the single-phase classes A, B and C.
 **What the code does.** Since v1.3.0, `load_task` applies LP-1 to the `fault_phase` tasks of the
 v1.3.0 cells (`version.results_version(protocol, task, grid=..., source=...)`): `held_out` on
 cigre_mv, `multi_grid_pretrain` on template_20kv, and the transfer cells that target cigre_mv or
-start from the template_20kv source — 151 cells. The patch restores the bit from the source
+start from the template_20kv source (count: `coverage_snapshot.json`). The patch restores the bit from the source
 selector (a/b/c -> A/B/C, the producer's rule for the other 1phg types), only on the partition
 whose `manifest_sha256` it was built for, and refuses to run if the data does not look exactly
 like the defect it repairs. The windows themselves are unchanged. Records stamped before v1.3.0 are
-re-evaluated without the patch. The 2.0 producer fixes the rule at the source, and the overlay is
-removed there.
+re-evaluated without the patch. Dataset V1 fixes the rule at the source, so benchmark 2.0.0 will
+need no patch.
 
 ## 5. `multi_grid` switching and busbar-fault episodes appear only as `no_event` windows
 
@@ -166,11 +165,11 @@ The hazard is outside the task definitions: a method that uses all `multi_grid` 
 negatives, or for self-supervised or contrastive pre-training on every window — would treat
 switching transients as quiescent signal.
 
-**What to do.** In 1.x, do not use `multi_grid` `no_event` windows as clean negatives. The 2.0
+**What to do.** In 1.x, do not use `multi_grid` `no_event` windows as clean negatives. Dataset V1
 producer writes switching and busbar-fault episodes with their event labels; this is a property of
 the 1.x corpora and is not changed in 1.x.
 
-## 6. The window just before an off-grid event onset counts as event-active (open in 1.x; fixed in 2.0.0)
+## 6. The window just before an off-grid event onset counts as event-active (open in 1.x; to be fixed in 2.0.0)
 
 **What.** The benchmark derives "fault active" and "switching active" as `overlap_ratio > 0`. The
 producer computes `overlap_ratio` on the continuous interval `[window_start, window_start + 0.05 s]`,
@@ -180,16 +179,16 @@ sample** (the producer's sample-based `y_fault_present` / `y_switch_present` are
 benchmark scores it as fault or switching active.
 
 **Where.** Every `adapt_grid` and `multi_grid` episode whose onset is off the 9.6 kHz grid (onsets are
-sampled continuously). The `benchmark` (`eval_grid`) families are not affected: their onsets lie on the
+sampled continuously). The `benchmark` families are not affected: their onsets lie on the
 grid (1.1 s). Measured on the DoubleLine `adapt_grid` windows: 4,667 of the fault-active and 5,332 of the
-switch-active windows of 1.x (about 6 % and 9 %); the same rates in the 2.0 release windows.
+switch-active windows of 1.x (about 6 % and 9 %); the same rates in the dataset V1 windows.
 
 **Effect.** One window per affected episode, directly before the onset, carries an active label with a
 pre-event signal: label noise in the training, validation and in-distribution test partitions of every
 task that uses the fault-active or switch-active rule (FD, FC, FL, FG, FP, FCat, FO, ES, ED, SD, ST, EC).
-It applies to all baselines alike. Results on the `eval_grid` families are unaffected.
+It applies to all baselines alike. Results on the `benchmark` families are unaffected.
 
 **Status.** Kept as is for the 1.x releases (changing it is a label-definition change that would require
-re-running nearly every learned cell). Fixed from benchmark 2.0.0 on: active windows are derived from the
-producer's sample-based labels (at least one post-onset sample). Found by the 2.0 window validation
-(2026-11-13).
+re-running nearly every learned cell). Planned for benchmark 2.0.0: active windows will be derived from the
+producer's sample-based labels (at least one post-onset sample). Found while validating the dataset V1
+windows (2026-11-13).

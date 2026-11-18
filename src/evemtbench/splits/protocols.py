@@ -31,9 +31,6 @@ from __future__ import annotations
 
 from dataclasses import dataclass
 
-# Three-way episode split names (used by the generic helpers).
-SPLIT_NAMES = ("train", "val", "test")
-
 # held_out has a 4th "benchmark" partition (the whole benchmark family, test-only).
 HELD_OUT_SPLIT_NAMES = ("train", "val", "test", "benchmark")
 

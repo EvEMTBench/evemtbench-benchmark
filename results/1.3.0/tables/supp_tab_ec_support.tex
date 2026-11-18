@@ -5,11 +5,12 @@
 %   src/evemtbench/splits/v1.0/held_out/<grid>/{test,benchmark}.txt
 %   $EVEMT_ROOT/{adapt_grid,benchmark}/windows/<grid>/y_*.parquet  (released dataset)
 %   src/evemtbench/tasks/labels/event_type.py  (frozen 23-class vocabulary+deriver)
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
-\scriptsize
-\setlength{\tabcolsep}{3.2pt}
-\caption{Per-class support of the frozen 23-class \ac{ec} vocabulary: number of \emph{windows} carrying each class in the in-distribution test split and the never-trained \texttt{eval\_grid} family of each grid. Class indices are the frozen label ids. A count of $0$ is genuine zero support --- the class does not occur in that evaluation set --- and its per-class $\text{F}_1$ is reported as \undefm{} (undefined), never as zero; the grid-restricted classes (the \ac{mv}-only \ac{hif} and cable/motor events, and the \ac{ehv}-only generator trip) are the systematic zeros. Column totals are the evaluated \ac{ec} sample count $n$ and match Table~\ref{tab:supp_primary_valid_counts}. Derived from the committed partitions and the released window labels with the benchmark's frozen deriver.}
+\footnotesize
+\setlength{\tabcolsep}{3pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Per-class support of the frozen 23-class \ac{ec} vocabulary: number of \emph{windows} carrying each class in the in-distribution test split and the never-trained \texttt{eval\_grid} family of each grid. Class indices are the frozen label ids. A count of $0$ indicates that the class does not occur in the corresponding evaluation set; its per-class $\text{F}_1$ is therefore reported as \undefm{} rather than zero; the grid-restricted classes (the \ac{mv}-only \ac{hif} and cable/motor events, and the \ac{ehv}-only generator trip) are the systematic zeros. Column totals are the evaluated \ac{ec} sample count $n$ and match Table~\ref{tab:supp_primary_valid_counts}. Derived from the committed partitions and released window labels.}
 \label{tab:supp_ec_support}
 \begin{tabular}{r l rr rr rr rr }
 \toprule
@@ -44,4 +45,4 @@
 \multicolumn{2}{l}{\textbf{total (evaluated EC windows)}} & 34,178 & 103,707 & 34,500 & 25,323 & 33,672 & 56,005 & 34,569 & 223,284 \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

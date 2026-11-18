@@ -100,15 +100,15 @@ the published model:** (1) the strided patch embedding — the source makes one 
 which is 480 tokens per window; patching follows Nie et al. (ICLR 2023, arXiv:2211.14730), but
 channel-mixing rather than channel-independent; (2) **8 attention heads** instead of the generic
 configuration's 16; (3) a **LayerNorm on the patch tokens** after the scaled projection — without
-it training diverged to NaN on the wide `global` views and stopped early on all views (issue #26). It also keeps the benchmark's shared optimiser and batch size (AdamW, cosine
+it training diverged to NaN on the wide `global` views and stopped early on all views. It also keeps the benchmark's shared optimiser and batch size (AdamW, cosine
 schedule, batch 256) rather than the RAdam and batch 128 of the source repository's examples, so
 that only the architecture differs from the other deep baselines; no masked pre-training is used.
 
-**`gnn`** *(planned)* — message-passing over the grid graph (`grid_graph.pickle`), the natural
+**`gnn`** *(planned)* — message-passing over the grid graph (`graph.pickle`), the natural
 contender for the **`cross_topology`** protocol (train on diverse topologies → test on unseen
-grids), where fixed-input models (MLP/CNN) cannot ingest a different channel count. The `multi_grid` family
-(formerly `train`) is windowed and the graph artifacts exist; pending the `cross_topology`
-protocol and a variable-channel (cubicle-set) view.
+grids), where fixed-input models (MLP/CNN) cannot ingest a different channel count. Pending the
+`cross_topology` protocol and a variable-channel (cubicle-set) view
+([design/cross_topology.md](design/cross_topology.md)).
 
 ## Hyperparameters & determinism
 
@@ -118,8 +118,7 @@ deep baselines (mlp/gru/cnn/resnet/tst) share **one** training regime via `basel
 AdamW + weight decay `1e-4`, `CosineAnnealingLR`, and **validation early-stopping** (patience 12, best-val checkpoint,
 restored before predict) — so only the architecture differs (a cross-baseline fairness requirement).
 GPU training is **not** bit-identical run-to-run (reported as mean ± std over 5 seeds); splits,
-labels, and metrics are deterministic (see [determinism.md](determinism.md)). Deep baselines require
-an sm_70+ GPU (v100 / Quadro RTX / A6000); sm_61 (GTX/TitanXP) nodes are excluded.
+labels, and metrics are deterministic (see [determinism.md](determinism.md)).
 
 ## Model capacity & fairness
 
@@ -133,27 +132,14 @@ form. Capacity is instead made **transparent**: every deep cell records its trai
 (`n_params` in `result.json`) and per-seed training cost (`compute`: wall-time, effective epochs, peak
 GPU mem), surfaced as `params`/`train` columns in RESULTS and the leaderboard.
 
-## Checkpoints, roadmap & limitations
+## Checkpoints
 
 The full sweep saves each deep baseline's **best-val checkpoint per seed** to
-`outputs/.../checkpoints/seedN.pt` (sha-recorded in `run_record.json`; `outputs/` is git-ignored, so
-these are release artifacts, not committed). This is deliberate insurance: several planned analyses
-become **post-hoc, no re-training required**:
-
-- **Noise / measurement-realism robustness** — evaluate the saved checkpoints on perturbed inputs
-  (sensor noise, quantization, CT/PT saturation); the sim-to-real gap is a known limitation addressed
-  this way rather than in-sweep.
-- **Detection latency (time-to-trip)** — derivable from the stored per-window predictions
-  (`predictions_seedN.parquet`, keyed by `sample_id, window_idx`): the FD valid set includes the
-  **pre-fault** windows, so first-correct-flag-after-inception is a pure post-processing metric.
-- **Dataset artifacts** (datasheet, license, DOI/Zenodo hosting, Croissant metadata) are tracked
-  separately from this sweep for a NeurIPS D&B-style submission.
+`outputs/.../checkpoints/seedN.pt` (sha-recorded in `run_record.json`; release artifacts, not
+committed). Noise-robustness and detection-latency analyses can run on them post hoc, without
+re-training.
 
 ## Adding a baseline
 
-Implement the `fit(task)` / `predict(view) -> predictions_frame` interface (mirror `cnn.py`),
-register its factory by name — `register_baseline()` for a third-party model (see
-[`examples/byo_model.py`](../examples/byo_model.py)), or an entry in
-`baselines/runner.py::BASELINE_FACTORIES` in-tree; `_make_baseline` just looks the name up there and
-the `--baseline` choices are derived from it — and add it to `coverage.py::ALL_BASELINES`. See [extending.md](extending.md). Third-party submissions need **not** add a
+See [extending.md](extending.md#add-a-baseline). Third-party submissions need **not** add a
 baseline — score directly via the evaluation layer ([submission.md](submission.md)).

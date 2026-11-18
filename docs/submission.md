@@ -46,8 +46,7 @@ Path: `outputs/<benchmark_version>/<task>/<protocol>/<grid>/<baseline>/<test_set
 `held_out`, `1.1.0` for the pre-training and transfer protocols, `1.2.0` for the fault-location
 tasks under `held_out` and both transfer protocols, and `1.3.0` for the faulted-phase cells that read
 a label repaired by label patch LP-1 (see [versioning.md](versioning.md)). The validator checks the
-stamp against that mapping, with the result's grid and `pretrain_grid`. The validator checks the stamp
-against that mapping.
+stamp against that mapping, with the result's grid and `pretrain_grid`.
 
 ```json
 {
@@ -84,10 +83,8 @@ metric read identically. `n` is the stratum's support (a property of the eval se
 seeds) and `n_seeds` counts the seeds that reported the group. Strata are `grid`, `event_family`,
 `event_type`, `origin` (and `resistance_bin` when aux settings are attached).
 
-> **Changed 2026-08 (v1.0.0 artifacts regenerated).** Before this, `breakdowns` held the values of
-> whichever seed ran *last*, sitting next to a 5-seed `aggregate`, with nothing recording that
-> mismatch. Headline numbers were never affected. The metrics themselves are unchanged; the field was
-> recomputed from the stored per-seed predictions by `evemtbench-reevaluate` — no model was retrained.
+Records written before 2026-08 held the last seed's breakdowns; they were recomputed from the stored
+predictions by `evemtbench-reevaluate`. Headline numbers were not affected.
 
 ## 4. Reproducibility requirements (for a valid submission)
 
@@ -100,7 +97,7 @@ seeds) and `n_seeds` counts the seeds that reported the group. Strata are `grid`
 - **Seeds:** report ≥3 seeds; submit `mean ± std` + the `ci95` half-width. (The reference
   baselines report **5**; rendered tables show mean ± 95% CI.)
 - **Environment:** record yours the way we record ours — as a capture, not an aspiration. Our
-  results environment is `env/results-v1.0.0.lock` (and the CI gate is pinned separately in
+  results environments are `env/results-v<version>.lock` (and the CI gate is pinned separately in
   `requirements-ci-py3.*.lock`; the two are not the same thing — see
   [determinism.md](determinism.md)). Every run emits `run_record.json` (seeds, git sha, executing
   host/SLURM job, input split-file + window-manifest hashes, lockfile + results-env hashes, the
@@ -154,11 +151,9 @@ shortest path. `metadata.json` describes the model:
 | `reproduced_commit` | no | commit of `code_link` that was re-run (set with `reproduced`) |
 | `notes` | no | free text |
 
-**Rules.** These are the same rules the reference baselines follow:
-- Fit on `train` only.
-- Select models and hyperparameters on `val` only.
-- Report at least 3 seeds.
-- Never use `test` or `benchmark` data, or simulations of them, in training or pretraining.
+**Rules** (the same the reference baselines follow): fit on `train` only; select models and
+hyperparameters on `val` only; report at least 3 seeds; never use `test` or `benchmark` data, or
+simulations of them, in training or pretraining.
 
 A `full` submission covers every `held_out` cell (every task × reference grid × scored test set).
 A `partial` one may cover any subset. Transfer-protocol cells are optional extras in both.

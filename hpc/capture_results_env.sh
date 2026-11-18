@@ -10,12 +10,12 @@
 # NOT the CI pin: CI installs requirements-ci-py3.*.lock (hash-enforced, torch-free). See
 # docs/determinism.md for why the two are separate files.
 #
-# Runs via SLURM, never on the login node (CLAUDE.md hard rule). Alex is GPU-only and forbids
+# Runs via SLURM, never on the login node (AGENTS.md hard rule). Alex is GPU-only and forbids
 # --mem on GPU jobs, so this metadata-only job takes the smallest MIG slice:
 #   srun --gres=gpu:a100small:1 --partition=a100mig --cpus-per-task=2 --time=00:10:00 \
 #     bash hpc/capture_results_env.sh
 #
-# After a capture that changes the file, run hpc/backfill_results_env.py so existing run records
+# After a capture that changes the file, run hpc/verify_results_env.py so existing run records
 # either still match (no-op) or are reported as mismatching — never silently re-stamped.
 # ============================================================================
 set -eo pipefail

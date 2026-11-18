@@ -30,32 +30,26 @@ PRUNE=(
   docs/EXTERNAL_REPOSITORY_REVIEW.md
   docs/results_audit/02-understandingvcs-case-study.md
   docs/results_audit/03-evemtbench-design.md
-  CLAUDE.md
+  docs/results_audit/01-results-audit-concept.md
+  docs/release.md
+  docs/design/metadata_template_20kv.json
+  docs/design/metadata_template_110kv.json
+  docs/design/metadata_template_345kv.json
   .claude
   AGENTS.md
   ONBOARDING.md
   .gitlab
   .gitlab-ci.yml
-  .github/workflows/paper.yml
   hpc/autonomous_loop.sh
-  hpc/autocommit_overview.sh
   hpc/autocommit_progress.sh
-  hpc/refresh_results.sh
   hpc/notify.sh
   hpc/heartbeat_check.sh
-  hpc/watch_ieee39_windows.sh
   hpc/nightly_integrity.sh
   hpc/setup_shared_outputs.sh
-  hpc/flip_split_stratified.sh
-  hpc/train_nhr.sh
   hpc/build_paper.py
-  hpc/backfill_host_provenance.py
   hpc/rescore_val.sbatch
   hpc/rescore_transfer_val.sbatch
   hpc/pwctrl_rescore.sbatch
-  # One-time 1.0.0 -> 1.1.0 hardlink migration of OUR private project cache; hardcodes the
-  # operator's cache root and means nothing without it.
-  hpc/seed_cache_1.1.0.sh
 )
 if [ "${1:-}" = "--print-prune" ]; then
   printf '%s\n' "${PRUNE[@]}"
@@ -127,7 +121,7 @@ REQUIRED=(
   env/results-v1.0.0.lock "env/results-v$VERSION.lock" env/results-scoring.constraints
   # both split trees ship: v1.0 (held_out) + v1.1 (corrected multi_grid_pretrain)
   src/evemtbench/version.py src/evemtbench/splits/v1.0 src/evemtbench/splits/v1.1
-  RESULTS.md leaderboard.html coverage_snapshot.json
+  RESULTS.md leaderboard.html leaderboard_full.html coverage_snapshot.json
   "results/$VERSION" audit/index.html "audit/provenance/$VERSION/index.json"
   .github/workflows/ci.yml .github/workflows/nightly.yml
   index.html .nojekyll

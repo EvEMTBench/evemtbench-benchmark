@@ -4,7 +4,7 @@ Everything the benchmark reads, where it lives, and how it joins. The data root 
 **producer-owned and actively written** — the benchmark treats it read-only; all derived
 assets go to the *auxiliary overlay* (separate root) or `outputs/`.
 
-**Where the windows come from.** The published download (FAUDataCloud) contains the producer's
+**Where the windows come from.** The published results use dataset **v0.1** ([datasheet.md](datasheet.md#identity)). Its download (FAUDataCloud) contains the producer's
 raw simulation exports (`raw/`); the `windows/` partitions below are produced from them by the
 producer pipeline, which is not public yet (release planned). A third-party windowing must
 satisfy the pinned contract in `src/evemtbench/contract/`: `load_windows` verifies each manifest
@@ -24,7 +24,7 @@ Families (`evemtbench.data.roots.FAMILIES`): **`benchmark`** (cross-distribution
 scored, never trained on), **`adapt_grid`** (in-distribution: train/val/test), **`multi_grid`**
 (multi-topology pre-training corpus — `template_20kv` / `template_110kv` / `template_345kv` — for
 the `multi_grid_pretrain` and transfer protocols). `fine_tune` is accepted as a read alias for
-`adapt_grid` and `train` for `multi_grid` (the pre-v0.2 names).
+`adapt_grid` and `train` for `multi_grid` (old names).
 
 Grids (`GRIDS`): `double_line` (110 kV HV) · `cigre_mv` (20 kV MV) · `testgrid_110kv` (110 kV HV)
 · `ieee39` (345 kV EHV, 60 Hz). Each maps to a `raw_foldername` (directory name, e.g.
@@ -89,6 +89,6 @@ golden-tested) — never from waveforms.
 | splits | `src/evemtbench/splits/v1.0/held_out/<grid>/` (held_out; transfer reuses it) · `src/evemtbench/splits/v1.1/multi_grid_pretrain/<grid>/` (pre-training; `version.splits_version`) | **committed, frozen** (regenerate bit-for-bit; changing = major bump) |
 | results (raw) | `outputs/<version>/<task>/<protocol>/<grid>/<baseline>/<test_set>/` | derived, git-ignored; coverage manifest is the source of truth. A cell directory may also hold `failure.json` (operational: failed attempts of a not-yet-done cell; removed on success; read only by `coverage`) |
 | outside submissions | `submissions/<model>/` — `metadata.json` + `results/<task>/<protocol>/<grid>/[pretrain-<src>/]<test_set>/result.json` | committed via pull request; validated in CI (`evemtbench-validate-submission`); listed on the leaderboard with a tier badge ([submission.md §6](submission.md#6-submitting-to-the-leaderboard)) |
-| results (public bundle) | `results/<version>/` — `aggregated_results.{csv,json}` + `tables/*.tex` | committed, **builder-generated** (`hpc/make_results_bundle.py`, freshness-gated); the self-contained public tier between raw `outputs/` and the private `paper/manuscript/` (never hand-edit) |
+| results (public bundle) | `results/<version>/` — `aggregated_results.{csv,json}` + `tables/*.tex` | committed, **builder-generated** (`hpc/make_results_bundle.py`, freshness-gated; never hand-edit) |
 | rendered tables | `RESULTS.md`, `leaderboard.html` | committed but **builder-generated** (freshness-gated; never hand-edit) |
 | projection caches | `$EVEMTBENCH_PROJECTION_CACHE` | derived, content-addressed, safe to delete |

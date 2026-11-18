@@ -1,0 +1,42 @@
+{
+  "tabulator.min.js": {
+    "package": "tabulator-tables",
+    "version": "6.3.1",
+    "source": "https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/js/tabulator.min.js",
+    "license": "MIT",
+    "license_file": "LICENSE-tabulator-tables.txt",
+    "sha256": "e952272c3b2afa4ebb60cef5db8cbe9cbaabaa52b50c3cd3d22993ca5215a6ff"
+  },
+  "tabulator_simple.min.css": {
+    "package": "tabulator-tables",
+    "version": "6.3.1",
+    "source": "https://cdn.jsdelivr.net/npm/tabulator-tables@6.3.1/dist/css/tabulator_simple.min.css",
+    "license": "MIT",
+    "license_file": "LICENSE-tabulator-tables.txt",
+    "sha256": "8a7431ff86fa6aa02943b70470df77fa7094e7eac9f2420b6780c6970c7345eb"
+  },
+  "vega.min.js": {
+    "package": "vega",
+    "version": "5.30.0",
+    "source": "https://cdn.jsdelivr.net/npm/vega@5.30.0/build/vega.min.js",
+    "license": "BSD-3-Clause",
+    "license_file": "LICENSE-vega.txt",
+    "sha256": "e432c751a6363f4a61da62920cc7d7ebd13cf09d82949f8f486248f8071dc3ce"
+  },
+  "vega-lite.min.js": {
+    "package": "vega-lite",
+    "version": "5.21.0",
+    "source": "https://cdn.jsdelivr.net/npm/vega-lite@5.21.0/build/vega-lite.min.js",
+    "license": "BSD-3-Clause",
+    "license_file": "LICENSE-vega-lite.txt",
+    "sha256": "cd32314b1e76e7d879dc9f0534b62be714df03554486c7ca2381abfd0a92d2f4"
+  },
+  "vega-embed.min.js": {
+    "package": "vega-embed",
+    "version": "6.26.0",
+    "source": "https://cdn.jsdelivr.net/npm/vega-embed@6.26.0/build/vega-embed.min.js",
+    "license": "BSD-3-Clause",
+    "license_file": "LICENSE-vega-embed.txt",
+    "sha256": "072c054f2a6310725e038c38a71e00052705e31835632462c9717a23a384e895"
+  }
+}

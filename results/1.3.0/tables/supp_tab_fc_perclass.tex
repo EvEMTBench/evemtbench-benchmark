@@ -3,11 +3,12 @@
 % Benchmark: EvEMTBench v1.3.0
 % Inputs:
 %   outputs/1.0.0/fault_classification_line/held_out/<grid>/<baseline>/{val,test}/result.json
-\begin{table}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{5pt}
-\caption{Per-class $\text{F}_1$ for fault-type classification (FC, 9-class, \emph{line} view, in-distribution test), validation-selected reference baseline. \undefm{}~= $\text{F}_1$ undefined (no supported \emph{and} no predicted samples); the two HIF subtypes are \ac{mv}-only, so their per-grid support (Table~\ref{tab:supp_fc_support}) is zero on the \ac{hv}/\ac{ehv} grids. Cells are mean\,$\pm$\,95\% CI over seeds.}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Per-class $\text{F}_1$ for fault-type classification (FC, 9-class, \emph{line} view, in-distribution test), validation-selected reference baseline. \undefm{} denotes undefined per-class $\text{F}_1$ for a zero-support class; the two HIF subtypes are \ac{mv}-only, so their per-grid support (Table~\ref{tab:supp_fc_support}) is zero on the \ac{hv}/\ac{ehv} grids. Cells are mean\,$\pm$\,95\% CI over seeds.}
 \label{tab:supp_fc_perclass}
 \begin{tabular}{l cccc}
 \toprule

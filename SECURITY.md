@@ -11,8 +11,8 @@ code execution during data loading, or a dependency CVE that affects this packag
 - **Julian Oelhaf** — <julian.oelhaf@fau.de>
 
 Do **not** open a public issue for a security report. Include a description, affected version
-(`python -c "import evemtbench; print(evemtbench.__version__)"` / `BENCHMARK_VERSION`), and a minimal
-reproduction. We aim to acknowledge within 5 working days.
+(`python -c "import evemtbench; print(evemtbench.BENCHMARK_VERSION)"`, and `pip show evemtbench` for
+the package version), and a minimal reproduction. We aim to acknowledge within 5 working days.
 
 ## Supported versions
 

@@ -293,7 +293,7 @@ GATES: list[Gate] = [
         stack=(
             (
                 "hpc/check_results_fresh.py",
-                "def _fresh_leaderboard() -> str:",
+                "def _fresh_leaderboard() -> tuple[str, str]:",
                 "Fresh-build calls: every view is rebuilt from outputs/ in-process, all with "
                 "generated_at=None so the rebuild is deterministic.",
             ),

@@ -4,11 +4,12 @@
 % Inputs:
 %   outputs/1.0.0/{fault_detection,fault_classification,fault_location}_{local,line,global}/held_out/<grid>/<baseline>/val/result.json
 %   outputs/1.0.0/{event_detection,event_classification}_global/held_out/<grid>/<baseline>/val/result.json
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{4.5pt}
-\caption{Validation-split selection audit: the headline score \emph{and identity} (in parentheses) of the validation-selected reference baseline that drives the model selection reported in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, per primary function, grid, and observability view. Each cell is the winner's validation mean\,$\pm$\,95\% CI over five seeds; its held-out \emph{test} and \emph{benchmark} values are in Tables~\ref{tab:res_fd}--\ref{tab:res_ec}, and the competing baselines' held-out values are in the S2 per-baseline tables. Arrows give the metric direction (balanced accuracy $\uparrow$; \acs{mae}\,\% $\downarrow$ for \ac{fl}). \notapp{}~= not defined for this view (the global-only event-scope functions \ac{ed}/\ac{ec} at \emph{local}/\emph{line}).}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Validation-split selection audit for the primary functions. Each cell reports the validation metric and selected reference baseline in parentheses for the corresponding grid and observability view. The selected baseline determines the results reported in Tables~S1--S5, while the full per-baseline held-out results are shown in Supplementary Section~\ref{sec:supp_full_baselines}. Arrows indicate the metric direction (balanced accuracy \(\uparrow\); \ac{mae} in \% of line length \(\downarrow\) for \ac{fl}). \notapp{} denotes a view for which the function is not defined.}
 \label{tab:supp_val_selection}
 \begin{tabular}{ll ccc}
 \toprule
@@ -40,4 +41,4 @@
                                & IEEE 39-Bus (345\,kV)    & \notapp & \notapp & 0.774 $\pm$ 0.003 (\acs{rf}) \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

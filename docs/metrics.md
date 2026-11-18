@@ -9,14 +9,16 @@ protection-grade metrics. Frozen within a benchmark major version (see
 
 | label kind | metrics |
 |---|---|
-| **binary** (FD) | `balanced_accuracy`, `macro_f1`, `missed_fault_rate`, `false_alarm_rate`, `accuracy` |
-| **multiclass** (FC) | `balanced_accuracy`, `macro_f1`, `accuracy` (+ per-class F1 when the class vocab is supplied) |
+| **binary**, fault detection (FD) | `balanced_accuracy`, `macro_f1`, `missed_fault_rate`, `false_alarm_rate`, `accuracy` |
+| **binary**, event and switch detection | `balanced_accuracy`, `macro_f1`, `missed_event_rate`, `false_event_trip_rate`, `accuracy` |
+| **binary**, attributes (grounded, origin) | `balanced_accuracy`, `macro_f1`, `accuracy` |
+| **multiclass** (FC, ES, EC, phase, category, switch type) | `balanced_accuracy`, `macro_f1`, `accuracy` (+ per-class F1 when the class vocab is supplied) |
 | **regression** (FL) | `mae`, `rmse`, `r2`, `median_abs_error` |
 
 - `missed_fault_rate` = FN/(positives) — **dependability** (missed faults); `false_alarm_rate` =
   FP/(negatives) — **security** (false trips). On a single-class subset, undefined metrics are
   `NaN` (recorded as `n_defined < n_seeds`, never silently 0).
-  Binary `macro_f1` is the exception: it stays defined but unstable there (see
+  Every binary task also emits `macro_f1_supported`. Binary `macro_f1` stays defined but unstable there (see
   [known_issues.md](known_issues.md#3-binary-macro_f1-on-single-class-breakdown-subsets)).
 - `balanced_accuracy` = mean per-class recall → robust to the heavy class imbalance (negatives ≫
   positives for FD; SHC ≫ incipient/HIF for FC), which is why it's the headline classification metric.
@@ -25,7 +27,7 @@ protection-grade metrics. Frozen within a benchmark major version (see
 
 | higher-is-better (+1) | lower-is-better (−1) |
 |---|---|
-| `balanced_accuracy`, `macro_f1`, `accuracy`, `r2` | `missed_fault_rate`, `false_alarm_rate`, `mae`, `rmse`, `median_abs_error` |
+| `balanced_accuracy`, `macro_f1`, `macro_f1_supported`, `accuracy`, `r2` | `missed_fault_rate`, `false_alarm_rate`, `missed_event_rate`, `false_event_trip_rate`, `mae`, `rmse`, `median_abs_error` |
 
 ## Aggregation across seeds
 
@@ -36,6 +38,43 @@ distinguished from a genuine 0. `ci95` is the 95% CI half-width (Student t, ddof
 claims use the paired-by-seed test (`evemtbench-significance`).
 
 ## Leaderboard ranking
+
+There are two pages, built from the same `result.json` files:
+`leaderboard.html` ranks models per view, protocol and evaluation set, and
+`leaderboard_full.html` lists every task, grid and metric.
+
+### Skill score (`leaderboard.html`)
+
+Each cell (task × grid, plus the pre-training source for transfer) has a headline **error**:
+`1 − balanced_accuracy` for classification and `mae` for regression. The error is divided by
+that of the `majority` reference, which predicts the most frequent train class or the train mean.
+The ratio is clipped to [0.01, 100]. Over the cells of a view:
+
+    skill = 1 − exp(mean(log(error / reference_error)))
+
+So 0 is no better than the reference, 1 is perfect, and a negative score is worse than the
+reference. A model's score does not change when other entries are added, unlike average rank
+or win rate. This is the skill score of fev-bench.
+
+- **Interval:** a 95% percentile bootstrap over cells (1000 resamples, fixed seed).
+- **Rank range:** the best and worst rank once only significant differences count. Two
+  entries are compared with a **paired** bootstrap over the same resampled cells, and one is
+  better when the 95% interval of the difference in mean log error ratio excludes zero. Per-model
+  intervals are not used for this: they overlap almost always, because the spread between cells
+  is much larger than the differences between models.
+- **Win rate:** the share of shared cells on which a model has the lower error than each other
+  ranked entry (ties count half), averaged over those entries. It changes as entries are added.
+- **Partial entries:** only entries that cover every cell of a view are ranked. Others are listed
+  below the ranking with their skill on their own cells and the best ranked entry's skill on the
+  same cells.
+- **Transfer protocols** have no `majority` run; their reference is the `held_out` majority of
+  the same task, target grid and evaluation set, used only when the evaluation set has the same
+  size. The page says how many runs were left out for that reason.
+- **Not scored:** a cell whose headline value is missing or not finite.
+- **Names:** an outside submission named like an in-house baseline or the reference is listed
+  as `<name> (submitted)`, so it never replaces those rows.
+
+### Per-task sections (`leaderboard_full.html`)
 
 Per task section the **headline metric** is the first present of
 `HEADLINE_PRIORITY = (balanced_accuracy, mae)` (i.e. balanced-accuracy for FD/FC, MAE for FL).
@@ -54,8 +93,9 @@ the windows `y` (never loading `X`):
   the first correctly-flagged active window → `detection_rate`, `median_latency_s`, `mean_latency_s`.
 - **Location difficulty curve** (FL): MAE binned by distance-along-line %, exposing where
   localization degrades (the `benchmark` family sweeps location at discrete points).
-- **Resistance-stratified curves**: planned — fault resistance is not yet in the windows `y` (lives
-  in the simulation `settings.csv`); a dataset-side dependency.
+- **Resistance**: with aux settings attached, results carry a `resistance_bin` breakdown
+  ([DATA_LAYOUT.md](DATA_LAYOUT.md#join-keys-the-one-rule-to-remember)); `analysis.py` computes no
+  resistance curve.
 
 Run: `python -m evemtbench.analysis --task <id> --grid <grid> --baseline <b> --test-set <test|benchmark>`.
 
@@ -72,7 +112,7 @@ after the fact, per (task, grid) under `held_out`, with three numbers:
 - **Kendall τ-b:** agreement between the validation ranking and the held-out ranking, and
   between the `test` and `benchmark` rankings.
 
-The held-out sets only grade the choice; they never change it. With five learned baselines τ is
+The held-out sets only grade the choice; they never change it. With six learned baselines τ is
 coarse, so read regret first.
 
 ## Reading transfer

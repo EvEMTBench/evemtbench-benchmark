@@ -696,7 +696,7 @@ def result_table(key: str) -> str:
             f"hpc/paper_artifacts/build_tab_res_{key}.py",
             [_held_out_glob(f"{stem}_{{local,line,global}}")],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.1pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         f"\\caption{{{name} --- reference baseline (best of RF/MLP/GRU/CNN/ResNet/TST, "
         "selected on the validation split; a beatable reference, full per-baseline breakdown "
         "in the Supplementary), headline metric "
@@ -714,7 +714,7 @@ def result_table(key: str) -> str:
         "\\textbf{Grid} & \\textbf{local} & \\textbf{line} & \\textbf{global} & "
         "\\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -945,7 +945,8 @@ def transfer_table(
         ],
     )
     return (
-        header + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
+        header
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         f"\\caption{{{name} --- cross-grid transfer reference baseline (best of "
         "MLP/GRU/CNN/ResNet/TST, selected on the validation split, never on the reported "
         "\\texttt{eval\\_grid} set: \\emph{fine-tune} on the target grid's validation split, "
@@ -968,7 +969,7 @@ def transfer_table(
         "\\textbf{Grid} & \\textbf{Src} & \\textbf{local} & \\textbf{line} & \\textbf{global} & "
         "\\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -1037,13 +1038,16 @@ Fault localisation (\ac{fl})\,$\dagger$   & 3 & regression  & L, Li, G & positio
 \end{tabular}
 \end{table*}
 """,
-    "topology_overview": r"""\begin{table}[t]
+    "topology_overview": r"""\begin{table}[!htbp]
 \caption{Reference grids used to instantiate the benchmark, as released with the
 EvEMTBench dataset. The \emph{global} view width (number of channels)
 is grid-dependent, which motivates topology-agnostic models for the planned
 cross-topology protocol.}
 \label{tab:topology_overview}
 \centering
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
 \begin{tabular}{lccc}
 \toprule
 \textbf{Grid} & \textbf{Voltage} & \textbf{$f_0$} & \textbf{\emph{global} width} \\
@@ -1281,7 +1285,7 @@ def fc_per_class_f1_table() -> str:
             "hpc/paper_artifacts/build_supp_tab_fc_perclass.py",
             [_held_out_glob("fault_classification_line", "{val,test}")],
         )
-        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Per-class $\\text{F}_1$ for fault-type classification (FC, 9-class, "
         "\\emph{line} view, in-distribution test), validation-selected reference baseline. "
         "\\undefm{}~= $\\text{F}_1$ undefined (no supported \\emph{and} no predicted samples); "
@@ -1339,7 +1343,7 @@ def dataset_split_table() -> str:
             "hpc/paper_artifacts/build_supp_tab_splits.py",
             ["src/evemtbench/splits/v1.0/held_out/<grid>/{train,val,test,benchmark}.txt"],
         )
-        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{6pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Held-out split composition: number of \\emph{episodes} per grid. Under the frozen "
         "window contract each episode yields $23$ windows ($50\\,$ms length, $5\\,$ms step, over "
         "the event-centred extraction interval), uniformly across every grid and family; the "
@@ -1400,7 +1404,7 @@ def fc_support_table() -> str:
             "hpc/paper_artifacts/build_supp_tab_fc_support.py",
             [_held_out_glob("fault_classification_line", "test") + "  (breakdowns.event_type.n)"],
         )
-        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Per-class support (test-set window count) for the 9 FC classes per grid. A count "
         "of $0$ means the class is absent on that grid (the two HIF subtypes are \\ac{mv}-only), so "
         "its per-class $\\text{F}_1$ is undefined rather than zero.}\n"
@@ -1436,20 +1440,31 @@ def _diag_cell(rows: dict, task_id: str, baseline: str) -> str:
     return _fmt_mean_ci(m, ci_val(doc, "balanced_accuracy"), "balanced_accuracy")
 
 
+def si_panels(tabulars: list[str]) -> str:
+    """Stack tabulars vertically under one caption and label.
+
+    An SI table that does not fit the text width at the minimum table font is split into panels;
+    each panel repeats the identifying columns and the column headings."""
+    return "\n\\par\\medskip\n".join(tabulars) + "\n"
+
+
 def diagnostic_overview_table() -> str:
     """SI table: per-baseline balanced accuracy for the seven diagnostic functions (in-distribution
-    test, each at its natural view), so the extended suite is reported rather than only summarised."""
+    test, each at its natural view), so the extended suite is reported rather than only summarised.
+
+    Each function is a group heading above its four grid rows, so the table needs no function
+    column and fits the text width at \\footnotesize."""
     per_grid = {g: load_rows(g) for g, _ in GRID_ROWS}
     heads = " & ".join(f"\\textbf{{{_BASELINE_LABEL[b].split()[0]}}}" for b in _DIAG_BASELINES)
-    body = []
+    ncol = 1 + len(_DIAG_BASELINES)
+    rows = []
     for label, stem, view, kind in _DIAGNOSTICS:
-        for i, (g, glabel) in enumerate(GRID_ROWS):
-            tid = f"{stem}_{view}"
-            cells = [_diag_cell(per_grid[g], tid, b) for b in _DIAG_BASELINES]
-            fn = f"{label} ({kind}, {view})" if i == 0 else ""
-            body.append(f"{fn} & {glabel} & " + " & ".join(cells) + r" \\")
-        body.append("\\midrule")
-    body = "\n".join(body[:-1])  # drop trailing midrule
+        rows.append(f"\\multicolumn{{{ncol}}}{{l}}{{\\textit{{{label} ({kind}, {view})}}}} \\\\")
+        for g, glabel in GRID_ROWS:
+            cells = [_diag_cell(per_grid[g], f"{stem}_{view}", b) for b in _DIAG_BASELINES]
+            rows.append(f"{glabel} & " + " & ".join(cells) + r" \\")
+        rows.append("\\midrule")
+    body = "\n".join(rows[:-1])  # drop trailing midrule
     return (
         provenance_header(
             "hpc/paper_artifacts/build_supp_tab_diagnostics.py",
@@ -1458,7 +1473,8 @@ def diagnostic_overview_table() -> str:
                 _held_out_glob("{fault_origin,event_state,switch_detection,switch_type}_global"),
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{4pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\footnotesize\n\\setlength{\\tabcolsep}{3pt}\n"
+        "\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Extended (diagnostic) functions: per-baseline balanced accuracy ($\\uparrow$) on "
         "the in-distribution test set, each function at its natural observability view. Reported "
         "per baseline (no single `best') for the full picture."
@@ -1466,17 +1482,19 @@ def diagnostic_overview_table() -> str:
         + " The never-trained, per-class, and protection-grade breakdowns are in the "
         "leaderboard.}\n"
         "\\label{tab:supp_diagnostics}\n"
-        + _SHRINK_TO_FIT
-        + f"\\begin{{tabular}}{{L{{3.4cm}} l {'c ' * len(_DIAG_BASELINES)}}}\n\\toprule\n"
-        f"\\textbf{{Function}} & \\textbf{{Grid}} & {heads} \\\\\n\\midrule\n"
+        + f"\\begin{{tabular}}{{l {'c ' * len(_DIAG_BASELINES)}}}\n\\toprule\n"
+        f"\\textbf{{Grid}} & {heads} \\\\\n\\midrule\n"
         + body
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
 def build_paper_tables() -> dict[str, str]:
     """``{filename: latex}`` for the five held_out result tables (pure, deterministic)."""
-    return {f"tab_res_{key}.tex": result_table(key) for key, *_ in PAPER_FUNCTIONS}
+    return {
+        f"tab_res_{key}.tex": manuscript_caption(f"tab_res_{key}.tex", result_table(key))
+        for key, *_ in PAPER_FUNCTIONS
+    }
 
 
 def _val_audit_cell(rows: dict, stem: str, view: str, metric: str) -> str:
@@ -1532,7 +1550,7 @@ def val_selection_table() -> str:
                 _held_out_glob("{event_detection,event_classification}_global", "val"),
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4.5pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Validation-split selection audit: the headline score \\emph{and identity} (in "
         "parentheses) of the validation-selected reference baseline that drives the model selection "
         "reported in Tables~\\ref{tab:res_fd}--\\ref{tab:res_ec}, per primary function, grid, and "
@@ -1548,7 +1566,7 @@ def val_selection_table() -> str:
         "\\textbf{Function} & \\textbf{Grid} & \\textbf{local} & \\textbf{line} & \\textbf{global} \\\\\n"
         "\\midrule\n"
         f"{body}\n"
-        "\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        "\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -1571,7 +1589,7 @@ def build_supplement_tables() -> dict[str, str]:
     tables["supp_tab_fc_support.tex"] = fc_support_table()
     tables["supp_tab_diagnostics.tex"] = diagnostic_overview_table()
     tables["supp_tab_val_selection.tex"] = val_selection_table()
-    return tables
+    return {name: manuscript_caption(name, latex) for name, latex in tables.items()}
 
 
 def build_transfer_tables(outputs: str | Path = "outputs") -> dict[str, str]:
@@ -1581,7 +1599,9 @@ def build_transfer_tables(outputs: str | Path = "outputs") -> dict[str, str]:
     idx = _transfer_index(outputs)
     val_idx = _transfer_val_index(outputs)
     return {
-        f"tab_transfer_{key}.tex": transfer_table(key, outputs, idx, val_idx)
+        f"tab_transfer_{key}.tex": manuscript_caption(
+            f"tab_transfer_{key}.tex", transfer_table(key, outputs, idx, val_idx)
+        )
         for key, *_ in PAPER_FUNCTIONS
         if key not in ("ed", "ec")
     }
@@ -1589,7 +1609,31 @@ def build_transfer_tables(outputs: str | Path = "outputs") -> dict[str, str]:
 
 def build_spec_tables() -> dict[str, str]:
     """``{filename: latex}`` for the five static specification tables."""
-    return {f"tab_{name}.tex": spec_table(name) for name in SPEC_TABLES}
+    return {
+        f"tab_{name}.tex": manuscript_caption(f"tab_{name}.tex", spec_table(name))
+        for name in SPEC_TABLES
+    }
+
+
+def manuscript_caption(name: str, content: str) -> str:
+    """Replace the generated caption with the manuscript's wording (si_captions.CAPTIONS), if any.
+
+    The caption text is maintained in the manuscript; the generator keeps the numbers and layout."""
+    from si_captions import CAPTIONS
+
+    caption = CAPTIONS.get(name)
+    if caption is None:
+        return content
+    start = content.index("\\caption{") + len("\\caption{")
+    depth, i = 1, start
+    while depth:
+        ch = content[i]
+        if ch == "\\":
+            i += 2
+            continue
+        depth += {"{": 1, "}": -1}.get(ch, 0)
+        i += 1
+    return content[:start] + caption + content[i - 1 :]
 
 
 def run(name: str, content: str, argv: list[str] | None = None) -> None:
@@ -1603,6 +1647,7 @@ def run(name: str, content: str, argv: list[str] | None = None) -> None:
     import argparse
     import difflib
 
+    content = manuscript_caption(name, content)
     ap = argparse.ArgumentParser(description=f"Build (or --check) {name}.")
     ap.add_argument(
         "--check",

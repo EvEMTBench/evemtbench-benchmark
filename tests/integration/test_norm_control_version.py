@@ -58,7 +58,7 @@ def test_provenance_names_the_per_task_trees(tmp_path, monkeypatch):
 
     repo, abl = _trees(tmp_path)
     monkeypatch.chdir(repo)
-    header = b.table(abl).split("\\begin{table*}")[0]
+    header = b.table(abl).split("\\begin{table}")[0]
     ho = "{fault_detection,fault_classification}_{local,line}/held_out/"
     assert f"outputs/1.0.0/{ho}" in header
     assert "outputs/1.2.0/fault_location_{local,line}/held_out/" in header

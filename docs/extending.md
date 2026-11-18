@@ -1,12 +1,7 @@
-# EvEMTBench — extending & operating the benchmark
+# EvEMTBench — extending the benchmark
 
-For maintainers/collaborators: how to add grids, tasks, and baselines, and how the HPC run/results
-machinery works. Public-facing usage is in [submission.md](submission.md). **How to *operate* the
-benchmark** (dispatch checklist, cadence tiers, loop/watcher conventions, results-integrity gate) is
-in `docs/internal/operating.md`; dated mistakes + fixes are in `docs/internal/lessons.md`. The
-engineering *principles* to apply when writing/changing code (SWE + MLOps, with primary sources) are in
-`docs/internal/agent/engineering.md`. These internal documents live in the development repository
-only; they are not part of the public release.
+How to add grids, tasks, baselines and protocols. Public-facing usage is in
+[submission.md](submission.md).
 
 ## Add a grid
 
@@ -26,8 +21,8 @@ only; they are not part of the public release.
 `taxonomy.py` (new `Function`) → `tasks/labels/<x>.py` (pure deriver + frozen class vocab) →
 `valid_samples.py` (admissible-window mask) → `task.py::_LABEL_DERIVERS` → `registry.py` (`_make`)
 → `evaluation/evaluate.py::_CLASS_VOCAB` (multiclass). Keep a window's label `-1` only for
-windows the valid mask excludes; never feed `-1` to a CrossEntropy head (the FC/HIF bug — a
-fault type outside the vocab must be excluded by `valid_samples`).
+windows the valid mask excludes; never feed `-1` to a CrossEntropy head (a fault type outside the
+vocab must be excluded by `valid_samples`).
 
 ## Add a baseline
 
@@ -39,7 +34,7 @@ its factory in `runner.py::BASELINE_FACTORIES` (in-tree) or via `runner.register
 `impedance`). A baseline that calibrates anything on `train` exposes it as a JSON-serialisable
 `calibration_` attribute after `fit`; the runner copies it to `run_record.json["calibration"]`.
 The builders that enumerate baselines are `hpc/make_results.py::BASELINES` (RESULTS.md),
-`hpc/completed_overview.py`, `hpc/audit_manifest.py::BASELINE_ABOUT`/`NA_REASONS` (audit site) and
+`hpc/audit_manifest.py::BASELINE_ABOUT`/`NA_REASONS` (audit site) and
 `hpc/paper_artifacts/paper_lib.py` (manuscript tables; labels, n/a rule and the table set). See
 [baselines.md](baselines.md).
 
@@ -55,69 +50,4 @@ double-line view (`tasks/line_view.py`), per-window normalization (`task.py::bui
 and checkpoint transfer (`baselines/_transfer.py`). Adding a protocol is a **minor** bump (additive;
 existing `held_out` results stay comparable).
 
-## Run machinery
-
-- **Coverage manifest** — [`coverage.py`](../src/evemtbench/coverage.py): the expected matrix
-  (tasks × grids × protocols × applicable baselines × test_sets) vs. produced `result.json` →
-  `done / pending / failed`. The single source of truth for skip-existing + progress.
-  `python -m evemtbench.coverage --summary | --emit-pending | --failures`. Each run keeps a
-  `failure.json` in its cell directory while it runs, which records the stage, exception and
-  traceback tail of a crash and is deleted on success (`evemtbench.failures`). `--emit-pending`
-  skips cells at the retry cap (`--max-attempts`, default 3; `0` disables it; deleting the file
-  resets it). Staging failures in `sweep.sh` happen before the runner starts and are deliberately
-  not counted: they are node or disk problems, not properties of the cell.
-- **`hpc/sweep.sh`** — grid-parametric worker (Alex): runs only the manifest-pending cells for one
-  grid. With prebuilt projection caches it stages **lazily per cell** (the current cell's ≤4 view
-  files, atomic copy, one-task-ahead background prefetch); without a complete cache it falls back to
-  staging the grid's canonical `W0p050_S0p005` windows to node-local `$TMPDIR` (7–14 TB SSD;
-  `hpc/lib_stage.sh`) and projecting once per job — reading the `$WORK`/NFS mount per epoch idles
-  the GPU. Writes `result.json` directly under `outputs/`.
-- **`hpc/submit.sh`** — submit driver (login node, **dry-run by default**; `--submit` to queue).
-  Queues GPU jobs per grid only where cells are pending; an all-classical `BASELINES` set
-  auto-routes to a MIG `a100small` slice (`a100mig`, `MIG_CPUS` cores). Knobs: `JOBTAG` (per-grid
-  job-name suffix, used by the loop's two waves), per-grid `SOFT_DEADLINE_SEC` defaults
-  (`grid_soft_deadline`). `gres` selects the partition (`gpu:a40:1` default; `GRES=gpu:a100:1`);
-  no `--partition`, no node excludes, no `--mem`.
-- A single cell runs via `sweep.sh` with a narrow `TASKS`/`BASELINES` selection, or via the runner
-  directly (`python -m evemtbench.baselines.runner`). The development repo additionally runs a
-  hands-off submission loop (hourly refresh+push of `RESULTS.md`/`leaderboard.html`, idle-guarded
-  resubmission via `submit.sh` with a no-progress halt) and profiling wrappers around the same
-  entrypoints.
-- **`hpc/make_results.py`** regenerates `RESULTS.md`; `evemtbench-leaderboard` regenerates the HTML.
-- **`hpc/make_results_bundle.py`** regenerates the public `results/<version>/` bundle
-  (`aggregated_results.{csv,json}` + the LaTeX `tables/`); **`hpc/make_audit.py`** the audit site + provenance index.
-
-### Add a committed derived view (the pattern)
-Every committed artifact derived from `outputs/` follows one contract: a **deterministic, pure
-builder** is the single source of truth, and the **freshness gate** (`hpc/check_results_fresh.py`)
-byte-compares the committed file against a fresh rebuild (pre-commit hook + loop). To add one, mirror
-the results bundle / provenance index: (1) write a pure `build_*() -> {relpath: content}` builder (no
-clock, sorted, version-scoped via `BENCHMARK_VERSION`); (2) in `check_results_fresh.py` add a
-`_fresh_*()` wrapper, a `checks += [...]` block, a `--fix` regeneration call, and stray-detection for
-files a rebuild no longer emits; (3) if it lives at a new top-level path, un-ignore it in `.gitignore`
-and add it to the pre-commit trigger regex; (4) add it to the development repo's publisher
-`git add` lists and CI upload; (5) document it in `docs/DATA_LAYOUT.md`.
-
-## Memory routing (the `global` view on big grids)
-
-The `global` view scales with topology (48 → 420 ch). Two mechanisms keep it in budget:
-- **Chunked projection** ([`task.py::_observe_chunked`](../src/evemtbench/tasks/task.py)) — reads
-  the memmap and projects per row-chunk, bounding the full-channel transient.
-- **Per-batch standardization** (mlp/gru/cnn) — no full standardized copy; predict moves batches to
-  the GPU one at a time (a 33 GB view won't fit a 16 GB GPU otherwise).
-
-With these two mechanisms the `global` view runs within a single GPU allocation for every grid
-(streaming view; per-batch standardization never materializes the full array). `hpc/submit.sh`
-does not request host memory on Alex (`--mem` is forbidden there; Alex allocates host RAM per GPU;
-`USE_MEM=1 MEM=…` is honoured only on TinyGPU). Its resource knobs are `GRES` (default from the
-cluster profile, `hpc/clusters/<CLUSTER>.env`), `TIME` (default `24:00:00`, the cluster cap),
-`CPUS_PER_TASK`, and `MIG_CPUS` for all-classical baseline sets, which are auto-routed to an
-`a100mig` slice instead of a full GPU. Sweeps longer than the 24 h wall use `SPLIT_BASELINES=1`
-and/or `CHAIN=K` (see the `hpc/submit.sh` header).
-
-## Gotchas & lessons
-
-Operating mistakes (duplicate loops, NFS-idle staging, noisy watchers, result drift, …) and the
-standing gotchas (`GROUPS` builtin, running-cells-read-as-pending, refit-from-scratch) now live in
-the dated `docs/internal/lessons.md` log (development repository only). Add a row there when
-something bites.
+How the reference sweep runs on the cluster is documented internally, in the development repository.

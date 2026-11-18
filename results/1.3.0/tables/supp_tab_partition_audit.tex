@@ -6,26 +6,44 @@
 %   src/evemtbench/splits/v1.0/held_out/<grid>/meta.json
 %   src/evemtbench/splits/v1.1/multi_grid_pretrain/<source>/audit.json  (committed leakage audit; not recomputed)
 %   src/evemtbench/splits/v1.1/multi_grid_pretrain/<source>/meta.json
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
-\scriptsize
-\setlength{\tabcolsep}{2.8pt}
-\caption{Partition and leakage audit of the committed splits used for every reported result. \emph{Top}: the four target grids' \texttt{held\_out} partitions of the \texttt{adapt\_grid} family, plus the never-trained \texttt{eval\_grid} family. \emph{Bottom}: the three \texttt{multi\_grid} pre-training source corpora, whose v1.1 splits are grouped by generated topology. Counts are \emph{episodes}. Overlap columns give the three pairwise intersection sizes train\,$\cap$\,val / train\,$\cap$\,test / val\,$\cap$\,test at each grouping level; every one is zero. For a reference grid one episode is one \ac{emt} simulation, so the simulation partition is the episode partition (\notapp{}), and all partitions share a single fixed topology (\notapp{}); the \texttt{eval\_grid} family is disjoint from the whole \texttt{adapt\_grid} family by construction (verified separately, see text). Source-corpus rows reproduce the committed \texttt{audit.json} written when the splits were generated; they are not a new resampling. Hashes are the leading $12$ hex digits of the SHA-256 of \texttt{train.txt}; the complete digests of every partition file are retained in each run's provenance record and in the source corpora's \texttt{audit.json}.}
+\small
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{Partition and leakage audit of the committed splits used for the reported results. \emph{Top}: the four reference grids' \texttt{held\_out} partitions of the \texttt{adapt\_grid} family and the never-trained \texttt{eval\_grid} family. \emph{Bottom}: the three \texttt{multi\_grid} pre-training source corpora, whose v1.1.0 splits are grouped by generated topology. Counts are episodes. Overlap columns report the pairwise intersection sizes train\,$\cap$\,validation / train\,$\cap$\,test / validation\,$\cap$\,test at each grouping level; all reported overlaps are zero. For each reference grid, one episode corresponds to one \ac{emt} simulation and all partitions share a fixed topology, so the corresponding simulation- and topology-level entries are \notapp{}. Hashes are the leading 12 hexadecimal digits of the SHA-256 digest of \texttt{train.txt}.}
 \label{tab:supp_partition_audit}
-\begin{tabular}{l l rrrr ccc r l}
+\begin{tabular}{l l rrrr r l}
 \toprule
- & & \multicolumn{4}{c}{\textbf{Episodes}} & \multicolumn{3}{c}{\textbf{Overlaps} (tr$\cap$va / tr$\cap$te / va$\cap$te)} & & \\
-\cmidrule(lr){3-6}\cmidrule(lr){7-9}
-\textbf{Partition set} & \textbf{Grouping unit} & \textbf{train} & \textbf{val} & \textbf{test} & \textbf{\texttt{eval\_grid}} & \textbf{episode} & \textbf{simulation} & \textbf{topology} & \textbf{seed} & \textbf{hash (\texttt{train.txt})} \\
+ & & \multicolumn{4}{c}{\textbf{Episodes}} & & \\
+\cmidrule(lr){3-6}
+\textbf{Partition set} & \textbf{Grouping unit} & \textbf{train} & \textbf{val} & \textbf{test} & \textbf{\texttt{eval\_grid}} & \textbf{seed} & \textbf{hash (\texttt{train.txt})} \\
 \midrule
-CIGR\'E MV (20\,kV) & simulation episode & 6,934 & 1,486 & 1,486 & 4,509 & 0/0/0 & \notapp & \notapp & 20306606 & \texttt{aa36a13970b6} \\
-Double Line (110\,kV) & simulation episode & 6,999 & 1,500 & 1,500 & 1,101 & 0/0/0 & \notapp & \notapp & 20325215 & \texttt{eb6df4100cc4} \\
-Prot.\ Ref.\ (110\,kV) & simulation episode & 6,816 & 1,459 & 1,464 & 2,435 & 0/0/0 & \notapp & \notapp & 20281368 & \texttt{9214dc7f1a9e} \\
-IEEE 39-Bus (345\,kV) & simulation episode & 6,997 & 1,500 & 1,503 & 9,708 & 0/0/0 & \notapp & \notapp & 20284363 & \texttt{0875ff7b8e21} \\
+CIGR\'E MV (20\,kV) & simulation episode & 6,934 & 1,486 & 1,486 & 4,509 & 20306606 & \texttt{aa36a13970b6} \\
+Double Line (110\,kV) & simulation episode & 6,999 & 1,500 & 1,500 & 1,101 & 20325215 & \texttt{eb6df4100cc4} \\
+Prot.\ Ref.\ (110\,kV) & simulation episode & 6,816 & 1,459 & 1,464 & 2,435 & 20281368 & \texttt{9214dc7f1a9e} \\
+IEEE 39-Bus (345\,kV) & simulation episode & 6,997 & 1,500 & 1,503 & 9,708 & 20284363 & \texttt{0875ff7b8e21} \\
 \midrule
-\texttt{multi\_grid} 20\,kV & topology & 82,253 & 18,593 & 18,307 & \notapp & 0/0/0 & 0/0/0 & 0/0/0 & 20313571 & \texttt{737bc45e1df6} \\
-\texttt{multi\_grid} 110\,kV & topology & 96,536 & 20,590 & 21,386 & \notapp & 0/0/0 & 0/0/0 & 0/0/0 & 20355208 & \texttt{52231f329fa4} \\
-\texttt{multi\_grid} 345\,kV & topology & 121,182 & 26,549 & 25,676 & \notapp & 0/0/0 & 0/0/0 & 0/0/0 & 20262559 & \texttt{0c7efc96795d} \\
+\texttt{multi\_grid} 20\,kV & topology & 82,253 & 18,593 & 18,307 & \notapp & 20313571 & \texttt{737bc45e1df6} \\
+\texttt{multi\_grid} 110\,kV & topology & 96,536 & 20,590 & 21,386 & \notapp & 20355208 & \texttt{52231f329fa4} \\
+\texttt{multi\_grid} 345\,kV & topology & 121,182 & 26,549 & 25,676 & \notapp & 20262559 & \texttt{0c7efc96795d} \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\par\medskip
+\begin{tabular}{l l ccc}
+\toprule
+ & & \multicolumn{3}{c}{\textbf{Overlaps} (tr$\cap$va / tr$\cap$te / va$\cap$te)} \\
+\cmidrule(lr){3-5}
+\textbf{Partition set} & \textbf{Grouping unit} & \textbf{episode} & \textbf{simulation} & \textbf{topology} \\
+\midrule
+CIGR\'E MV (20\,kV) & simulation episode & 0/0/0 & \notapp & \notapp \\
+Double Line (110\,kV) & simulation episode & 0/0/0 & \notapp & \notapp \\
+Prot.\ Ref.\ (110\,kV) & simulation episode & 0/0/0 & \notapp & \notapp \\
+IEEE 39-Bus (345\,kV) & simulation episode & 0/0/0 & \notapp & \notapp \\
+\midrule
+\texttt{multi\_grid} 20\,kV & topology & 0/0/0 & 0/0/0 & 0/0/0 \\
+\texttt{multi\_grid} 110\,kV & topology & 0/0/0 & 0/0/0 & 0/0/0 \\
+\texttt{multi\_grid} 345\,kV & topology & 0/0/0 & 0/0/0 & 0/0/0 \\
+\bottomrule
+\end{tabular}
+\end{table}

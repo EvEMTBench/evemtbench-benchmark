@@ -22,7 +22,7 @@ def test_build_is_deterministic_and_all_res_without_outputs(tmp_path, monkeypatc
     assert a == b  # pure/deterministic
     assert set(a) == {f"tab_res_{k}.tex" for k in ("fd", "fc", "fl", "ed", "ec")}
     for name, latex in a.items():
-        assert "\\begin{table*}" in latex and f"tab:res_{name[8:-4]}" in latex
+        assert "\\begin{table}[!htbp]" in latex and f"tab:res_{name[8:-4]}" in latex
         # 4 grids × 6 columns = 24 body cells, all \res (no numeric ± cells)
         body = latex.split("\\midrule")[1]
         # B2: pre-outputs placeholder is the five-state marker set (\pending/\notapp), not \res
@@ -83,7 +83,7 @@ def test_committed_fragments_are_well_formed():
         pytest.skip("generated/ not present")
     for key in ("fd", "fc", "fl", "ed", "ec"):
         latex = (gen / f"tab_res_{key}.tex").read_text()
-        assert "\\begin{table*}" in latex and "\\end{table*}" in latex
+        assert "\\begin{table}[!htbp]" in latex and "\\end{table}" in latex
         assert f"\\label{{tab:res_{key}}}" in latex
         body = latex.split("\\midrule")[1].split("\\bottomrule")[0]
         for row in (ln for ln in body.splitlines() if "&" in ln):

@@ -2,7 +2,7 @@
 
 Records written before ``results_env_sha256`` existed (the whole v1.0.0 corpus) cannot carry that
 hash honestly: stamping it in after the fact would make a July artifact look like the runner had
-recorded it. So, like the host-provenance backfill, this script NEVER mutates
+recorded it. So this script NEVER mutates
 run_record.json. Instead it does the check the hash only *gestures* at — it compares each record's
 independently captured ``versions`` / ``python`` / ``torch`` against
 ``env/results-v<version>.lock`` and reports agreement per cell.

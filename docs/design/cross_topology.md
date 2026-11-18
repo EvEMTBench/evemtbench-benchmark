@@ -2,7 +2,7 @@
 
 **Status: designed, not built** — a paper Open Challenge. Code seams:
 `evemtbench.baselines.gnn`, the `cross_topology` protocol slot, the aux graph layer
-(`data/graphs.py` — built in M2).
+(`data/graphs.py`).
 
 > **Now built (the portable-view slice of this):** the `local`/`line` cross-grid transfer track —
 > pre-train on the `multi_grid` corpus, zero-shot / fine-tune on the reference grids — is
@@ -14,15 +14,14 @@
 
 The strongest form of generalization for protection ML is **train on some grids, protect an
 unseen one**. Today's tasks are per-grid (`held_out` within a topology); the `benchmark` family
-shifts the *scenario distribution*, not the *topology*. The `multi_grid` family (formerly `train`;
-20/110/345 kV template variants) is windowed and already used for pre-training by the built
-transfer protocols, though stored in the portable 12-channel double-line view, which yields only the `local` / `line` inputs — and the M2 aux layer
-already serves each grid's networkx topology graph, so graph-conditioned models have their input.
+shifts the *scenario distribution*, not the *topology*. The `multi_grid` family (20/110/345 kV
+template variants) is windowed and used for pre-training, but only in the portable 12-channel view
+(`local` / `line` inputs). The aux layer already serves each grid's networkx topology graph, so
+graph-conditioned models have their input.
 
 ## Protocol sketch (`cross_topology`)
 
-- **Train:** all episodes of grids G \ {g} (+ the `multi_grid` family, which is stored in the
-  portable 12-channel double-line view, which yields only the `local` / `line` inputs).
+- **Train:** all episodes of grids G \ {g} (+ the `multi_grid` family).
 - **Test:** grid g, both held-out families — zero-shot; a small-adaptation variant
   (few episodes of g's `adapt_grid`) is the second axis.
 - Leave-one-grid-out over the 4 reference grids ⇒ 4 folds; per-fold reporting (never pooled —
@@ -41,16 +40,13 @@ already serves each grid's networkx topology graph, so graph-conditioned models 
 
 ## Prerequisites (why this is post-freeze)
 
-1. ~~`train` family windowed~~ — done: the `multi_grid` family (formerly `train`) is windowed and
-   used for pre-training, but stored in the portable 12-channel double-line view, which yields only the `local` / `line` inputs; the global-view case still needs
-   the cubicle-set view of item 3.
-2. Single-config window read (the W0p020/W0p050 coexistence fix — also an M7 prerequisite).
-3. A cubicle-set view API (`feature_groups` already names per-cubicle channel blocks).
+1. A `global`-capable `multi_grid` view (today only `local` / `line`; needs item 2).
+2. A cubicle-set view API (`feature_groups` already names per-cubicle channel blocks).
 
 ## Open questions
 
 - Per-grid normalization under transfer (fit stats on train grids only; per-unit vs. z-score).
-- Whether `cross_topology` scores enter the leaderboard at v0.3 or live as a challenge track.
+- Whether `cross_topology` scores enter the leaderboard or live as a separate challenge track.
 
 ## Acceptance criteria
 

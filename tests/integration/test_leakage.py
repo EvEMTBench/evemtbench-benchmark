@@ -58,7 +58,7 @@ def test_stratified_split_regenerates_from_meta(fixture_root, tmp_path):
     )  # must not raise
 
 
-@pytest.mark.parametrize("grid", sorted(GRIDS))
+@pytest.mark.parametrize("grid", [g for g in sorted(GRIDS) if g not in PRETRAIN_GRIDS])
 def test_committed_splits_are_disjoint_and_family_pure(grid):
     """The COMMITTED packaged splits (what users consume) are episode-disjoint with the right
     family per partition — a data-free gate on the split artifacts themselves (CI-safe: reads

@@ -66,7 +66,7 @@ DEST_OUT="${OUT:-$PROJECT_DIR/outputs}"; mkdir -p "$DEST_OUT"   # written direct
 # --- Experiment tracking (W&B) — ONLINE channel, redundant with the offline artifact tree. Alex
 #     compute nodes reach the internet via the NHR proxy, so we log live. WANDB_ENTITY + WANDB_API_KEY
 #     propagate from the login-node env via submit.sh --export=ALL (a key is NEVER committed). Disable
-#     with EVEMTBENCH_WANDB=0; WANDB_MODE=offline falls back to a syncable local dir (hpc/wandb_sync.sh). ---
+#     with EVEMTBENCH_WANDB=0; WANDB_MODE=offline falls back to a local dir (sync it with `wandb sync <dir>`). ---
 export EVEMTBENCH_WANDB="${EVEMTBENCH_WANDB:-1}"
 export WANDB_MODE="${WANDB_MODE:-online}"
 [ -n "${WANDB_ENTITY:-}" ] && export WANDB_ENTITY  # personal entity comes from the env, never a default

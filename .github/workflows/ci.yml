@@ -86,6 +86,7 @@ jobs:
             audit/
             results/
             leaderboard.html
+            leaderboard_full.html
             RESULTS.md
             coverage_snapshot.json
           if-no-files-found: error

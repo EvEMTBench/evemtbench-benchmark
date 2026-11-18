@@ -6,12 +6,7 @@ Derived from **every** windowed label file on disk — all four reference grids 
 
 ## Reference grids & levels
 
-| grid key | topology id | level | voltage | frequency |
-|---|---|---|---|---|
-| `cigre_mv` | `mv_cigre_distribution_20kv` | **MV** | 20 kV | 50 Hz |
-| `double_line` | `hv_double_line_110kv` | **HV** | 110 kV | 50 Hz |
-| `testgrid_110kv` | `hv_testgrid_110kv` | **HV** | 110 kV | 50 Hz |
-| `ieee39` | `ehv_ieee39_transmission_345kv` | **EHV** | 345 kV | 60 Hz (only 60 Hz grid) |
+Grid keys, levels and frequencies: [grids.md](grids.md).
 
 **23 distinct `event_type`s = 9 faults + 14 operating events**, in 3 families: `fault`,
 `switching`, `normal`.
@@ -22,7 +17,7 @@ Derived from **every** windowed label file on disk — all four reference grids 
 > is narrower wherever a specific grid lacks the element: e.g. synchronous-machine trips are
 > generated at HV *and* EHV, but among our reference grids only IEEE-39 contributes them; IBR trips
 > are MV+HV by design and appear at CIGRÉ MV and TestGrid 110 kV only. Use this column to read the
-> `\notapp` (not-applicable) cells in the result tables; use the dataset paper for what the
+> not-applicable cells in the result tables; use the dataset paper for what the
 > generator can produce.
 
 ## Fault events (9) — `event_family = fault`, `event_type` prefix `flt_`
@@ -119,25 +114,5 @@ CigreMV 4509, IEEE-39 9711.
 
 ## Mapping to benchmark tasks
 
-- **Fault classification (FC)** uses the **9-class** fault taxonomy above (the 7 universal
-  SHC/incipient subtypes + the 2 MV-only HIF subtypes); HV/EHV grids have zero HIF support.
-- **Fault detection (FD)** / **fault location (FL)** key off `y_fault_present` / `y_fault_location`.
-- **Event-state classification (ES, `event_state_global`)** — 3-class `normal` / `switching` /
-  `fault` over **every** window, keyed off `overlap_ratio` × `event_family` (see
-  [task_cards/event_state.md](task_cards/event_state.md)). The `normal` class comes from every
-  non-overlapping (pre-/post-event) window, so it has support on all four grids — not just the
-  HV grids that carry `no_event`. The high-level middle ground between FD and FC.
-- **Event-scope tasks (global-only):** **event detection** (`event_detection_global`, any active
-  event vs. quiescent), **switch detection** (`switch_detection_global`), **switch-type**
-  (`switch_type_global`, 8 categories from `y_switch_category`), and **full event classification**
-  (`event_classification_global`, 23-class from `event_type`, non-active → `no_event`).
-- **Fault-attribute tasks (fault-active windows, all 3 observability):** **grounded vs ungrounded**
-  (`fault_grounded_*`, `y_is_grounded`), **faulted-phase** (`fault_phase_*`, 7-class from
-  `y_phase_*`), **fault-category** (`fault_category_*`, shc/incipient/hif from `y_fault_category`).
-- **Fault origin (`fault_origin_global`):** binary line-vs-bus from the `y_fault_line` prefix
-  (`MainLn*` vs `MainBus*`), **global-only** (the local/line oracle is keyed on `y_fault_line`, so it
-  would leak). Line vs bus is *also* a leakage-free **stratification axis** (`origin`) reported for
-  every fault task.
-- See [task_suite_roadmap.md](task_suite_roadmap.md) for the full difficulty-tiered catalog and the
-  deferred axes (noise-robustness harness, `cross_topology`, resistance stratification) and the
-  mechanism-blocked tasks (faulted-line/zone ID; multi-label phase).
+Which label field each task reads: the [task cards](task_cards/); the task list with tiers: the
+[README](../README.md#tasks); deferred tasks and axes: [task_suite_roadmap.md](task_suite_roadmap.md).

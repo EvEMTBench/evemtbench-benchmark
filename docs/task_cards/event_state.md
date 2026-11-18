@@ -1,9 +1,6 @@
-# Task card: `event_state_global` (ES) — **IMPLEMENTED**
+# Task card: `event_state_global` (ES)
 
-> **Status:** in the registry and scored. The high-level "middle ground" between the fault triad's
-> detection (FD) and classification (FC): a 3-class grid-state classifier over *every* window.
-> Realizes the family granularity sketched in [event_classification.md](event_classification.md),
-> with a precise activity×family label that makes the `normal` class available on **all four grids**.
+A 3-class grid-state classifier over *every* window.
 
 | | |
 |---|---|
@@ -41,8 +38,9 @@ episode contributes its own quiescent pre-event windows, `normal` has support on
 
 `local`/`line` observability projects onto the faulted line via the `y_fault_line` oracle
 ([tasks/task.py](../../src/evemtbench/tasks/task.py) `_observe`). Switching and `normal` windows have
-no faulted line, so a per-line view is undefined for them without ED's vantage machinery. ES is
-therefore a single `global` task (matching the EC card's global-only decision).
+no faulted line, so a per-line view is undefined for them (a fixed-vantage view is the
+[relay-selectivity](relay_selectivity.md) design, not built). ES is therefore a single `global`
+task (matching the EC card's global-only decision).
 
 ## Relationship to FD / FC / EC
 

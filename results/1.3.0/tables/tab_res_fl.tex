@@ -3,11 +3,12 @@
 % Benchmark: EvEMTBench v1.3.0
 % Inputs:
 %   outputs/1.2.0/fault_location_{local,line,global}/held_out/<grid>/<baseline>/{val,test,benchmark}/result.json
-\begin{table*}[t]
+\begin{table}[!htbp]
 \centering
 \small
-\setlength{\tabcolsep}{4.1pt}
-\caption{Fault localisation (\ac{fl}) --- reference baseline (best of RF/MLP/GRU/CNN/ResNet/TST, selected on the validation split; a beatable reference, full per-baseline breakdown in the Supplementary), headline metric (\acs{mae}\,\% $\downarrow$) per grid and observability view, for the two \texttt{held\_out} test sets (in-distribution vs.\ never-trained \texttt{eval\_grid} family). Cells are mean\,$\pm$\,95\% CI (Student's $t$); \notapp{}~= not defined for this view. Full per-baseline tables in the Supplementary.}
+\setlength{\tabcolsep}{4pt}
+\renewcommand{\arraystretch}{1.05}
+\caption{\Ac{fl} -- reference baseline selected from RF/MLP/GRU/CNN/ResNet/TST using the validation split, headline metric (\acs{mae}\,\% $\downarrow$) per grid and observability view, on the in-distribution test split and the never-trained \texttt{eval\_grid} family. Cells are mean\,$\pm$\,95\% CI (Student's $t$); \notapp{}~= not defined for this view. Full per-baseline results are shown in Supplementary Section~\ref{sec:supp_full_baselines}.}
 \label{tab:res_fl}
 \begin{tabular}{l ccc ccc}
 \toprule
@@ -21,4 +22,4 @@ Prot.\ Ref.\ (110\,kV)     & 12.867 $\pm$ 0.165 & 6.990 $\pm$ 1.313 & 6.455 $\pm
 IEEE 39-Bus (345\,kV)      & 19.820 $\pm$ 0.210 & 9.885 $\pm$ 1.133 & 13.470 $\pm$ 0.712 & 19.881 $\pm$ 0.357 & 6.603 $\pm$ 0.589 & 12.167 $\pm$ 1.664 \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

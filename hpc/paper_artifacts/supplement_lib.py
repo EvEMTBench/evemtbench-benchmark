@@ -156,20 +156,22 @@ def partition_audit_table() -> str:
     """SI table: the committed partitions behind every reported number, with their grouping unit,
     sizes, machine-checked zero-overlap counts, split seed and partition hash."""
     rows = partition_audit_rows()
-    body: list[str] = []
+    body_a: list[str] = []
+    body_b: list[str] = []
     for i, r in enumerate(rows):
         if r["protocol"] == "held_out":
             counts = [f"{r['counts'][k]:,}" for k in ("train", "val", "test", "benchmark")]
         else:
             counts = [f"{r['counts'][k]:,}" for k in ("train", "val", "test")] + [r"\notapp"]
-        cells = (
-            counts
-            + [_ov3(r["overlaps"]["episode"]), _ov3(r["overlaps"]["simulation"])]
-            + [_ov3(r["overlaps"]["topology"]), str(r["seed"]), _short(r["train_hash"])]
+        ident = f"{r['label']} & {r['grouping']} & "
+        body_a.append(
+            ident + " & ".join(counts + [str(r["seed"]), _short(r["train_hash"])]) + r" \\"
         )
-        body.append(f"{r['label']} & {r['grouping']} & " + " & ".join(cells) + r" \\")
+        overlaps = [_ov3(r["overlaps"][k]) for k in ("episode", "simulation", "topology")]
+        body_b.append(ident + " & ".join(overlaps) + r" \\")
         if i == len(pl.GRID_ROWS) - 1:
-            body.append(r"\midrule")
+            body_a.append(r"\midrule")
+            body_b.append(r"\midrule")
     return (
         pl.provenance_header(
             "hpc/paper_artifacts/build_supp_tab_partition_audit.py",
@@ -181,7 +183,8 @@ def partition_audit_table() -> str:
                 "src/evemtbench/splits/v1.1/multi_grid_pretrain/<source>/meta.json",
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{2.8pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n"
+        "\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Partition and leakage audit of the committed splits used for every reported "
         "result. \\emph{Top}: the four target grids' \\texttt{held\\_out} partitions of the "
         "\\texttt{adapt\\_grid} family, plus the never-trained \\texttt{eval\\_grid} family. "
@@ -198,17 +201,26 @@ def partition_audit_table() -> str:
         "the complete digests of every partition file are retained in each run's provenance record "
         "and in the source corpora's \\texttt{audit.json}.}\n"
         "\\label{tab:supp_partition_audit}\n"
-        + pl._SHRINK_TO_FIT
-        + "\\begin{tabular}{l l rrrr ccc r l}\n\\toprule\n"
-        " & & \\multicolumn{4}{c}{\\textbf{Episodes}} & "
-        "\\multicolumn{3}{c}{\\textbf{Overlaps} (tr$\\cap$va / tr$\\cap$te / va$\\cap$te)} & & \\\\\n"
-        "\\cmidrule(lr){3-6}\\cmidrule(lr){7-9}\n"
-        "\\textbf{Partition set} & \\textbf{Grouping unit} & \\textbf{train} & \\textbf{val} & "
-        "\\textbf{test} & \\textbf{\\texttt{eval\\_grid}} & \\textbf{episode} & "
-        "\\textbf{simulation} & \\textbf{topology} & \\textbf{seed} & "
-        "\\textbf{hash (\\texttt{train.txt})} \\\\\n\\midrule\n"
-        + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + pl.si_panels(
+            [
+                "\\begin{tabular}{l l rrrr r l}\n\\toprule\n"
+                " & & \\multicolumn{4}{c}{\\textbf{Episodes}} & & \\\\\n"
+                "\\cmidrule(lr){3-6}\n"
+                "\\textbf{Partition set} & \\textbf{Grouping unit} & \\textbf{train} & "
+                "\\textbf{val} & \\textbf{test} & \\textbf{\\texttt{eval\\_grid}} & \\textbf{seed} & "
+                "\\textbf{hash (\\texttt{train.txt})} \\\\\n\\midrule\n"
+                + "\n".join(body_a)
+                + "\n\\bottomrule\n\\end{tabular}",
+                "\\begin{tabular}{l l ccc}\n\\toprule\n"
+                " & & \\multicolumn{3}{c}{\\textbf{Overlaps} (tr$\\cap$va / tr$\\cap$te / va$\\cap$te)} "
+                "\\\\\n\\cmidrule(lr){3-5}\n"
+                "\\textbf{Partition set} & \\textbf{Grouping unit} & \\textbf{episode} & "
+                "\\textbf{simulation} & \\textbf{topology} \\\\\n\\midrule\n"
+                + "\n".join(body_b)
+                + "\n\\bottomrule\n\\end{tabular}",
+            ]
+        )
+        + "\\end{table}\n"
     )
 
 
@@ -303,7 +315,7 @@ def transfer_scratch_table() -> str:
                 )
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{From-scratch target-grid reference for the cross-grid transfer tables "
         "(Tables~\\ref{tab:transfer_fd}--\\ref{tab:transfer_fl}). Each cell is the "
         "\\texttt{held\\_out} baseline trained on the \\emph{target} grid's \\texttt{adapt\\_grid} "
@@ -328,7 +340,7 @@ def transfer_scratch_table() -> str:
         "\\textbf{Function} & \\textbf{Target grid} & \\textbf{ref.} & \\textbf{from scratch} & "
         "\\textbf{ref.} & \\textbf{from scratch} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -410,7 +422,7 @@ def primary_valid_counts_table() -> str:
                 + "  (n_test)",
             ],
         )
-        + "\\begin{table}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{6pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Evaluated sample counts for the five primary functions: the number of "
         "\\emph{windows} (not episodes) admitted by each function's frozen valid-sample mask, per "
         "grid and evaluation family. This is the $n$ behind every mean and confidence interval in "
@@ -530,7 +542,7 @@ def baseline_cfg_table() -> str:
             r"\multicolumn{2}{l}{\textit{Shared deep-baseline training regime "
             r"(\ac{mlp}/\ac{gru}/\ac{cnn}/\ac{resnet}/\ac{tst})}} \\"
         ),
-        f"Optimiser & AdamW, learning rate ${deep['lr']:g}$, weight decay "
+        f"Optimizer & AdamW, learning rate ${deep['lr']:g}$, weight decay "
         f"${deep['weight_decay']:g}$ \\\\",
         f"Batch / epochs & batch size {deep['batch_size']}; up to {deep['epochs']} epochs \\\\",
         f"Learning-rate schedule & cosine annealing, $T_{{\\max}}={deep['epochs']}$ "
@@ -538,9 +550,9 @@ def baseline_cfg_table() -> str:
         f"Early stopping & on validation loss, patience {deep['patience']}, best-checkpoint "
         "restore \\\\",
         r"Loss & cross-entropy with inverse-frequency class weights (classification); "
-        r"mean-squared error (MSE) on train-standardised targets, de-standardised at predict "
+        r"mean-squared error (MSE) on train-standardized targets, de-standardized at predict "
         r"(regression, \ac{fl}) \\",
-        r"Input & per-channel standardisation fitted on train only \\",
+        r"Input & per-channel standardization fitted on train only \\",
         f"Seeds & {len(seeds)} per cell (${min(seeds)}$--${max(seeds)}$): model init, "
         "batch-shuffle order, dropout (not the split) \\\\",
         r"\midrule",
@@ -567,7 +579,7 @@ def baseline_cfg_table() -> str:
         r"\midrule",
         r"\emph{majority} & most-frequent train class (classification) / train-mean target "
         r"(regression) \\",
-        f"\\emph{{threshold}} & phase-maximum \\ac{{rms}}-current statistic; threshold maximises "
+        f"\\emph{{threshold}} & phase-maximum \\ac{{rms}}-current statistic; threshold maximizes "
         f"balanced accuracy over a {thr['n_candidates']}-point train quantile grid; binary "
         r"\ac{fd}, \emph{local} only \\",
         f"\\emph{{random forest}} & {rf['n_estimators']} trees, "
@@ -591,7 +603,7 @@ def baseline_cfg_table() -> str:
                 pl._held_out_glob("*", "{val,test,benchmark}") + "  (executed seed set)",
             ],
         )
-        + "\\begin{table}[t]\n\\centering\n\\small\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         f"\\caption{{Reference-baseline configurations (benchmark \\texttt{{v{BENCHMARK_VERSION}}}). "
         "The five deep baselines share one training regime (top) and differ only in architecture "
         "(and, for the \\ac{tst}, the dropout rate its source prescribes); "
@@ -682,7 +694,7 @@ def ec_support_table(root=None) -> str:
                 "src/evemtbench/tasks/labels/event_type.py  (frozen 23-class vocabulary+deriver)",
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{3.2pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\footnotesize\n\\setlength{\\tabcolsep}{3pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Per-class support of the frozen 23-class \\ac{ec} vocabulary: number of "
         "\\emph{windows} carrying each class in the in-distribution test split and the "
         "never-trained \\texttt{eval\\_grid} family of each grid. Class indices are the frozen "
@@ -699,7 +711,7 @@ def ec_support_table(root=None) -> str:
         f" & & {heads} \\\\\n{cmids}\n"
         f"\\textbf{{idx}} & \\textbf{{\\ac{{ec}} class}} & {sub} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -778,22 +790,22 @@ def ed_negative_support_table(root=None) -> str:
     # LaTeX would typeset as two minus signs).
     sw_id = f"${min(shares['test']):.0f}$--${max(shares['test']):.0f}"
     sw_ev = f"${min(shares['benchmark']):.0f}$--${max(shares['benchmark']):.0f}"
-    body = []
+    body_a: list[str] = []
+    body_b: list[str] = []
     for grid, glabel in pl.GRID_ROWS:
         for split, slabel in _EVAL_FAMILIES:
             c = comp[(grid, split)]
             share = f"{100.0 * c['negative'] / c['total']:.1f}" if c["total"] else "0.0"
-            cells = [f"{c['positive']:,}"] + [f"{c[k]:,}" for k in _ED_NEG_ORDER]
-            cells += [
-                f"{c['neg. in fault episodes']:,}",
-                f"{c['neg. in switching episodes']:,}",
-                f"{c['negative']:,}",
-                f"{c['total']:,}",
-                share,
-            ]
-            body.append(f"{glabel} & {slabel} & " + " & ".join(cells) + r" \\")
-        body.append(r"\midrule")
-    body = body[:-1]
+            ident = f"{glabel} & {slabel} & "
+            cells_a = [f"{c['positive']:,}"] + [f"{c[k]:,}" for k in _ED_NEG_ORDER]
+            cells_a += [f"{c['negative']:,}"]
+            cells_b = [f"{c['neg. in fault episodes']:,}", f"{c['neg. in switching episodes']:,}"]
+            cells_b += [f"{c['total']:,}", share]
+            body_a.append(ident + " & ".join(cells_a) + r" \\")
+            body_b.append(ident + " & ".join(cells_b) + r" \\")
+        body_a.append(r"\midrule")
+        body_b.append(r"\midrule")
+    body_a, body_b = body_a[:-1], body_b[:-1]
     return (
         pl.provenance_header(
             "hpc/paper_artifacts/build_supp_tab_ed_negative_support.py",
@@ -803,7 +815,8 @@ def ed_negative_support_table(root=None) -> str:
                 "src/evemtbench/tasks/labels/event_detection.py  (frozen ED label deriver)",
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{2.0pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n"
+        "\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Composition of the \\ac{ed} evaluation sets, in \\emph{windows}. \\ac{ed} scores "
         "every window: a window is positive iff it overlaps an active fault or switching event, and "
         "every other window is negative. Negatives are decomposed twice --- by position relative to "
@@ -821,17 +834,26 @@ def ed_negative_support_table(root=None) -> str:
         "checker asserts both. Derived from the committed partitions and the released window labels "
         "with the benchmark's frozen \\ac{ed} label deriver.}\n"
         "\\label{tab:supp_ed_negative_support}\n"
-        + pl._SHRINK_TO_FIT
-        + "\\begin{tabular}{ll r rrr rr rr r}\n\\toprule\n"
-        " & & & \\multicolumn{3}{c}{\\textbf{Negatives by position}} & "
-        "\\multicolumn{2}{c}{\\textbf{Negatives by episode family}} & & & \\\\\n"
-        "\\cmidrule(lr){4-6}\\cmidrule(lr){7-8}\n"
-        "\\textbf{Grid} & \\textbf{Family} & \\textbf{positive} & \\textbf{pre} & "
-        "\\textbf{post} & \\textbf{quiesc.} & \\textbf{fault ep.} & "
-        "\\textbf{switch.\\ ep.} & \\textbf{all neg.} & \\textbf{total} & "
-        "\\textbf{neg./total (\\%)} \\\\\n\\midrule\n"
-        + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + pl.si_panels(
+            [
+                "\\begin{tabular}{ll r rrr r}\n\\toprule\n"
+                " & & & \\multicolumn{3}{c}{\\textbf{Negatives by position}} & \\\\\n"
+                "\\cmidrule(lr){4-6}\n"
+                "\\textbf{Grid} & \\textbf{Family} & \\textbf{positive} & \\textbf{pre} & "
+                "\\textbf{post} & \\textbf{quiesc.} & \\textbf{all neg.} \\\\\n\\midrule\n"
+                + "\n".join(body_a)
+                + "\n\\bottomrule\n\\end{tabular}",
+                "\\begin{tabular}{ll rr r r}\n\\toprule\n"
+                " & & \\multicolumn{2}{c}{\\textbf{Negatives by episode family}} & & \\\\\n"
+                "\\cmidrule(lr){3-4}\n"
+                "\\textbf{Grid} & \\textbf{Family} & \\textbf{fault ep.} & "
+                "\\textbf{switch.\\ ep.} & \\textbf{total} & "
+                "\\textbf{neg./total (\\%)} \\\\\n\\midrule\n"
+                + "\n".join(body_b)
+                + "\n\\bottomrule\n\\end{tabular}",
+            ]
+        )
+        + "\\end{table}\n"
     )
 
 
@@ -912,7 +934,7 @@ def current_shift_table(root=None) -> str:
                 "src/evemtbench/tasks/valid_samples.py  (fault-detection valid-sample mask)",
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Raw current scale of the fitting distribution versus the never-trained "
         "\\texttt{eval\\_grid} family. The per-window statistic is the \\emph{phase-maximum "
         "\\ac{rms} current}: the root-mean-square of each phase current over the $480$ samples "
@@ -937,7 +959,7 @@ def current_shift_table(root=None) -> str:
         "\\textbf{Grid} & \\textbf{median (A)} & \\textbf{[IQR]} & \\textbf{$n$} & "
         "\\textbf{median (A)} & \\textbf{[IQR]} & \\textbf{$n$} & \\textbf{ratio} \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -1079,7 +1101,7 @@ def fl_locator_breakdown_table(root=None) -> str:
                 " overlap_ratio, y_fault_line)",
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{5pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{4pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Fault-location error of the impedance-based locator and of the "
         "validation-selected learned reference by window position. \\ac{mae} in \\% of line "
         "length, five-seed mean for the learned reference (the locator is deterministic). "
@@ -1106,7 +1128,7 @@ def fl_locator_breakdown_table(root=None) -> str:
         "\\textbf{locator} & \\textbf{learned} & \\textbf{locator} & \\textbf{learned} & \\\\\n"
         "\\midrule\n"
         + "\n".join(" & " + r for r in one)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 
@@ -1160,7 +1182,11 @@ SUPP_ARTIFACTS: dict[str, dict] = {
 def dataset_free_artifacts() -> dict[str, str]:
     """``{filename: latex}`` for the SI artifacts that need only committed repo/outputs artefacts —
     the set the pre-commit freshness gate can rebuild anywhere."""
-    return {n: spec["builder"]() for n, spec in SUPP_ARTIFACTS.items() if not spec["dataset"]}
+    return {
+        n: pl.manuscript_caption(n, spec["builder"]())
+        for n, spec in SUPP_ARTIFACTS.items()
+        if not spec["dataset"]
+    }
 
 
 __all__ = [

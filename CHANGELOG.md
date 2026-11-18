@@ -4,6 +4,21 @@ Benchmark-contract versions (see [docs/versioning.md](docs/versioning.md)). The 
 in `evemtbench.version` is stamped into every result; a **major** bump means scores are not
 comparable across versions.
 
+## In the 1.3.0 tag — reproduction guides, paper builders and a cleanup (docs and tooling; no contract change)
+
+- **`reproduce/`.** One guide per group of paper results: where the numbers are, how to retrain
+  them, and which builder rebuilds each table and figure. The README and the public docs are
+  shorter and point there.
+- **Normalisation control (SI Table S10).** The per-window control tree now holds the TST, so all
+  three arms select among the same five deep baselines, and arm B's pre-training source is chosen
+  on validation, never on the evaluation grid (`hpc/paper_artifacts/build_supp_tab_norm_control.py`).
+- **Leaderboard.** `main`'s redesign is merged: `leaderboard.html` is the ranked page, the full
+  tables are in `leaderboard_full.html`.
+- **Cleanup.** One-off and superseded `hpc/` scripts, stale build outputs, the root
+  `requirements.txt` and three unused helpers are removed; `tqdm`, `hydra-core` and `xgboost` are no
+  longer dependencies, and the `baselines` extra now pulls `networkx` for the impedance locator.
+  Stale lines in the public docs are fixed. No result, metric, split or task changes.
+
 ## 1.3.0 — faulted phase of `flt_1phg_hif_w_arc` restored by a label patch (scoped revision, by cell)
 
 - **The defect.** In the 1.x windows (`W0p050_S0p005`) every fault-active window of the
@@ -81,7 +96,7 @@ through a committed, pinned overlay keeps the windows byte-identical, keeps ever
 reproducible, and makes the repair reviewable in one small file; the producer is fixed for 2.0,
 which deletes the overlay.
 
-## Unreleased — conventional fault-locator baseline `impedance` (additive; no contract change)
+## In the 1.3.0 tag — conventional fault-locator baseline `impedance` (additive; no contract change)
 
 A physical reference for the fault-location (FL) tasks, in answer to the review request for an
 established fault-localisation method (EXP-06). No task, split, metric, valid-sample rule or
@@ -117,7 +132,7 @@ established fault-localisation method (EXP-06). No task, split, metric, valid-sa
   baseline set until its place in the manuscript is decided, so every generated manuscript
   artifact is unchanged.
 
-## Unreleased — transformer reference baseline `tst` (additive; no task, split or metric change)
+## In the 1.3.0 tag — transformer reference baseline `tst` (additive; no task, split or metric change)
 
 - **New deep baseline `tst`** (`baselines/tst.py`): the Time Series Transformer encoder of Zerveas
   et al. (KDD 2021, arXiv:2010.02803), trained from scratch under the shared deep-baseline regime
@@ -143,7 +158,7 @@ established fault-localisation method (EXP-06). No task, split, metric, valid-sa
   audit site, `coverage_snapshot.json`, `results/<version>/`, the generated paper tables) have to
   be regenerated once, because they enumerate baselines.
 
-## Unreleased — run-machinery hardening (tooling only; no contract change)
+## In the 1.3.0 tag — run-machinery hardening (tooling only; no contract change)
 
 Adapted from akmaier/Agent4CT (see `docs/EXTERNAL_REPOSITORY_REVIEW.md` §4). No task, split,
 metric or `result.json` field changes, and no result is re-scored.
@@ -157,7 +172,7 @@ metric or `result.json` field changes, and no result is re-scored.
   Both CIs run it in `--clean` mode, which installs the declared dependencies from PyPI and so
   proves that dependency list sufficient. `tests/unit/test_package_data.py` fails when a new data
   file under `src/evemtbench/` is missing from `package-data`. `pyproject.toml` gains trove
-  classifiers, and `docs/release.md` gains the PyPI step. Nothing is uploaded yet; publishing is
+  classifiers, and the release checklist gains the PyPI step. Nothing is uploaded yet; publishing is
   the owner's call.
 
 - **Failure records + retry cap.** The runner keeps `failure.json` in a cell's directory while a

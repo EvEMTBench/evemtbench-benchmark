@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Standalone builder → paper/manuscript/generated/supp_tab_norm_control.tex
+"""Standalone builder → paper/manuscript/ablation/supp_tab_norm_control.tex
 (the input-normalization control for the cross-grid transfer comparison).
 
     PYTHONPATH=src python hpc/paper_artifacts/build_supp_tab_norm_control.py --abl <tree>
@@ -29,7 +29,7 @@ WHY THIS BUILDER IS NOT IN THE COMMIT-TIME REGISTRY
 
 WHAT IT REPORTS
     Three arms per (function, target grid, view), all fitted on the TARGET grid's ``adapt_grid``
-    training partition, selected on that grid's validation split out of the four deep baselines,
+    training partition, selected on that grid's validation split out of the five deep baselines,
     and reported on that grid's never-trained ``eval_grid`` family:
 
         A  held_out, normalize=none        (the published from-scratch reference)
@@ -43,8 +43,9 @@ WHAT IT REPORTS
     inadmissible, since per-window normalization is what makes one model portable across
     20--345 kV at all.
 
-    B is the best (per the metric direction) over the three pre-training sources, and the source
-    that achieves it is named, because the control is source-independent while B is not.
+    B is reported for the pre-training source whose validation-selected fine-tuned model has the best
+    validation score (never the best eval_grid value), and that source is named, because the control
+    is source-independent while B is not.
 """
 
 import argparse
@@ -58,7 +59,7 @@ import paper_lib as pl
 
 from evemtbench.coverage import DEEP_BASELINES, PRETRAIN_GRIDS
 from evemtbench.version import results_version
-from make_results import load_rows
+from make_results import load_rows, mean_val
 
 NAME = "supp_tab_norm_control.tex"
 #: NOT paper_lib.GEN_DIR — see the module docstring: generated/ is glob-copied into the public
@@ -129,16 +130,20 @@ def rows(abl: Path) -> list[dict]:
                 tid = f"{stem}_{view}"
                 a = pl.best_cell_choice(per_grid_a[grid], tid, "benchmark", metric, DEEP_BASELINES)
                 c = pl.best_cell_choice(per_grid_c[grid], tid, "benchmark", metric, DEEP_BASELINES)
-                best_b, best_src = None, None
+                # B's source is chosen like its architecture: on the validation score of each
+                # source's validation-selected winner, never on the eval_grid value it reports.
+                best_b, best_src, best_val = None, None, None
                 for src in PRETRAIN_GRIDS:
                     r = pl.best_transfer_row(
                         idx, tid, grid, "transfer_finetune", metric, src, val_idx
                     )
                     if r is None:
                         continue
-                    v = r.mean(metric)
-                    if best_b is None or pl.METRIC_DIRECTION.get(metric, 1) * (v - best_b) > 0:
-                        best_b, best_src = v, src
+                    v = mean_val(
+                        val_idx.get(("transfer_finetune", grid, tid, r.baseline, src)), metric
+                    )
+                    if best_val is None or pl.METRIC_DIRECTION.get(metric, 1) * (v - best_val) > 0:
+                        best_b, best_src, best_val = r.mean(metric), src, v
                 out.append(
                     {
                         "key": key,
@@ -198,15 +203,16 @@ def table(abl: Path) -> str:
                 )
             ],
         )
-        + "\\begin{table*}[t]\n\\centering\n\\scriptsize\n\\setlength{\\tabcolsep}{3pt}\n"
+        + "\\begin{table}[!htbp]\n\\centering\n\\small\n\\setlength{\\tabcolsep}{3pt}\n\\renewcommand{\\arraystretch}{1.05}\n"
         "\\caption{Input-normalization control for the cross-grid transfer comparison. "
         "\\textbf{A} is the from-scratch reference of Table~\\ref{tab:supp_transfer_scratch} "
         "(\\texttt{held\\_out}, \\texttt{normalize=none}); \\textbf{C} repeats it with the "
         "per-window, per-channel normalization the transfer protocols require for voltage "
         "invariance, changing nothing else; \\textbf{B} is target-grid fine-tuning, reported for "
-        "the best of the three pre-training sources with that source in parentheses. All three are "
+        "the pre-training source whose fine-tuned model scores best on the target grid's validation "
+        "split, with that source in parentheses. All three are "
         "fitted on the target grid's \\texttt{adapt\\_grid} training partition, select their "
-        "architecture on that grid's validation split out of the four deep baselines, and are "
+        "architecture on that grid's validation split out of the five deep baselines, and are "
         "scored on its never-trained \\texttt{eval\\_grid} family. $C-A$ is therefore the cost of "
         "the normalization at random initialisation and $B-C$ the effect of the pre-trained "
         "initialisation under that normalization; the (pre-trained, \\texttt{none}) condition is "
@@ -224,7 +230,7 @@ def table(abl: Path) -> str:
         "& \\textbf{A} & \\textbf{C} & \\textbf{B} & $C-A$ & $B-C$ "
         "& \\textbf{A} & \\textbf{C} & \\textbf{B} & $C-A$ & $B-C$ \\\\\n\\midrule\n"
         + "\n".join(body)
-        + "\n\\bottomrule\n\\end{tabular}\n\\end{table*}\n"
+        + "\n\\bottomrule\n\\end{tabular}\n\\end{table}\n"
     )
 
 

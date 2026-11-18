@@ -32,7 +32,7 @@ trained only on the oracle views have never been asked the question.
 2. `vantage_view(task, cubicle)` — a `TaskView` of the vantage's channels over *all* valid
    windows, labels rewritten to `in_zone` (a pure deriver + golden tests, like every label).
 3. Register `relay_selectivity_local` (tier 3) — the registry/coverage/leaderboard machinery
-   picks it up with no further changes (all registry-driven since M1).
+   picks it up with no further changes (all registry-driven).
 4. Baseline expectation: threshold overcurrent should look *good* on in-zone recall and *bad* on
    out-of-zone trips at low fault impedance — the gap is the benchmark's headroom.
 
