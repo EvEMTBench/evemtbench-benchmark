@@ -18,6 +18,10 @@ comparable across versions.
   `requirements.txt` and three unused helpers are removed; `tqdm`, `hydra-core` and `xgboost` are no
   longer dependencies, and the `baselines` extra now pulls `networkx` for the impedance locator.
   Stale lines in the public docs are fixed. No result, metric, split or task changes.
+- **Release metadata for the software archive.** `CITATION.cff` (read by Zenodo) names the software
+  "EvEMTBench Benchmark", lists all six paper authors with affiliations, dates the release
+  2026-11-18, adds keywords and an abstract, and cites dataset v0.1 by its DOI and the
+  data-generation code (doi:10.5281/zenodo.21624649); `pyproject.toml` matches.
 
 ## 1.3.0 — faulted phase of `flt_1phg_hif_w_arc` restored by a label patch (scoped revision, by cell)
 

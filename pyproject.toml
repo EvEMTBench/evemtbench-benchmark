@@ -5,13 +5,17 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "evemtbench"
 version = "1.3.0"
-description = "EvEMTBench: a protocol-driven ML benchmark for power system protection on EMT waveform data"
+description = "EvEMTBench Benchmark: evaluation software for machine learning in power system protection on EMT waveform data"
 readme = "README.md"
 requires-python = ">=3.10"
 license = { text = "MIT" }
 authors = [
     { name = "Julian Oelhaf" },
     { name = "Georg Kordowich" },
+    { name = "Christian Bergler" },
+    { name = "Andreas Maier" },
+    { name = "Johann Jäger" },
+    { name = "Siming Bayer" },
 ]
 keywords = ["power-systems", "protection", "machine-learning", "benchmark", "EMT", "waveform"]
 classifiers = [
@@ -50,6 +54,7 @@ Leaderboard = "https://evemtbench.github.io/evemtbench-benchmark/leaderboard.htm
 Paper = "https://arxiv.org/abs/2609.28149"
 Dataset = "https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/"
 "Dataset paper" = "https://arxiv.org/abs/2608.19777"
+"Dataset generation code" = "https://doi.org/10.5281/zenodo.21624649"
 
 [project.optional-dependencies]
 # Deep-learning baselines and the impedance locator. Kept optional so the
