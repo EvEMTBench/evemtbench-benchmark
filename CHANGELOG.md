@@ -34,6 +34,8 @@ comparable across versions.
   blocks model selection. `make_results_bundle.py` refuses to write without result records. The
   evaluator JSON names the transfer source; the table preamble defines every macro the tables use;
   the quickstart activates its environment and has a data-free example.
+  `check_results_fresh.py` reports a run without `outputs/` as SKIPPED, not as a pass (`--strict`:
+  exit code 3).
 
 ## 1.3.0 — faulted phase of `flt_1phg_hif_w_arc` restored by a label patch (scoped revision, by cell)
 

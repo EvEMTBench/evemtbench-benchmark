@@ -13,7 +13,8 @@ Covered views: ``RESULTS.md``, ``coverage_snapshot.json``, ``leaderboard.html``,
 
 Behaviour:
 * Exit 0 if every committed view matches a fresh build.
-* Exit 0 (skip) if ``outputs/`` is absent/empty — dev machines / CI cannot rebuild the
+* Exit 0 with an explicit SKIPPED line (``--strict``: exit 3) if ``outputs/`` is absent or
+  empty: dev machines and CI cannot rebuild the
   gitignored data, so the gate is a no-op there. It is meaningful only where ``outputs/``
   lives (the loop host).
 * Exit 1 on drift (including a committed audit page a rebuild no longer produces), printing a
@@ -196,6 +197,11 @@ def _short_diff(name: str, committed: str, fresh: str, limit: int = 40) -> str:
     return body + (f"\n… (+{len(d) - limit} more diff lines)" if len(d) > limit else "")
 
 
+#: Exit code of ``--strict`` when the comparison could not run (no ``outputs/``): neither a pass (0)
+#: nor a stale view (1).
+EXIT_SKIPPED = 3
+
+
 def main(argv: list[str] | None = None) -> int:
     ap = argparse.ArgumentParser(description="Verify committed results match a fresh rebuild.")
     mode = ap.add_mutually_exclusive_group()
@@ -203,15 +209,23 @@ def main(argv: list[str] | None = None) -> int:
     mode.add_argument(
         "--staged", action="store_true", help="check the staged (git index) views, not the disk"
     )
+    ap.add_argument(
+        "--strict",
+        action="store_true",
+        help=f"exit {EXIT_SKIPPED} instead of 0 when nothing could be compared (release check)",
+    )
     args = ap.parse_args(argv)
     repo = _repo()
 
     if not _outputs_present():
+        # A skip is NOT a pass: nothing was compared. Say so in words, and let a release check
+        # (--strict) tell the two apart by the exit code.
         print(
-            "check_results_fresh: outputs/ absent or empty — skipping "
-            "(gate runs only where data lives)."
+            "check_results_fresh: SKIPPED — no outputs/ found, so NOTHING WAS COMPARED. "
+            "The committed views are not verified by this run (the gate needs the per-run "
+            "outputs, which are not part of the public release)."
         )
-        return 0
+        return EXIT_SKIPPED if args.strict else 0
 
     os.chdir(repo)  # the builders glob 'outputs/...' relative to cwd
     views = _Views(repo, staged=args.staged)

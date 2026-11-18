@@ -169,3 +169,13 @@ def test_one_fix_pass_regenerates_fragments_before_the_bundle_copies_them(tmp_pa
     )
     assert gate.main(["--fix"]) == 0
     assert gate.main([]) == 0  # fresh after ONE pass
+
+
+def test_skip_is_reported_as_skip_not_as_pass(monkeypatch, capsys):
+    """Without outputs/ nothing is compared: the gate says SKIPPED, and --strict exits non-zero
+    with a code distinct from a stale view (git5 #49)."""
+    monkeypatch.setattr(gate, "_outputs_present", lambda: False)
+    assert gate.main([]) == 0
+    out = capsys.readouterr().out
+    assert "SKIPPED" in out and "NOTHING WAS COMPARED" in out and "✓" not in out
+    assert gate.main(["--strict"]) == gate.EXIT_SKIPPED == 3
