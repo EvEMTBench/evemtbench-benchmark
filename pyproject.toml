@@ -52,7 +52,7 @@ Repository = "https://github.com/EvEMTBench/evemtbench-benchmark"
 Documentation = "https://github.com/EvEMTBench/evemtbench-benchmark/tree/main/docs"
 Leaderboard = "https://evemtbench.github.io/evemtbench-benchmark/leaderboard.html"
 Paper = "https://arxiv.org/abs/2609.28149"
-Dataset = "https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/"
+Dataset = "https://doi.org/10.48742/fau.abpd-r521"
 "Dataset paper" = "https://arxiv.org/abs/2608.19777"
 "Dataset generation code" = "https://doi.org/10.5281/zenodo.21624649"
 

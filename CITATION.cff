@@ -84,11 +84,11 @@ references:
     year: 2026
     publisher:
       name: FAUDataCloud
-    doi: "10.48742/fau.1fkx-ef11"
-    url: "https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/"
+    doi: "10.48742/fau.abpd-r521"
+    url: "https://doi.org/10.48742/fau.abpd-r521"
     notes: >-
-      The dataset version all benchmark 1.x results use (CC-BY-4.0). The DOI is reserved; until it
-      resolves, the URL is the download. The later release EvEMTBench V1
+      The dataset version all benchmark 1.x results use (CC-BY-4.0).
+      The later release EvEMTBench V1
       (doi:10.48742/fau.3383-vd93) is not used by benchmark 1.x.
   - type: article
     title: "A simulation based dataset of faults and events for machine learning in power systems"

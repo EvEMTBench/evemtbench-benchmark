@@ -16,7 +16,7 @@ documents how the benchmark uses it and its known limitations.
 ## Identity
 
 - **Dataset v0.1** — the data behind every published benchmark 1.x result. DOI
-  [10.48742/fau.1fkx-ef11](https://doi.org/10.48742/fau.1fkx-ef11) (reserved, not yet active).
+  [10.48742/fau.abpd-r521](https://doi.org/10.48742/fau.abpd-r521).
 - **Dataset V1** — the new release, DOI
   [10.48742/fau.3383-vd93](https://doi.org/10.48742/fau.3383-vd93). Benchmark 1.x does not use it.
 

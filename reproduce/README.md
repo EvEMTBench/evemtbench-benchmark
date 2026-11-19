@@ -46,7 +46,7 @@ uv pip install -e ".[dev,baselines]"   # torch; the deep baselines need a CUDA G
 `env/results-v1.3.0.lock` pins the environment the published results ran in.
 
 **Data.** The results use EvEMTBench dataset v0.1
-([download](https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/)).
+([doi:10.48742/fau.abpd-r521](https://doi.org/10.48742/fau.abpd-r521)).
 The download holds the raw simulation exports. The benchmark reads windowed data, and the tool
 that windows the exports is not public yet. Until it is, retraining needs windows built to the
 contract in `src/evemtbench/contract/`; `python -m evemtbench.data.input_digests --verify` checks

@@ -5,6 +5,8 @@ in `evemtbench.version` is stamped into every result; a **major** bump means sco
 comparable across versions.
 
 ## In the 1.3.0 tag — reproduction guides, paper builders and a cleanup (docs and tooling; no contract change)
+- **Dataset DOI.** Dataset v0.1, the data behind every 1.x result, is registered as
+  `10.48742/fau.abpd-r521`; the README and the datasheet name it.
 
 - **`reproduce/`.** One guide per group of paper results: where the numbers are, how to retrain
   them, and which builder rebuilds each table and figure. The README and the public docs are

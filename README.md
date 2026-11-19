@@ -41,13 +41,13 @@ Command-line tools: `evemtbench-evaluate`, `evemtbench-run`, `evemtbench-splits`
 
 ## Dataset
 
-The published results use **EvEMTBench dataset v0.1** (CC-BY-4.0), on FAUDataCloud:
-<https://data.fau.de/share/0e8d60feb7e65616c60aab78b93db77053275da53fd894bf5b75fc5e9ee7dfbf/>.
-Its DOI, `10.48742/fau.1fkx-ef11`, is reserved but not yet active. The newer dataset **V1**
+The published results use **EvEMTBench dataset v0.1** (CC-BY-4.0),
+<https://doi.org/10.48742/fau.abpd-r521>, on FAUDataCloud.
+The newer dataset **V1**
 (`10.48742/fau.3383-vd93`) is not used by benchmark 1.x. The data-generation code is archived at
 <https://doi.org/10.5281/zenodo.21624649>.
 
-The share holds the raw simulation exports. The benchmark reads windowed partitions; the tool that
+The dataset holds the raw simulation exports. The benchmark reads windowed partitions; the tool that
 builds them is not public yet. Until it is, build windows to the contract in
 `src/evemtbench/contract/`: the loader rejects partitions that do not match it, and
 `python -m evemtbench.data.input_digests --verify` checks them against the reference digests
