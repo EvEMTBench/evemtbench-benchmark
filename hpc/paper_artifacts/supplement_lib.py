@@ -664,7 +664,8 @@ def ec_support_table(root=None) -> str:
     heads = " & ".join(
         f"\\multicolumn{{2}}{{c}}{{\\textbf{{{label}}}}}" for _g, label in pl.GRID_ROWS
     )
-    cmids = "".join(f"\\cmidrule(lr){{{2 + 2 * i}-{3 + 2 * i}}}" for i in range(len(pl.GRID_ROWS)))
+    # two leading columns (idx, class), then one test/eval pair per grid
+    cmids = "".join(f"\\cmidrule(lr){{{3 + 2 * i}-{4 + 2 * i}}}" for i in range(len(pl.GRID_ROWS)))
     sub = " & ".join([r"\textbf{test} & \textbf{eval}"] * len(pl.GRID_ROWS))
     body = []
     for idx, cls in enumerate(vocab):

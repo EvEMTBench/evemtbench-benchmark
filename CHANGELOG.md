@@ -4,6 +4,14 @@ Benchmark-contract versions (see [docs/versioning.md](docs/versioning.md)). The 
 in `evemtbench.version` is stamped into every result; a **major** bump means scores are not
 comparable across versions.
 
+## After the 1.3.0 tag — software archive DOI (docs and table typesetting; no contract change)
+- **Zenodo archive.** Release v1.3.0 is archived on Zenodo: version DOI `10.5281/zenodo.24463496`, concept DOI
+  `10.5281/zenodo.24463495`. `CITATION.cff` (`doi`, `identifiers`), the README (badge, citation text and a
+  `@software` entry), `pyproject.toml` and `reproduce/README.md` name it.
+- **SI table typesetting.** The column rules of the EC class-support table (SI Table S20) sit over the
+  grid columns, and the caption of the FC result table (SI Table S2) uses the short acronym form, as
+  in the manuscript. No number changes.
+
 ## In the 1.3.0 tag — reproduction guides, paper builders and a cleanup (docs and tooling; no contract change)
 - **Dataset DOI.** Dataset v0.1, the data behind every 1.x result, is registered as
   `10.48742/fau.abpd-r521`; the README and the datasheet name it.

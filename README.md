@@ -2,6 +2,7 @@
 
 [![ci](https://github.com/EvEMTBench/evemtbench-benchmark/actions/workflows/ci.yml/badge.svg)](https://github.com/EvEMTBench/evemtbench-benchmark/actions/workflows/ci.yml)
 [![arXiv](https://img.shields.io/badge/arXiv-2609.28149-b31b1b)](https://arxiv.org/abs/2609.28149)
+[![DOI](https://img.shields.io/badge/DOI-10.5281%2Fzenodo.24463496-blue)](https://doi.org/10.5281/zenodo.24463496)
 ![benchmark v1.3.0](https://img.shields.io/badge/benchmark-v1.3.0-blue)
 ![python 3.10+](https://img.shields.io/badge/python-3.10%2B-blue)
 [![code: MIT](https://img.shields.io/badge/code-MIT-green)](LICENSE)
@@ -127,7 +128,9 @@ submission, versioning, known issues.
 ## License and citation
 
 Code: MIT ([LICENSE](LICENSE)). Dataset: CC-BY-4.0 ([LICENSES/DATA-LICENSE.md](LICENSES/DATA-LICENSE.md)).
-Please cite the paper and the dataset; identifiers are in [CITATION.cff](CITATION.cff).
+Release v1.3.0 is archived on Zenodo: <https://doi.org/10.5281/zenodo.24463496> (version DOI; all versions:
+<https://doi.org/10.5281/zenodo.24463495>). Please cite the paper and the dataset, and the software archive when you
+use the code; identifiers are in [CITATION.cff](CITATION.cff).
 
 ```bibtex
 @misc{oelhaf_evemtbench_2026,
@@ -140,6 +143,17 @@ Please cite the paper and the dataset; identifiers are in [CITATION.cff](CITATIO
   primaryClass  = {eess.SY},
   doi           = {10.48550/arXiv.2609.28149},
   url           = {https://arxiv.org/abs/2609.28149}
+}
+
+@software{oelhaf_evemtbench_benchmark_v130_2026,
+  title     = {{EvEMTBench Benchmark}: evaluation software for machine learning in power system protection},
+  author    = {Oelhaf, Julian and Kordowich, Georg and Bergler, Christian and Maier, Andreas
+               and J{\"a}ger, Johann and Bayer, Siming},
+  year      = {2026},
+  version   = {v1.3.0},
+  publisher = {Zenodo},
+  doi       = {10.5281/zenodo.24463496},
+  url       = {https://doi.org/10.5281/zenodo.24463496}
 }
 ```
 

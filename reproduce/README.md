@@ -3,7 +3,7 @@
 One guide per group of results in *EvEMTBench: An Open Benchmark for Machine Learning in Power
 System Protection*. Every guide has the same steps: where the numbers are, how to retrain them,
 and which script rebuilds the table or figure. Table and figure numbers follow the journal version
-of the paper.
+of the paper. The paper's results come from release v1.3.0, archived at <https://doi.org/10.5281/zenodo.24463496>.
 
 | Guide | Reproduces |
 |---|---|
