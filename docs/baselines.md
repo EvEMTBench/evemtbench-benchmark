@@ -28,7 +28,7 @@ classification, MSE (+ target standardization) for regression — and fit per-ch
 (regression). The trivial floor: any useful model must beat it; on balanced_accuracy it sits at
 ~1/num_classes.
 
-**`threshold`** — a single-end **overcurrent** rule (peak |current| > learned threshold). Restricted
+**`threshold`** — a single-end **overcurrent** rule (largest per-phase RMS current in the window > learned threshold). Restricted
 to **binary detection at `local`** observability — the information set of a classical overcurrent
 relay. It is the *conventional-protection anchor*: where it collapses on `benchmark` transfer, that
 is a diagnostic of the operating-point shift, not merely a weak model.

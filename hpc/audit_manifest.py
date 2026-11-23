@@ -505,7 +505,7 @@ ENVIRONMENT: dict = {
         ),
         (
             "Classical baselines",
-            "NHR@FAU Alex — A40 MIG slice",
+            "NHR@FAU Alex — A100 MIG slice (SLURM a100mig partition)",
             "majority/threshold/random_forest sweeps auto-routed by hpc/submit.sh",
         ),
         (

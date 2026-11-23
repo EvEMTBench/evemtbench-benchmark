@@ -22,6 +22,17 @@ greyscale and colour-vision deficiency. Y limits are shared within a task column
 the figure exists to support is across source rows — and deliberately not across tasks, whose
 metrics differ.
 
+**Target-only reference.** Behind each pair, a dashed segment with a translucent 95\\% CI band
+marks the matched target-only control: a deep baseline trained from random initialisation on the
+target grid's ``adapt_grid`` training partition with the transfer protocols' per-window
+normalization, selected on the target grid's validation split and reported on the same
+``eval_grid`` family. It differs from the fine-tuned mark only in initialisation, and it does not
+depend on the pre-training source, so the same level is drawn in all three rows of a column. Its
+values are arm C of the input-normalization control (``build_supp_tab_norm_control.py``) and are
+read from the same isolated control tree, passed with ``--abl`` (see
+``reproduce/3_normalization_control.md``); the published ``held_out`` results use
+``normalize=none`` and are not a like-for-like comparator for this figure.
+
 Authored at exactly ``paperfig_style.FIG_WIDTH`` (= ``\\textwidth``), so LaTeX places it at scale
 1.0 and the point sizes set here are the point sizes on the page. No in-figure title: that text
 lives in the LaTeX caption (``main.tex``, ``fig:transfer_overview``).
@@ -31,9 +42,10 @@ running sweep is untouched). This is compute — run via ``srun``, never the log
 
     srun --partition=a100mig --gres=gpu:a100small:1 --time=10:00 bash -c \
       'CUDA_VISIBLE_DEVICES= PYTHONPATH=src \
-       "$PAPERFIGS_PY" hpc/paper_artifacts/build_fig_transfer_overview.py'
+       "$PAPERFIGS_PY" hpc/paper_artifacts/build_fig_transfer_overview.py --abl <control tree>'
 """
 
+import argparse
 import os
 import sys
 from pathlib import Path
@@ -56,8 +68,13 @@ from paper_lib import (
     _is_bounded01,
     _transfer_index,
     _transfer_val_index,
+    best_cell_choice,
+    ci_bounds,
     transfer_series,
 )
+
+from evemtbench.coverage import DEEP_BASELINES
+from make_results import load_rows
 
 STEM = "fig_transfer_overview"
 # Coverage lives in paper_lib so the figure-value test checks the same view and functions.
@@ -100,6 +117,20 @@ _XTICK_FONTSIZE = 7.0
 _YTICK_FONTSIZE = 6.8
 _Y_PAD_FRAC = 0.07  # headroom around the data+CI extent, as a fraction of its span
 
+# The matched target-only reference. Deliberately not a third hue: the two saturated series colours
+# are the transfer question, and a reference in its own hue would read as a third stage. A neutral
+# graphite sits outside that class and separates from both series in greyscale. It is drawn as a
+# level to beat (a segment across the target's slot plus a translucent CI band), and DASHED: width
+# is pinned at the journal's stroke floor and tone alone would walk it into the connector's grey,
+# so the dash pattern is what keeps the two apart.
+_REF_LABEL = "target-only, matched norm."
+_REF_COLOR = "#4d4d4d"
+_REF_LINEWIDTH = style.MIN_LINEWIDTH
+_REF_ALPHA = 0.6
+_REF_DASHES = (2.6, 1.8)
+_REF_HALFWIDTH = 0.30
+_REF_BAND_ALPHA = 0.10
+
 
 def _panel_limits(cells, metric):
     """Shared y limits for one task column from every drawn cell's CI extent, so no whisker is
@@ -115,6 +146,68 @@ def _panel_limits(cells, metric):
     if _is_bounded01(metric):
         return max(lo, 0.0), min(hi, 1.02)
     return max(lo, 0.0), hi
+
+
+def reference_cells(abl, grids, view=OBS_VIEW):
+    """``{function key: [cell | None per target grid]}`` — the matched target-only reference.
+
+    Read from the control tree ``abl`` (the directory containing ``outputs/``): ``held_out`` cells
+    re-run with ``--normalize per_window``, selected on the target grid's validation split out of
+    ``DEEP_BASELINES`` and reported on the ``eval_grid`` family — arm C of
+    ``build_supp_tab_norm_control.py``, with the same selection call. Source-independent: one list
+    per function, reused unchanged in every source row."""
+    cwd = Path.cwd()
+    os.chdir(abl)  # load_rows resolves outputs/<results_version(...)> relative to cwd
+    try:
+        per_grid = {g: load_rows(g) for g in grids}
+    finally:
+        os.chdir(cwd)
+    out = {}
+    for key, _name, stem, metric, _label in PAPER_FUNCTIONS:
+        if key not in TRANSFER_FUNCTIONS:
+            continue
+        cells = []
+        for grid in grids:
+            c = best_cell_choice(
+                per_grid[grid], f"{stem}_{view}", "benchmark", metric, DEEP_BASELINES
+            )
+            if c is None:
+                cells.append(None)
+                continue
+            lo, hi = ci_bounds(c["mean"], c["ci"], metric) or (c["mean"], c["mean"])
+            cells.append({**c, "grid": grid, "lo": lo, "hi": hi})
+        out[key] = cells
+    return out
+
+
+def _draw_reference(ax, cells):
+    """The target-only reference of one function: per target grid, a dashed segment across the slot
+    and a translucent band over its 95% CI. Background ink: drawn before the pair."""
+    for i, c in enumerate(cells):
+        if c is None:
+            continue
+        x0, x1 = i - _REF_HALFWIDTH, i + _REF_HALFWIDTH
+        if c["hi"] > c["lo"]:
+            ax.fill_between(
+                [x0, x1],
+                [c["lo"], c["lo"]],
+                [c["hi"], c["hi"]],
+                color=_REF_COLOR,
+                alpha=_REF_BAND_ALPHA,
+                linewidth=0,
+                zorder=0,
+            )
+        ax.plot(
+            [x0, x1],
+            [c["mean"], c["mean"]],
+            color=_REF_COLOR,
+            alpha=_REF_ALPHA,
+            linewidth=_REF_LINEWIDTH,
+            dashes=_REF_DASHES,
+            solid_capstyle="butt",
+            dash_capstyle="butt",
+            zorder=1.5,
+        )
 
 
 def _draw_panel(ax, series, x):
@@ -185,8 +278,10 @@ def _draw_panel(ax, series, x):
     return drawn
 
 
-def build_figure():
+def build_figure(abl):
     """Build the matplotlib Figure (does not write it) — returns the Figure.
+
+    ``abl`` is the control tree the target-only reference is read from (see the module docstring).
 
     A ``source × function`` panel grid: one row per pre-training source grid (20/110/345 kV, the
     ``PRETRAIN_GRIDS`` order) and one column per fault-triad function. ``sharey="col"`` plus limits
@@ -200,6 +295,7 @@ def build_figure():
     grids = [g for g, _ in GRID_ROWS]
     sources = list(PRETRAIN_GRIDS)
     x = np.arange(len(grids))
+    reference = reference_cells(abl, grids)
 
     fig, axes = plt.subplots(
         len(sources),
@@ -221,6 +317,7 @@ def build_figure():
     for si, source in enumerate(sources):
         for fi, (key, _name, _stem, metric, _label) in enumerate(funcs):
             ax = axes[si][fi]
+            _draw_reference(ax, reference[key])  # background: before the pair
             drawn = _draw_panel(ax, series_by[(si, fi)], x)
             if not drawn:
                 ax.text(
@@ -263,7 +360,7 @@ def build_figure():
                 )
 
     # Shared limits per task column, from every cell drawn in that column (CI extent included).
-    for fi, (_key, _name, _stem, metric, _label) in enumerate(funcs):
+    for fi, (key, _name, _stem, metric, _label) in enumerate(funcs):
         cells = [
             c
             for si in range(len(sources))
@@ -271,6 +368,7 @@ def build_figure():
             for c in proto_cells
             if c is not None
         ]
+        cells += [c for c in reference[key] if c is not None]  # the band must not be clipped
         limits = _panel_limits(cells, metric)
         if limits is not None:
             axes[0][fi].set_ylim(*limits)  # sharey="col" propagates to the rows below
@@ -279,12 +377,14 @@ def build_figure():
     # Text only — the size is applied per-axes in _draw_panel (see the note there).
     axes[0][0].set_xticklabels([style.grid_label(g) for g in grids])
     # Tight x padding buys tick pitch: four two-line target names have to sit side by side inside a
-    # ~2 in panel without touching, and the marks only reach +/-0.14 from their tick.
-    axes[0][0].set_xlim(-0.35, len(grids) - 0.65)
+    # ~2 in panel without touching. The marks only reach +/-0.14 from their tick, but the reference
+    # segment reaches +/-0.30, so the padding is 0.42 to keep a margin at the spines.
+    axes[0][0].set_xlim(-0.42, len(grids) - 1 + 0.42)
 
     # One shared legend in a reserved strip at the very top (``rect`` below keeps the axes out of
     # it), so it cannot crowd the top row's panel titles. Marker only — no connector segment in the
-    # key, because the connector is a pairing aid rather than a third series.
+    # key, because the connector is a pairing aid rather than a third series. The reference gets its
+    # dashed segment.
     handles = [
         Line2D(
             [],
@@ -299,6 +399,19 @@ def build_figure():
         )
         for spec in style.SERIES.values()
     ]
+    handles.append(
+        Line2D(
+            [],
+            [],
+            linestyle="-",
+            marker="none",
+            color=_REF_COLOR,
+            alpha=_REF_ALPHA,
+            linewidth=_REF_LINEWIDTH,
+            dashes=_REF_DASHES,
+            label=_REF_LABEL,
+        )
+    )
     fig.legend(handles=handles, loc="upper center", bbox_to_anchor=(0.5, 1.0), ncol=len(handles))
     fig.get_layout_engine().set(
         h_pad=0.01, w_pad=0.01, hspace=0.05, wspace=0.015, rect=(0, 0, 1, 0.955)
@@ -309,7 +422,10 @@ def build_figure():
 if __name__ == "__main__":
     from paper_lib import FIG_DIR
 
-    figure = build_figure()
+    ap = argparse.ArgumentParser()
+    ap.add_argument("--abl", required=True, help="control tree (the dir CONTAINING outputs/)")
+    args = ap.parse_args()
+    figure = build_figure(Path(args.abl).resolve())
     print(f"sans face: {style.resolved_sans()}")
     for path in style.save_figure(figure, STEM, FIG_DIR):
         print(f"wrote {path}")

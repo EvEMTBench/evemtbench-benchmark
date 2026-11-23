@@ -2,26 +2,51 @@
 % Generator: hpc/paper_artifacts/build_tab_baselines.py
 % Benchmark: EvEMTBench v1.3.0
 % Inputs: (none — static specification)
-\begin{table*}[t]
+\begin{table}[t]
 \centering
-\small
-\caption{Reference baselines: a trivial floor, a conventional-protection anchor,
-classical \ac{ml}, and deep learning. The \ac{gnn} is planned for the cross-topology
-protocol.}
+\caption{Reference baseline suite. The threshold baseline is defined only for local \ac{fd}, and the impedance-based locator only for \ac{fl} under local and line observability. Complete configurations are reported in the Supplementary Information.}
 \label{tab:baselines}
-\begin{tabular}{L{2.2cm} L{2.8cm} L{3.0cm} L{4.6cm}}
+\begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Baseline} & \textbf{Family} & \textbf{Input} & \textbf{Notes} \\
+\textbf{Baseline} &
+\textbf{Type} &
+\textbf{Input representation} \\
 \midrule
-majority & trivial floor & labels only & per-task chance level \\
-threshold & conventional (overcurrent) & local current & binary \ac{fd}, \emph{local} only; the conventional-protection anchor \\
-\ac{rf} & classical \ac{ml} & per-channel summary features & tree-based ensemble \\
-\ac{mlp} & deep (flattened window) & raw window & no hand-crafted features \\
-\ac{gru} & deep (sequence) & raw window & sequence model \\
-\ac{cnn} & deep (1-D waveform) & raw window & waveform model \\
-\ac{resnet} & deep (1-D residual) & raw window & residual waveform model \\
-\ac{tst} & deep (Transformer) & raw window & Time Series Transformer encoder; deviates from the source in its strided patch embedding (16 samples, stride 8), its 8 heads and a LayerNorm on the patch tokens \\
-\ac{gnn} \planned & deep (topology-aware) & grid graph & cross-topology contender \\
+Majority
+& Trivial
+& Training labels or regression targets \\
+
+Threshold
+& Conventional
+& Local phase currents (\ac{fd}) \\
+
+Impedance locator
+& Conventional
+& Fundamental phasors and line impedance (\ac{fl}) \\
+
+\Ac{rf}
+& Feature-based
+& Per-channel waveform statistics \\
+
+\Ac{mlp}
+& Deep
+& Flattened waveform window \\
+
+\Ac{tst}
+& Deep
+& Patch-embedded waveform sequence \\
+
+\Ac{gru}
+& Deep
+& Waveform sequence \\
+
+\Ac{cnn}
+& Deep
+& Waveform sequence \\
+
+\Ac{resnet}
+& Deep
+& Waveform sequence \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}

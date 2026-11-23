@@ -976,6 +976,8 @@ def transfer_table(
 # --------------------------------------------------------------------------------------------------
 # Static specification tables (authored content lifted verbatim out of main.tex). These are NOT
 # data-derived, so they are exempt from the pre-freeze \res policy (see check_results_fresh.py).
+# task_spec, dataset_families and baselines are byte-identical to the table environments of the
+# revised manuscript (Tables 2-4, 23 Nov 2026); update them here when the manuscript text changes.
 # --------------------------------------------------------------------------------------------------
 def _spec_header(name: str) -> str:
     """Provenance block for a static specification table (authored content, no data inputs)."""
@@ -985,19 +987,49 @@ def _spec_header(name: str) -> str:
 SPEC_TABLES: dict[str, str] = {
     "task_spec": r"""\begin{table*}[t]
 \centering
-\caption{Benchmark task specification. Each function is scored under each
-observability view (Table~\ref{tab:observability}); a window is scored by exactly one
-rule per task. FC uses a frozen 9-class fault vocabulary.}
+%\small
+
+\caption{Target and valid-sample definitions for the five primary EvEMTBench functions. L, Li, and G denote local, line, and global observability, respectively.}
 \label{tab:task_spec}
-\begin{tabular}{L{2.2cm} L{2.0cm} L{4.6cm} L{4.4cm}}
+
+\begin{tabular}{@{}
+  >{\raggedright\arraybackslash}p{2.7cm}
+  >{\raggedright\arraybackslash}p{3.0cm}
+  >{\raggedright\arraybackslash}p{8.3cm}
+  >{\centering\arraybackslash}p{1.5cm}
+@{}}
 \toprule
-\textbf{Function} & \textbf{Label kind} & \textbf{Valid samples (windows scored)} & \textbf{Primary metrics} \\
+\textbf{Function} &
+\textbf{Target} &
+\textbf{Valid evaluation windows} &
+\textbf{Views} \\
 \midrule
-\ac{fd} & binary & all windows of fault episodes: pre-fault negatives + fault-active positives & balanced accuracy, macro $\text{F}_1$, missed-fault rate, false-alarm rate \\
-\ac{fc} & 9-class & fault-active windows whose type is in the 9-class vocabulary & balanced accuracy, macro / per-class $\text{F}_1$ \\
-\ac{fl} & regression & fault-active windows of \emph{line}-fault episodes (location defined; bus faults excluded) & \acs{mae}, \acs{rmse}, $R^2$ \\
-\ac{ed} & binary & every window: fault- or switching-active positives vs.\ quiescent negatives & balanced accuracy, missed-detection rate, false-trip rate; detection latency \\
-\ac{ec} & 23-class & every window over the full event-type vocabulary (non-active windows labelled \texttt{no\_event}; out-of-vocabulary types excluded) & balanced accuracy, macro / per-class $\text{F}_1$ \\
+
+Fault detection (\acs{fd})
+& Fault active / inactive
+& All windows from fault episodes; fault-active windows are positive, while windows before inception or after the annotated fault interval are negative
+& L, Li, G \\
+
+Fault classification (\acs{fc})
+& Fault class
+& Fault-active windows with labels in the frozen nine-class fault vocabulary
+& L, Li, G \\
+
+Fault localization (\acs{fl})
+& Position along line (\% of line length)
+& Fault-active windows from line-fault episodes; busbar faults are excluded because no unique line position is defined
+& L, Li, G \\
+
+Event detection (\acs{ed})
+& Event active / inactive
+& All valid event-analysis windows; fault- or switching-active windows are positive, while inactive windows are negative
+& G \\
+
+Event classification (\acs{ec})
+& Event class
+& All valid event-analysis windows over the frozen 23-class vocabulary; inactive windows are labeled \texttt{no\_event}
+& G \\
+
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -1061,24 +1093,33 @@ IEEE 39-Bus System       & 345\,kV & 60\,Hz & 420\,ch \\
 \end{table}
 """,
     "dataset_families": r"""\begin{table*}[t]
-\caption{Dataset families as a generalisation ladder (family name; benchmark code
-handle in \texttt{typewriter}; \texttt{train} and \texttt{fine\_tune} are accepted as
-legacy read-aliases of \texttt{multi\_grid} and \texttt{adapt\_grid}). The dataset
-publication calls the evaluation-only family \emph{Benchmark}, which is also its on-disk
-handle; this article writes it \texttt{eval\_grid} to keep it distinct from the benchmark
-as a whole. Rows increase in
-what is held fixed between training and test. The Eval-Grid family is
-\emph{evaluation-only}: it is never used for training, validation, model selection,
-early stopping, normalisation, or threshold/hyperparameter tuning.}
-\label{tab:dataset_families}
 \centering
-\begin{tabular}{L{3.4cm} L{5.2cm} L{5.4cm}}
+\caption{Dataset families defining the EvEMTBench generalization conditions. The families differ in topology, operating state, and event-parameter variation.}
+\label{tab:dataset_families}
+
+\begin{tabular}{@{}
+  >{\raggedright\arraybackslash}p{2.4cm}
+  >{\raggedright\arraybackslash}p{6.1cm}
+  >{\raggedright\arraybackslash}p{5.3cm}
+@{}}
 \toprule
-\textbf{Family (handle)} & \textbf{Randomised / fixed} & \textbf{Generalisation role} \\
+\textbf{Family} &
+\textbf{Variation} &
+\textbf{Role} \\
 \midrule
-Train (\texttt{multi\_grid}) & all three parameter classes; diverse random topologies & cross-topology training + evaluation \planned \\
-Fine-tune (\texttt{adapt\_grid}) & fixed topology; random events + operating states & in-grid training + in-distribution test (\texttt{held\_out}) \\
-Eval-Grid (\texttt{eval\_grid}) & fixed topology + operating point; discrete event-parameter sweep & never-trained systematic transfer evaluation \\
+
+\texttt{multi\_grid}
+& Topology, operating state, and event parameters vary
+& Cross-grid pre-training and source-domain learning \\
+
+\texttt{adapt\_grid}
+& Topology is fixed; operating state and event parameters vary
+& Target-grid training, validation, and in-distribution testing \\
+
+\texttt{eval\_grid}
+& Topology and operating state are fixed; event parameters follow predefined sweeps
+& Evaluation-only shifted condition for held-out and transfer protocols \\
+
 \bottomrule
 \end{tabular}
 \end{table*}
@@ -1098,29 +1139,54 @@ global & grid-dependent & centralised / wide-area \\
 \end{tabular}
 \end{table}
 """,
-    "baselines": r"""\begin{table*}[t]
+    "baselines": r"""\begin{table}[t]
 \centering
-\small
-\caption{Reference baselines: a trivial floor, a conventional-protection anchor,
-classical \ac{ml}, and deep learning. The \ac{gnn} is planned for the cross-topology
-protocol.}
+\caption{Reference baseline suite. The threshold baseline is defined only for local \ac{fd}, and the impedance-based locator only for \ac{fl} under local and line observability. Complete configurations are reported in the Supplementary Information.}
 \label{tab:baselines}
-\begin{tabular}{L{2.2cm} L{2.8cm} L{3.0cm} L{4.6cm}}
+\begin{tabular}{@{}lll@{}}
 \toprule
-\textbf{Baseline} & \textbf{Family} & \textbf{Input} & \textbf{Notes} \\
+\textbf{Baseline} &
+\textbf{Type} &
+\textbf{Input representation} \\
 \midrule
-majority & trivial floor & labels only & per-task chance level \\
-threshold & conventional (overcurrent) & local current & binary \ac{fd}, \emph{local} only; the conventional-protection anchor \\
-\ac{rf} & classical \ac{ml} & per-channel summary features & tree-based ensemble \\
-\ac{mlp} & deep (flattened window) & raw window & no hand-crafted features \\
-\ac{gru} & deep (sequence) & raw window & sequence model \\
-\ac{cnn} & deep (1-D waveform) & raw window & waveform model \\
-\ac{resnet} & deep (1-D residual) & raw window & residual waveform model \\
-\ac{tst} & deep (Transformer) & raw window & Time Series Transformer encoder; deviates from the source in its strided patch embedding (16 samples, stride 8), its 8 heads and a LayerNorm on the patch tokens \\
-\ac{gnn} \planned & deep (topology-aware) & grid graph & cross-topology contender \\
+Majority
+& Trivial
+& Training labels or regression targets \\
+
+Threshold
+& Conventional
+& Local phase currents (\ac{fd}) \\
+
+Impedance locator
+& Conventional
+& Fundamental phasors and line impedance (\ac{fl}) \\
+
+\Ac{rf}
+& Feature-based
+& Per-channel waveform statistics \\
+
+\Ac{mlp}
+& Deep
+& Flattened waveform window \\
+
+\Ac{tst}
+& Deep
+& Patch-embedded waveform sequence \\
+
+\Ac{gru}
+& Deep
+& Waveform sequence \\
+
+\Ac{cnn}
+& Deep
+& Waveform sequence \\
+
+\Ac{resnet}
+& Deep
+& Waveform sequence \\
 \bottomrule
 \end{tabular}
-\end{table*}
+\end{table}
 """,
 }
 

@@ -15,9 +15,9 @@
 
 - ED extends FD with **benign negatives and positives**: FD only sees windows inside fault
   episodes; ED sees every window, so switching transients count as events.
-- Negatives are the pre-/post-event windows of every episode plus the `no_event` episodes. The
-  `no_event` episodes exist only in the HV grids' `adapt_grid` ([taxonomy.md](../taxonomy.md)), so
-  the negative-class composition differs by grid and by test set. Report per grid.
+- Negatives are the inactive pre-/post-event windows of the fault and switching episodes. The
+  reference grids contain no dedicated `no_event` episodes ([taxonomy.md](../taxonomy.md)). The
+  pre/post mix differs by grid and by test set. Report per grid.
 - ED = FD-positives ∪ switch-detection positives ([switch_tasks.md](switch_tasks.md)).
 - A per-line relay framing (trip only for a fault on the protected line) is the
   [relay-selectivity](relay_selectivity.md) task, designed but not built.

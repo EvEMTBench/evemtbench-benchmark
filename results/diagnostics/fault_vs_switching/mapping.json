@@ -1,0 +1,43 @@
+{
+  "ticket": "EXP-04",
+  "source_task": "event_state_global",
+  "protocol": "held_out",
+  "classes": [
+    "normal",
+    "switching",
+    "fault"
+  ],
+  "fault_prediction": [
+    "fault"
+  ],
+  "non_fault_prediction": [
+    "normal",
+    "switching"
+  ],
+  "true_state": {
+    "fault": "overlap_ratio > 0 and event_family == 'fault'",
+    "switching": "overlap_ratio > 0 and event_family == 'switching'",
+    "normal": "every other window (inactive)"
+  },
+  "rates": {
+    "switch_to_fault": "fault predictions / active switching windows",
+    "missed_fault": "non-fault predictions / active fault windows",
+    "inactive_to_fault": "fault predictions / inactive (normal) windows"
+  },
+  "zero_support": "undefined (empty), never 0",
+  "selection": "paper_lib.best_cell_choice on validation, headline balanced_accuracy; no selection on test/benchmark; every learned baseline reported in the supplementary table",
+  "evaluation_sets": [
+    "test",
+    "benchmark"
+  ],
+  "seeds": [
+    0,
+    1,
+    2,
+    3,
+    4
+  ],
+  "event_detection_used": false,
+  "threshold_tuning": false,
+  "scope": "global view, window level; no trip-security or fixed-relay selectivity claim"
+}

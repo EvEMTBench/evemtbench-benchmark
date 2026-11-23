@@ -20,8 +20,8 @@ Per window, from the required contract columns `overlap_ratio` and `event_family
 - **`fault` (2)** iff `overlap_ratio > 0` and `event_family == "fault"`;
 - **`switching` (1)** iff `overlap_ratio > 0` and `event_family == "switching"` — the user-facing
   "Event" class;
-- **`normal` (0)** otherwise — every pre-/post-event (non-overlapping) window of *any* episode,
-  plus the fully quiescent `no_event` (family `normal`) episodes.
+- **`normal` (0)** otherwise — every pre-/post-event (non-overlapping) window of *any* episode
+  (and any fully quiescent `no_event` episode; the reference grids have none).
 
 Frozen class order `("normal", "switching", "fault")` (index = id); a change is a **major** bump.
 Every window has a defined state, so **all windows are scored** (valid-sample mask is all-True) —
@@ -29,8 +29,8 @@ unlike the within-fault-episode masks of FD/FC/FL.
 
 ## Why `normal` is available on every grid
 
-`no_event` episodes exist only on the HV grids ([taxonomy.md](../taxonomy.md)). But `normal` here is
-**not** tied to `no_event`: it is any non-overlapping window. Because every fault and switching
+The reference grids contain no dedicated `no_event` episodes ([taxonomy.md](../taxonomy.md)). `normal`
+here is **not** tied to `no_event` episodes: it is any non-overlapping window. Because every fault and switching
 episode contributes its own quiescent pre-event windows, `normal` has support on **all four grids**
 (CigreMV, DoubleLine, TestGrid, IEEE-39) — the grid restriction that caveats ED/EC does not bind ES.
 

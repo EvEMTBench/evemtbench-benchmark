@@ -8,11 +8,13 @@ predictions of the reference runs (guide 1), and three also read the dataset.
 | Table S11 | `supp_tab_diagnostics.tex` | `build_supp_tab_diagnostics.py` | `outputs/` |
 | Fig. S6 | — | `build_fig_supp_protection.py` | `outputs/` |
 | Table S12 | `supp_tab_fc_perclass.tex` | `build_supp_tab_fc_perclass.py` | `outputs/` |
-| Table S13 | — | `hpc/diag_fault_vs_switching.py --out <dir>` | `outputs/`, data |
+| Table S13 | `results/diagnostics/fault_vs_switching/si_table.tex` | `hpc/diag_fault_vs_switching.py --out <dir>` | `outputs/`, data |
 | Table S14 | `supp_tab_current_shift.tex` | `build_supp_tab_current_shift.py` | data |
 | Table S15 | `supp_tab_ed_negative_support.tex` | `build_supp_tab_ed_negative_support.py` | data |
 
 `build_*` scripts are in `hpc/paper_artifacts/`; run them as
 `PYTHONPATH=src python hpc/paper_artifacts/<script>`. `make supp-artifacts-dataset` runs the
 dataset-backed ones. Table S13 (fault vs switching) uses the `event_state_global` predictions; its
-script writes CSVs and the table into `<dir>`, and its definitions are in the script's header.
+script writes CSVs and the table into `<dir>`, and its definitions are in the script's header. The
+files of the run behind the paper (per-seed rates, supports, breakdowns by event type and switching
+category) are in [`results/diagnostics/fault_vs_switching/`](../results/diagnostics/fault_vs_switching/).

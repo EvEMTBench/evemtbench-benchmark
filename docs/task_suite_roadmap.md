@@ -55,6 +55,13 @@ possible future addition.
 
 ## Difficulty axes (deferred — the roadmap's next phases)
 
+The next benchmark version, **2.0.0 on dataset V1**, is planned separately (development roadmap; paused until
+after the 1.x paper revision). It re-runs the existing suite on the new data and changes how the active-window
+label is derived ([known_issues.md](known_issues.md) §6); the axes below come after it.
+
+- **Relay selectivity** *(designed, not built)*: a fixed-relay task with out-of-zone faults, so that zone
+  selection and selectivity are scored instead of assumed ([design/selectivity.md](design/selectivity.md)).
+
 - **Noise / perturbation robustness** (the "community adds noise" axis): a post-hoc evaluation that
   degrades the ideal inputs with the benchmark-owned perturbation taxonomy
   ([design/robustness.md](design/robustness.md): noise/SNR, harmonics, CT saturation, sensor

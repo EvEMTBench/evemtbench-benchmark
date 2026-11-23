@@ -45,5 +45,9 @@ guide 1.
 ```bash
 PYTHONPATH=src python hpc/paper_artifacts/build_tab_transfer_fd.py        # Table S6; likewise fc, fl
 PYTHONPATH=src python hpc/paper_artifacts/build_supp_tab_transfer_scratch.py
-PYTHONPATH=src python hpc/paper_artifacts/build_fig_transfer_overview.py  # Fig. 3
+PYTHONPATH=src python hpc/paper_artifacts/build_fig_transfer_overview.py --abl control  # Fig. 3
 ```
+
+Fig. 3 also draws the matched target-only reference (dashed, with its 95 % interval): arm C of the
+input-normalization control. `--abl` names that control tree, the directory containing its
+`outputs/` ([guide 3](3_normalization_control.md)).

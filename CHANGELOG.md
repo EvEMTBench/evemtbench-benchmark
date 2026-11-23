@@ -7,6 +7,26 @@ comparable across versions.
 ## In the 1.3.0 tag — reproduction guides, paper builders and a cleanup (docs and tooling; no contract change)
 - **Dataset DOI.** Dataset v0.1, the data behind every 1.x result, is registered as
   `10.48742/fau.abpd-r521`; the README and the datasheet name it.
+- **Fault-versus-switching diagnostic files (SI Table S13).** `results/diagnostics/fault_vs_switching/`
+  holds the output of `hpc/diag_fault_vs_switching.py` for the reference runs: per-seed and
+  seed-summary rates and confusion shares, with supports and breakdowns by event type and switching
+  category, the control and selection records, the input digests and the table. No result changes.
+- **SI captions.** The captions of the split-composition and valid-count tables (SI Tables S17 and
+  S18) follow the manuscript wording; the numbers are unchanged.
+- **Fig. 3 builder.** `hpc/paper_artifacts/build_fig_transfer_overview.py` draws the matched
+  target-only reference (dashed segment with its 95 % interval; arm C of the input-normalization
+  control) behind each zero-shot/fine-tune pair, as in the paper's figure. It reads the control tree
+  passed with `--abl`. The plotted transfer values are unchanged.
+- **Tables 2-4 builders.** `build_tab_dataset_families.py`, `build_tab_task_spec.py` and
+  `build_tab_baselines.py` emit the table environments of the revised manuscript verbatim (the
+  baselines table now lists the impedance locator and no planned GNN).
+- **Docs: no dedicated `no_event` episodes.** `docs/taxonomy.md`, the datasheet and three task cards
+  said the two 110 kV grids contain quiescent `no_event` episodes. They do not (SI Table S15): the
+  `no_event` / `normal` label comes from inactive windows of fault and switching episodes. The
+  episode counts in `docs/taxonomy.md` are now the `adapt_grid` counts of the committed splits, and
+  `docs/baselines.md` names the threshold statistic as it is computed (largest per-phase RMS current).
+  The datasheet's operating-point note follows SI Table S14, and the audit's environment page names
+  the A100 MIG slices the classical baselines ran on.
 
 - **`reproduce/`.** One guide per group of paper results: where the numbers are, how to retrain
   them, and which builder rebuilds each table and figure. The README and the public docs are
@@ -22,7 +42,7 @@ comparable across versions.
   Stale lines in the public docs are fixed. No result, metric, split or task changes.
 - **Release metadata for the software archive.** `CITATION.cff` (read by Zenodo) names the software
   "EvEMTBench Benchmark", lists all six paper authors with affiliations, dates the release
-  2026-11-18, adds keywords and an abstract, and cites dataset v0.1 by its DOI and the
+  2026-11-23, adds keywords and an abstract, and cites dataset v0.1 by its DOI and the
   data-generation code (doi:10.5281/zenodo.21624649); `pyproject.toml` matches.
 - **Paper names.** The README and `reproduce/` map the paper's names (`eval_grid`, Protection Reference
   grid) to the identifiers used here (`benchmark`, `testgrid_110kv`). The scheduled `nightly` workflow is

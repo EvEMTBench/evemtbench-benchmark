@@ -1,0 +1,9 @@
+grid,test_set,selected,status
+double_line,test,tst,selected on val
+double_line,benchmark,tst,selected on val
+testgrid_110kv,test,resnet,selected on val
+testgrid_110kv,benchmark,resnet,selected on val
+cigre_mv,test,tst,selected on val
+cigre_mv,benchmark,tst,selected on val
+ieee39,test,random_forest,selected on val
+ieee39,benchmark,random_forest,selected on val

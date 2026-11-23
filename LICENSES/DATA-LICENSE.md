@@ -5,11 +5,12 @@ The **code** in this repository is licensed under MIT (see [`/LICENSE`](../LICEN
 The **EvEMTBench dataset** (waveform recordings, labels, metadata, topology graphs) is a
 **separate artifact** distributed under its own terms and is **not** contained in this repository.
 
-## Dataset license: CC-BY-4.0 (intended)
+## Dataset license: CC-BY-4.0
 
-The EvEMTBench dataset is released separately (FAUDataCloud; see the README's *Dataset* section) under the
-**Creative Commons Attribution 4.0 International (CC-BY-4.0)** license, unless the dataset's
-own landing page states otherwise. When you use the dataset, cite it per the dataset DOI and
+The EvEMTBench dataset is released separately on FAUDataCloud (v0.1:
+<https://doi.org/10.48742/fau.abpd-r521>; see the README's *Dataset* section) under the
+**Creative Commons Attribution 4.0 International (CC-BY-4.0)** license; the dataset's own
+landing page is authoritative. When you use the dataset, cite it per the dataset DOI and
 this repository's [`CITATION.cff`](../CITATION.cff).
 
 ## PowerFactory / simulation-tool note

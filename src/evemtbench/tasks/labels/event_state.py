@@ -9,12 +9,12 @@ The label keys off **window activity × event family** — a window is:
 
 * ``fault`` (2) iff it overlaps the event (``overlap_ratio > 0``) AND ``event_family == "fault"``;
 * ``switching`` (1) iff it overlaps the event AND ``event_family == "switching"``;
-* ``normal`` (0) otherwise — i.e. every pre-/post-event (non-overlapping) window of *any* episode,
-  plus the fully quiescent ``no_event`` (family ``normal``) episodes.
+* ``normal`` (0) otherwise — i.e. every pre-/post-event (non-overlapping) window of *any* episode
+  (and any fully quiescent ``no_event`` episode, family ``normal``; the reference grids have none).
 
 Because every fault and switching episode contributes its own quiescent pre-event windows, the
-``normal`` class has support on **all four grids** — it does not depend on the HV-only ``no_event``
-episodes. Every window has a defined state, so the deriver never returns -1 (unlike FC).
+``normal`` class has support on **all four grids** without any dedicated ``no_event`` episodes.
+Every window has a defined state, so the deriver never returns -1 (unlike FC).
 
 Presentation note: the ``switching`` class is what the user-facing "Normal / **Event** / Fault"
 framing calls "Event". The frozen vocabulary uses the raw ``event_family`` values for a robust,

@@ -165,9 +165,9 @@ The hazard is outside the task definitions: a method that uses all `multi_grid` 
 negatives, or for self-supervised or contrastive pre-training on every window — would treat
 switching transients as quiescent signal.
 
-**What to do.** In 1.x, do not use `multi_grid` `no_event` windows as clean negatives. Dataset V1
-producer writes switching and busbar-fault episodes with their event labels; this is a property of
-the 1.x corpora and is not changed in 1.x.
+**What to do.** In 1.x, do not use `multi_grid` `no_event` windows as clean negatives. This is a
+property of the 1.x corpora and is not changed in 1.x. The producer of dataset V1 (the data for
+benchmark 2.0.0) writes switching and busbar-fault episodes with their event labels.
 
 ## 6. The window just before an off-grid event onset counts as event-active (open in 1.x; to be fixed in 2.0.0)
 

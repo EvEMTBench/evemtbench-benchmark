@@ -82,16 +82,16 @@ Layout, extraction and join keys: [DATA_LAYOUT.md](DATA_LAYOUT.md#auxiliary-over
   remains (noise, unknown controls, measurement error).
 - **Balanced ≠ empirical** — `adapt_grid`/`multi_grid` class balance is for controlled comparison,
   not real event frequencies.
-- **`no_event` asymmetry** — the steady-state `no_event` class exists only in the HV grids'
-  `adapt_grid` (not in any `benchmark` family, nor on MV/EHV), so the negative-class composition
-  differs by grid and an event-vs-quiescent task has no benchmark negative. Window-level family is
-  derived from `y_event_present`/`y_fault_present`, not the episode-level `event_family` column.
-- **Operating-point / scale shift (adapt_grid → benchmark)** — the `benchmark` family sits at a
-  different operating point (≈6–13× steady-state current on some grids) from `adapt_grid`. With
-  per-channel standardization fit on train, magnitude-reliant view×model combos transfer poorly
-  while the **differential `line` view** (which cancels the shared load term) transfers — a genuine
-  domain-shift test, not a calibration artifact. Transfer behaviour is **grid-dependent**
-  (e.g. CigreMV transfers well, TestGrid collapses); always read the per-grid `benchmark` column.
+- **No dedicated `no_event` episodes** — neither family of any reference grid contains quiescent
+  episodes. The `no_event` / `normal` label is carried by the inactive pre- and post-event windows
+  of fault and switching episodes, so event-detection negatives are never drawn from separate
+  steady-state simulations. Window-level family is derived from `y_event_present`/`y_fault_present`,
+  not the episode-level `event_family` column.
+- **Operating-point shift (adapt_grid → benchmark)** — the `benchmark` family is simulated at a
+  fixed operating point with its own event-parameter sweeps. The median per-window phase-current RMS
+  is 0.8–1.0× that of the `adapt_grid` training partition, and its spread is much narrower on the
+  110 kV and 345 kV grids (the paper's Supplementary Table S14). Behaviour under this shift depends
+  on the grid, the view and the model; always read the per-grid `benchmark` column.
 - **Grid-confounded grounding & events** — grounding types and HIF/cable/motor events are
   grid-restricted (IEEE-39 is solid-ground, no MV events), so grounding/event-stratified robustness
   is confounded with grid. The 9-class FC vocabulary includes HIF, which has **zero support** on

@@ -14,7 +14,7 @@
 ## Notes
 
 - **Grid-restricted classes** (HIF / cable / motor MV-only, `gen_trip` EHV-only, `ibr_trip` on IBR
-  grids, `no_event` episodes HV-only; [taxonomy.md](../taxonomy.md)) have zero support where absent
+  grids; [taxonomy.md](../taxonomy.md)) have zero support where absent
   (NaN per-class F1). Report **per grid**, never pooled.
 - Per-class F1 exposes the hard confusions (e.g. inrush vs. incipient fault).
 - The 3-class family granularity (normal / switching / fault) is its own task,

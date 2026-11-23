@@ -22,17 +22,17 @@ Grid keys, levels and frequencies: [grids.md](grids.md).
 
 ## Fault events (9) — `event_family = fault`, `event_type` prefix `flt_`
 
-| event_type | category | grounded | faulted phases | levels present | episodes |
+| event_type | category | grounded | faulted phases | levels present | `adapt_grid` episodes |
 |---|---|---|---|---|---|
-| `flt_1phg_shc` | shc | yes | A · B · C (single, per episode) | MV/HV/EHV | 5622 |
-| `flt_1phg_shc_w_arc` | shc | yes | A · B · C | MV/HV/EHV | 5670 |
-| `flt_2ph_shc` | shc | **no** | AB · AC · BC | MV/HV/EHV | 5547 |
-| `flt_2phg_shc` | shc | yes | AB · AC · BC | MV/HV/EHV | 5539 |
-| `flt_3ph_shc` | shc | **no** | ABC | MV/HV/EHV | 5597 |
-| `flt_1phg_incipient` | incipient | yes | A · B · C | MV/HV/EHV | 2589 |
-| `flt_1phg_incipient_w_arc` | incipient | yes | A · B · C | MV/HV/EHV | 2640 |
-| `flt_1phg_hif` | **hif** | yes | A · B · C | **MV only** | 555 |
-| `flt_1phg_hif_w_arc` | **hif** | yes | A · B · C | **MV only** | 560 |
+| `flt_1phg_shc` | shc | yes | A · B · C (single, per episode) | MV/HV/EHV | 2420 |
+| `flt_1phg_shc_w_arc` | shc | yes | A · B · C | MV/HV/EHV | 2492 |
+| `flt_2ph_shc` | shc | **no** | AB · AC · BC | MV/HV/EHV | 2466 |
+| `flt_2phg_shc` | shc | yes | AB · AC · BC | MV/HV/EHV | 2416 |
+| `flt_3ph_shc` | shc | **no** | ABC | MV/HV/EHV | 2527 |
+| `flt_1phg_incipient` | incipient | yes | A · B · C | MV/HV/EHV | 2333 |
+| `flt_1phg_incipient_w_arc` | incipient | yes | A · B · C | MV/HV/EHV | 2479 |
+| `flt_1phg_hif` | **hif** | yes | A · B · C | **MV only** | 477 |
+| `flt_1phg_hif_w_arc` | **hif** | yes | A · B · C | **MV only** | 456 |
 
 Categories: **shc** = solid/low-impedance short circuit; **hif** = high-impedance ground fault;
 **incipient** = self-extinguishing high-impedance fault. `_w_arc` = Kizilcay arc model on the
@@ -41,18 +41,18 @@ and is recorded in `y_phase_{A,B,C}`).
 
 ## Operating / non-fault events (14)
 
-| event_type | family | switch category | action | levels present | episodes |
+| event_type | family | switch category | action | levels present | `adapt_grid` episodes |
 |---|---|---|---|---|---|
-| `switch_load_on` / `switch_load_off` | switching | load | on/off | MV/HV/EHV | 2353 / 2315 |
-| `switch_cap_on` / `switch_cap_off` | switching | capacitor | on/off | MV/HV/EHV | 2312 / 2319 |
-| `switch_ohl_on` / `switch_ohl_off` | switching | ohl | on/off | MV/HV/EHV | 2365 / 2334 |
-| `switch_inrush_lv` | switching | inrush | on (LV trafo) | MV/HV/EHV | 2305 |
-| `switch_inrush_hv` | switching | inrush | on (HV trafo) | MV/HV (not EHV) | 1709 |
-| `switch_ibr_trip` | switching | ibr | trip | MV + TestGrid HV | 1147 |
-| `switch_cable_on` / `switch_cable_off` | switching | cable | on/off | **MV only** | 463 / 434 |
-| `switch_motor_start` | switching | motor_start | start | **MV only** | 472 |
-| `switch_gen_trip` | switching | generator | trip | **EHV only** | 675 |
-| `no_event` | normal | — | — | **HV only** (DoubleLine, TestGrid) | 1841 |
+| `switch_load_on` / `switch_load_off` | switching | load | on/off | MV/HV/EHV | 2357 / 2408 |
+| `switch_cap_on` / `switch_cap_off` | switching | capacitor | on/off | MV/HV/EHV | 2423 / 2363 |
+| `switch_ohl_on` / `switch_ohl_off` | switching | ohl | on/off | MV/HV/EHV | 2423 / 2404 |
+| `switch_inrush_lv` | switching | inrush | on (LV trafo) | MV/HV/EHV | 2344 |
+| `switch_inrush_hv` | switching | inrush | on (HV trafo) | MV/HV (not EHV) | 1728 |
+| `switch_ibr_trip` | switching | ibr | trip | MV + TestGrid HV | 1093 |
+| `switch_cable_on` / `switch_cable_off` | switching | cable | on/off | **MV only** | 493 / 420 |
+| `switch_motor_start` | switching | motor_start | start | **MV only** | 457 |
+| `switch_gen_trip` | switching | generator | trip | **EHV only** | 665 |
+| `no_event` | normal | — | — | all grids, as the label of inactive windows; no dedicated episodes | — |
 
 ## Grid × event availability matrix
 
@@ -64,7 +64,7 @@ and is recorded in `y_phase_{A,B,C}`).
 | `flt_2ph_shc` / `flt_2phg_shc` / `flt_3ph_shc` | ✓ | ✓ | ✓ | ✓ |
 | `flt_1phg_incipient`(+`_w_arc`) | ✓ | ✓ | ✓ | ✓ |
 | `flt_1phg_hif`(+`_w_arc`) | ✓ | · | · | · |
-| `no_event` | · | ✓ | ✓ | · |
+| `no_event` (inactive windows; no dedicated episodes) | ✓ | ✓ | ✓ | ✓ |
 | `switch_load_*` / `switch_cap_*` / `switch_ohl_*` / `switch_inrush_lv` | ✓ | ✓ | ✓ | ✓ |
 | `switch_inrush_hv` | ✓ | ✓ | ✓ | · |
 | `switch_ibr_trip` | ✓ | · | ✓ | · |
@@ -80,9 +80,9 @@ and is recorded in `y_phase_{A,B,C}`).
 - **IBR trip → grids with inverter-based resources** (CigreMV + TestGrid110kV); DoubleLine and
   IEEE-39 (as configured) have none.
 - **HV-trafo inrush → not on EHV** (the modeled EHV grid has no higher level to energize from).
-- **`no_event` (quiescent background) → only the HV grids** (DoubleLine, TestGrid). CigreMV and
-  IEEE-39 carry **no `no_event` episodes** — relevant for event-detection negatives and for any
-  same-grid transfer of an "event vs. quiescent" task on those grids.
+- **`no_event` → no dedicated episodes.** Neither family of any reference grid contains quiescent
+  (`no_event`) episodes. The `no_event` / `normal` label is carried by the inactive pre- and
+  post-event windows of the fault and switching episodes, so it has support on all four grids.
 
 ## Label fields in `y` (per window)
 
@@ -94,16 +94,20 @@ and is recorded in `y_phase_{A,B,C}`).
 
 ## `adapt_grid` vs `benchmark` availability (per grid)
 
-The two families share the **same event vocabulary on every grid**, with a single exception:
-`no_event` is **`adapt_grid`-only** on the two HV grids (and absent entirely on MV/EHV). Nothing
-is `benchmark`-only anywhere.
+The two families share the **same event vocabulary on every grid**; nothing is `adapt_grid`-only or
+`benchmark`-only.
 
 | grid | adapt_grid types | benchmark types | difference |
 |---|:--:|:--:|---|
-| DoubleLine (HV) | 16 | 15 | `no_event` adapt_grid-only (1218 ep) |
-| TestGrid110kV (HV) | 17 | 16 | `no_event` adapt_grid-only (623 ep) |
+| DoubleLine (HV) | 15 | 15 | identical |
+| TestGrid110kV (HV) | 16 | 16 | identical |
 | CigreMV (MV) | 21 | 21 | identical |
 | IEEE-39 (EHV) | 15 | 15 | identical |
+
+Episode counts in the tables above are the `adapt_grid` episodes of the four reference grids
+(train + validation + test), summed from the committed split metadata
+(`src/evemtbench/splits/v1.0/held_out/<grid>/meta.json`). Window support per class in both families
+is in the paper's Supplementary Tables S19 and S20.
 
 So fault and switching types transfer cleanly (every such type in `adapt_grid` is also in
 `benchmark`); only an "event-vs-quiescent" task lacks a `benchmark` negative. The families still

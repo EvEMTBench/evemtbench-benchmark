@@ -29,7 +29,7 @@ authors:
 repository-code: "https://github.com/EvEMTBench/evemtbench-benchmark"
 license: MIT
 version: 1.3.0
-date-released: 2026-11-18
+date-released: 2026-11-23
 keywords:
   - power system protection
   - machine learning
